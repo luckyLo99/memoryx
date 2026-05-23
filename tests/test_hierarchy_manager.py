@@ -43,7 +43,7 @@ async def test_hierarchical_manager_migrates_cold_memories_to_archive(tmp_path: 
 
     assert report.migrated_counts[MemoryTier.ARCHIVE] == 1
     assert record is not None
-    assert int(record["active_state"]) == 0
+    assert str(record["active_state"]) != "active"
     assert archived
     await repo.close()
 

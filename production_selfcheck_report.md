@@ -2,33 +2,31 @@
 
 - Root: `/home/lucky/memoryx`
 - Python: `3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]`
-- Started: `2026-05-23T10:58:58.016575+00:00`
-- Finished: `2026-05-23T10:59:01.729941+00:00`
-- Duration: `3.713s`
-- Worst severity: **ERROR**
+- Started: `2026-05-23T11:11:04.364223+00:00`
+- Finished: `2026-05-23T11:11:08.057620+00:00`
+- Duration: `3.693s`
+- Worst severity: **WARN**
 
 ## Counts
 
 | Severity | Count |
 |---|---:|
 | FATAL | 0 |
-| ERROR | 1 |
-| WARN | 4 |
-| INFO | 23 |
+| ERROR | 0 |
+| WARN | 3 |
+| INFO | 24 |
 
 ## Production readiness
 
-❌ Not production-ready by this suite.
+✅ Production-ready by this suite.
 
 ## Findings
 
 | Severity | Check | Status | Path | Message |
 |---|---|---|---|---|
-| ERROR | `source_schema_consistency` | `fail` | `` | Source contains SQL/schema references incompatible with detected schema. |
 | WARN | `async_safety` | `warn` | `` | Daemon thread detected in async path; verify no shared asyncio state. |
 | WARN | `self_editor_static_contract` | `warn` | `memoryx/self_editor.py` | SelfEditor.apply contains UPDATE memories; verify it only appears in safe repository-backed paths. |
 | WARN | `self_editor_static_contract` | `warn` | `memoryx/self_editor.py` | SelfEditor.apply builds UPDATE columns from changes dict; ensure column whitelist is enforced. |
-| WARN | `source_schema_consistency` | `warn` | `` | Source contains suspicious active_state numeric usage. |
 | INFO | `cognitive_static_contract` | `pass` | `` | Expected cognitive module files are present. |
 | INFO | `cognitive_static_contract` | `pass` | `` | Feedback LESSON creation policy appears to handle propagated evidence. |
 | INFO | `cognitive_static_contract` | `pass` | `` | Cognitive schema compatibility helpers are present. |
@@ -51,6 +49,7 @@
 | INFO | `schema_contract` | `pass` | `` | memories.active_state type is TEXT. |
 | INFO | `schema_contract` | `pass` | `` | Cognitive schema tables are present. |
 | INFO | `secret_scan` | `pass` | `` | No obvious hardcoded secrets detected by built-in patterns. |
+| INFO | `source_schema_consistency` | `pass` | `` | No fatal legacy SQL/schema references detected. |
 | INFO | `sqlite_capabilities` | `pass` | `` | SQLite and FTS5 are available. |
 
 ## Agent repair guidance

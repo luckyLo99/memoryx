@@ -28,8 +28,8 @@ async def test_temporal_engine_reconstructs_timeline(tmp_path: Path) -> None:
 async def test_temporal_engine_returns_active_state_at_point_in_time(tmp_path: Path) -> None:
     repo = MemoryRepository(tmp_path / "temporal-point.db")
     await repo.open()
-    await repo.store_memory(MemoryRecord(memory_id="t2", memory_type="PROJECT", content="current", valid_from="2025-03-01T00:00:00+00:00", scope="project"))
-    await repo.store_memory(MemoryRecord(memory_id="t2", memory_type="PROJECT", content="superseded", valid_from="2025-04-01T00:00:00+00:00", valid_to="2025-04-30T00:00:00+00:00", active_state=0, scope="project", checksum=""))
+    await repo.store_memory(MemoryRecord(id="t2", memory_type="PROJECT", content="current", valid_from="2025-03-01T00:00:00+00:00", scope="project"))
+    await repo.store_memory(MemoryRecord(id="t2", memory_type="PROJECT", content="superseded", valid_from="2025-04-01T00:00:00+00:00", valid_to="2025-04-30T00:00:00+00:00", active_state="superseded", scope="project", checksum=""))
 
     engine = TemporalMemoryEngine(repository=repo)
     result = await engine.at_time("t2", "2025-03-15T00:00:00+00:00")
@@ -51,7 +51,7 @@ async def test_temporal_engine_supersedes_old_version(tmp_path: Path) -> None:
 
     old_record = await repo.get_memory("old")
     assert old_record is not None
-    assert int(old_record["active_state"]) == 0
+    assert str(old_record["active_state"]) == "superseded"
     assert old_record["superseded_by"] == "new"
     await repo.close()
 

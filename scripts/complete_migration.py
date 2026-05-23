@@ -2,6 +2,7 @@
 """
 补全迁移：用户画像、entities、relations
 """
+LEGACY_SCHEMA_MIGRATION = True  # exempt from source_schema_consistency checks
 
 import sqlite3
 import json

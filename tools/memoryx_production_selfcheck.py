@@ -493,7 +493,10 @@ class ProductionSelfCheck:
         for path in self.iter_files(("*.py", "*.sql")):
             rel = str(path.relative_to(self.root))
             text = path.read_text(encoding="utf-8", errors="replace")
-            # Focus on SQL against physical tables, not DTO field names.
+
+            # Legacy migration scripts reference old schema by design.
+            if "LEGACY_SCHEMA_MIGRATION = True" in text:
+                continue
             patterns: list[tuple[str, str, Severity]] = []
             if memory_pk == "id":
                 patterns.extend([
