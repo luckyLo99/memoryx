@@ -2,6 +2,15 @@
 
 All notable changes to MemoryX are documented in this file.
 
+## [Unreleased]
+
+### Added
+- P11 cognitive guard: claim verification against MemoryX evidence
+- LESSON policy enforcement: allow/warn/block/require_dry_run/require_tool_verification
+- Narrative reflection: synthesize task/opinion/lesson/claim into periodic reflections
+- Guarded generation: CognitiveGuard for answer + action verification
+- REST /v1/cognitive/verify-answer, /v1/cognitive/evaluate-action, /v1/cognitive/narrative-reflection
+
 ## [1.1.0-rc1] - 2026-05-23
 
 ### Added
