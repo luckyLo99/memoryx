@@ -22,6 +22,8 @@ class HybridRetrievalEngine:
         scope_filter: str | None = None,
         session_id: str | None = None,
         include_global: bool = True,
+        include_lessons: bool = True,
+        explain_scores: bool = False,
         tag_filter: list[str] | None = None,
         tag_mode: str = "any",
         fusion_method: str = "weighted",
@@ -123,6 +125,19 @@ class HybridRetrievalEngine:
             )
 
         results.sort(key=lambda item: item.final_score, reverse=True)
+
+        # LESSON fusion: boost matching lesson memories
+        if include_lessons:
+            results = await self._merge_lesson_candidates(
+                results,
+                query=query,
+                intent=str(intent.value) if intent else None,
+                session_id=session_id,
+                scope_filter=scope_filter,
+                include_global=include_global,
+                limit=limit,
+            )
+
         return results[:limit]
 
     @staticmethod
@@ -250,3 +265,67 @@ class HybridRetrievalEngine:
         if intent:
             parts.append(f"intent={intent.value}")
         return ", ".join(parts)
+
+    # ── LESSON retrieval boost ──
+
+    async def _merge_lesson_candidates(
+        self,
+        results: list[RetrievalResult],
+        *,
+        query: str,
+        intent: str | None,
+        session_id: str | None,
+        scope_filter: str | None,
+        include_global: bool,
+        limit: int,
+    ) -> list[RetrievalResult]:
+        from memoryx.cognitive.lessons import LessonPolicyEngine
+        engine = LessonPolicyEngine(repository=self.repository)
+        lessons = await engine.match(
+            query=query,
+            intent=intent,
+            session_id=session_id,
+            scope_filter=scope_filter,
+            include_global=include_global,
+            limit=max(5, limit),
+        )
+        if not lessons:
+            return results
+
+        by_id = {r.memory_id: r for r in results}
+        for lesson in lessons:
+            mid = lesson["memory_id"]
+            match_score = float(lesson.get("lesson_match_score", 0.0))
+            boost = 0.35 + 0.55 * match_score
+
+            if mid in by_id:
+                item = by_id[mid]
+                item.final_score = item.final_score + boost
+                item.explanation = item.explanation + f", lesson_boost={boost:.2f}"
+                continue
+
+            item = self._lesson_to_retrieval_result(lesson, boost=boost)
+            results.append(item)
+
+        results.sort(key=lambda r: r.final_score, reverse=True)
+        return results[:limit]
+
+    @staticmethod
+    def _lesson_to_retrieval_result(lesson: dict, *, boost: float) -> RetrievalResult:
+        mid = lesson.get("memory_id", "")
+        return RetrievalResult(
+            memory_id=mid,
+            content=lesson.get("lesson_text") or lesson.get("content", ""),
+            memory_type="LESSON",
+            scope=lesson.get("scope", "global"),
+            semantic_score=0.0,
+            keyword_score=float(lesson.get("lesson_match_score", 0.0)),
+            temporal_score=0.0,
+            entity_score=0.0,
+            importance_score=float(lesson.get("severity", 0.0)),
+            episodic_score=0.0,
+            final_score=min(1.0, 0.60 + boost),
+            explanation=f"lesson_boost={boost:.2f},"
+            f"match={lesson.get('lesson_match_score',0):.2f},"
+            f"policy={lesson.get('policy_type','')}",
+        )

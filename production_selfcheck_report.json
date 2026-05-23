@@ -1,14 +1,14 @@
 {
   "stats": {
-    "started_at": "2026-05-23T10:49:26.602849+00:00",
-    "finished_at": "2026-05-23T10:49:30.854389+00:00",
-    "duration_seconds": 4.252,
+    "started_at": "2026-05-23T10:58:58.016575+00:00",
+    "finished_at": "2026-05-23T10:59:01.729941+00:00",
+    "duration_seconds": 3.713,
     "root": "/home/lucky/memoryx",
     "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
     "counts": {
-      "INFO": 22,
+      "INFO": 23,
       "WARN": 4,
-      "ERROR": 2,
+      "ERROR": 1,
       "FATAL": 0
     }
   },
@@ -256,10 +256,10 @@
     },
     {
       "check": "retrieval_static_contract",
-      "severity": "ERROR",
-      "status": "fail",
-      "message": "Retrieval engine does not appear to boost or include LESSON memories.",
-      "path": "memoryx/retrieval/engine.py",
+      "severity": "INFO",
+      "status": "pass",
+      "message": "Retrieval engine appears lesson-aware.",
+      "path": "",
       "detail": {}
     },
     {
@@ -322,7 +322,7 @@
   ],
   "summary": {
     "production_ready": false,
-    "blocker_count": 2,
+    "blocker_count": 1,
     "warning_count": 4,
     "top_blockers": [
       {
@@ -388,12 +388,6 @@
           ],
           "total": 9
         }
-      },
-      {
-        "check": "retrieval_static_contract",
-        "message": "Retrieval engine does not appear to boost or include LESSON memories.",
-        "path": "memoryx/retrieval/engine.py",
-        "detail": {}
       }
     ],
     "agent_instruction": "Fix all ERROR/FATAL findings first. Do not overwrite db/schema.sql, repository.py, or mcp_server.py from older patches; prefer additive migrations and compatibility adapters."

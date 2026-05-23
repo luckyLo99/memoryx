@@ -2,9 +2,9 @@
 
 - Root: `/home/lucky/memoryx`
 - Python: `3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]`
-- Started: `2026-05-23T10:49:26.602849+00:00`
-- Finished: `2026-05-23T10:49:30.854389+00:00`
-- Duration: `4.252s`
+- Started: `2026-05-23T10:58:58.016575+00:00`
+- Finished: `2026-05-23T10:59:01.729941+00:00`
+- Duration: `3.713s`
 - Worst severity: **ERROR**
 
 ## Counts
@@ -12,9 +12,9 @@
 | Severity | Count |
 |---|---:|
 | FATAL | 0 |
-| ERROR | 2 |
+| ERROR | 1 |
 | WARN | 4 |
-| INFO | 22 |
+| INFO | 23 |
 
 ## Production readiness
 
@@ -24,7 +24,6 @@
 
 | Severity | Check | Status | Path | Message |
 |---|---|---|---|---|
-| ERROR | `retrieval_static_contract` | `fail` | `memoryx/retrieval/engine.py` | Retrieval engine does not appear to boost or include LESSON memories. |
 | ERROR | `source_schema_consistency` | `fail` | `` | Source contains SQL/schema references incompatible with detected schema. |
 | WARN | `async_safety` | `warn` | `` | Daemon thread detected in async path; verify no shared asyncio state. |
 | WARN | `self_editor_static_contract` | `warn` | `memoryx/self_editor.py` | SelfEditor.apply contains UPDATE memories; verify it only appears in safe repository-backed paths. |
@@ -43,6 +42,7 @@
 | INFO | `repository_static_contract` | `pass` | `` | Repository exposes update_memory_versioned(). |
 | INFO | `retrieval_static_contract` | `pass` | `` | Retrieval engine mentions session_id. |
 | INFO | `retrieval_static_contract` | `pass` | `` | Retrieval engine mentions scope_filter and likely filtering logic. |
+| INFO | `retrieval_static_contract` | `pass` | `` | Retrieval engine appears lesson-aware. |
 | INFO | `runtime_smoke` | `pass` | `` | Runtime repository/storage smoke test passed. |
 | INFO | `schema_bootstrap` | `pass` | `` | db/schema.sql bootstraps a temporary SQLite database. |
 | INFO | `schema_contract` | `pass` | `` | Core production tables are present. |
