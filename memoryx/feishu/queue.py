@@ -12,12 +12,13 @@ P14.1 硬化：
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 import time
 from pathlib import Path
 
-from .schemas import FeishuRenderJob, HermesRunState
+from .schemas import AttachmentRef, FeishuRenderJob, HermesRunState
 
 
 class FeishuSQLiteQueue:
@@ -212,15 +213,61 @@ class FeishuSQLiteQueue:
                 job.job_id,
             ))
 
-    def mark_attachment_status(self, att_id: str, *, download_status: str, error_msg: str | None = None) -> None:
+    def mark_attachment_status(self, att_id: str, *, download_status: str, local_path: str | None = None, error_msg: str | None = None) -> None:
         """更新附件下载状态"""
         now = time.time()
         with self._connect() as conn:
-            conn.execute("""
-            UPDATE feishu_attachments
-            SET download_status=?, error_msg=?, updated_at=?
-            WHERE id=?;
-            """, (download_status, error_msg, now, att_id))
+            if local_path is not None:
+                conn.execute("""
+                UPDATE feishu_attachments
+                SET download_status=?, local_path=?, error_msg=?, updated_at=?
+                WHERE id=?;
+                """, (download_status, local_path, error_msg, now, att_id))
+            else:
+                conn.execute("""
+                UPDATE feishu_attachments
+                SET download_status=?, error_msg=?, updated_at=?
+                WHERE id=?;
+                """, (download_status, error_msg, now, att_id))
+
+    async def download_attachments(self, job: FeishuRenderJob, client: "FeishuClient") -> list[AttachmentRef]:
+        """下载 job 的所有待处理附件，返回更新后的 attachment refs"""
+        attachments = list(job.attachments)
+        pending = [(i, a) for i, a in enumerate(attachments) if a.local_path is None and (a.image_key or a.file_key)]
+
+        if not pending:
+            return attachments
+
+        async def download_one(idx: int, att: AttachmentRef) -> AttachmentRef | Exception:
+            try:
+                if att.image_key:
+                    local_path = await client.download_image(image_key=att.image_key)
+                elif att.file_key:
+                    local_path = await client.download_file(file_key=att.file_key)
+                else:
+                    return att
+
+                # 更新本地路径
+                att.local_path = str(local_path)
+                # 更新队列中的状态
+                att_id = f"{job.job_id}_att_{idx}"
+                self.mark_attachment_status(att_id, download_status="downloaded", local_path=str(local_path))
+                return att
+            except Exception as e:
+                att_id = f"{job.job_id}_att_{idx}"
+                self.mark_attachment_status(att_id, download_status="failed", error_msg=str(e))
+                return e
+
+        # 并发下载
+        tasks = [download_one(idx, att) for idx, att in pending]
+        results = await asyncio.gather(*tasks)
+
+        # 更新 results 到 attachments
+        for i, result in enumerate(results):
+            if isinstance(result, AttachmentRef):
+                attachments[pending[i][0]] = result
+
+        return attachments
 
     def get_attachments_for_job(self, job_id: str) -> list[dict]:
         """获取 job 的所有附件"""

@@ -191,28 +191,78 @@ class FeishuClient:
             )
         return data["data"]["file_key"]
 
-    async def download_image(self, *, image_key: str, save_path: str | Path) -> Path:
-        """下载图片到本地"""
+    async def download_image(self, *, image_key: str, save_path: str | Path | None = None) -> Path:
+        """下载图片到本地（带 sha256 哈希和 spool 管理）"""
+        import hashlib
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(
+                f"{self.base_url}/open-apis/im/v1/images/{image_key}/image",
+                headers=await self._headers(),
+            )
+
+        if resp.status_code >= 400:
+            raise FeishuAPIError(f"Failed to download image {image_key}: status={resp.status_code}")
+
+        # 计算 sha256
+        content = resp.content
+        sha256 = hashlib.sha256(content).hexdigest()
+
+        # 确定保存路径
+        if save_path is None:
+            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            # 使用 image_key 前 8 位 + sha256 前 8 位作为文件名，避免冲突
+            file_name = f"img_{image_key[:8]}_{sha256[:8]}.png"
+            save_path = spool_dir / file_name
+
         path = Path(save_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        data = await self._request_json(
-            "GET",
-            f"{self.base_url}/open-apis/im/v1/images/{image_key}/image",
-            headers=await self._headers(),
-        )
-        # 飞书图片下载返回二进制，需要特殊处理
-        # 这里假设 data 包含 image_data 或直接是二进制
+        # 如果文件已存在且 sha256 匹配，直接返回
+        if path.exists():
+            existing_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+            if existing_sha == sha256:
+                return path
+
+        # 写入文件
+        path.write_bytes(content)
         return path
 
-    async def download_file(self, *, file_key: str, save_path: str | Path) -> Path:
-        """下载文件到本地"""
+    async def download_file(self, *, file_key: str, save_path: str | Path | None = None) -> Path:
+        """下载文件到本地（带 sha256 哈希和 spool 管理）"""
+        import hashlib
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(
+                f"{self.base_url}/open-apis/im/v1/files/{file_key}/file",
+                headers=await self._headers(),
+            )
+
+        if resp.status_code >= 400:
+            raise FeishuAPIError(f"Failed to download file {file_key}: status={resp.status_code}")
+
+        # 计算 sha256
+        content = resp.content
+        sha256 = hashlib.sha256(content).hexdigest()
+
+        # 确定保存路径
+        if save_path is None:
+            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            # 使用 file_key 前 8 位 + sha256 前 8 位作为文件名
+            file_name = f"file_{file_key[:8]}_{sha256[:8]}"
+            save_path = spool_dir / file_name
+
         path = Path(save_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        data = await self._request_json(
-            "GET",
-            f"{self.base_url}/open-apis/im/v1/files/{file_key}/file",
-            headers=await self._headers(),
-        )
+        # 如果文件已存在且 sha256 匹配，直接返回
+        if path.exists():
+            existing_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+            if existing_sha == sha256:
+                return path
+
+        # 写入文件
+        path.write_bytes(content)
         return path

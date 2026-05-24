@@ -74,6 +74,11 @@ class FeishuHermesBotService:
             return False
 
         job.state = HermesRunState.RUNNING
+
+        # P14.2: 下载附件（如果有）
+        job.attachments = await self.queue.download_attachments(job, self.client)
+        self.queue.update(job)
+
         await self._update_card(job)
 
         last_update = 0.0
