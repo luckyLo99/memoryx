@@ -80,15 +80,15 @@ class FeishuHermesBotService:
 
         card = self.renderer.render(job)
 
-        resp = await self.client.send_message(
-            receive_id=job.chat_id,
-            receive_id_type=job.receive_id_type,
-            msg_type="interactive",
-            content=card,
-            uuid=job.job_id,
-        )
-
         try:
+            resp = await self.client.send_message(
+                receive_id=job.chat_id,
+                receive_id_type=job.receive_id_type,
+                msg_type="interactive",
+                content=card,
+                uuid=job.job_id,
+            )
+
             job.card_message_id = resp["data"]["message_id"]
             self.queue.update(job)
             # 追踪：卡片发送成功
