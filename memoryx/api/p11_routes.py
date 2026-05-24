@@ -179,22 +179,18 @@ async def _context_via_repo(
         return []
 
     try:
-        tokens = " OR ".join(
-            t for t in "".join(ch.lower() if ch.isalnum() else " " for ch in query).split()
-            if t
-        ) or query
-        cursor = conn.execute(
-            """
-            SELECT id, memory_type, content, importance_score, created_at,
-                   source_type, verification_status, trust_score
-            FROM memories
-            WHERE active_state = 'active'
-              AND (content LIKE ? OR content LIKE ? OR content LIKE ?)
-            ORDER BY importance_score DESC, created_at DESC
-            LIMIT ?
-            """,
-            (f"%{query}%", f"%{query[:50]}%", f"%{_first_word(query)}%", limit),
-        )
+        patterns = _cjk_like_patterns(query)
+        placeholders = " OR ".join(f"content LIKE ?" for _ in patterns)
+        sql = f"""
+        SELECT id, memory_type, content, importance_score, created_at,
+               source_type, verification_status, trust_score
+        FROM memories
+        WHERE active_state = 'active'
+          AND ({placeholders})
+        ORDER BY importance_score DESC, created_at DESC
+        LIMIT ?
+        """
+        cursor = conn.execute(sql, (*patterns, limit))
         rows = cursor.fetchall()
         return [
             {
@@ -214,7 +210,43 @@ async def _context_via_repo(
 
 
 def _first_word(s: str) -> str:
-    return s.split(maxsplit=1)[0] if s.strip() else ""
+    """Return the first whitespace-delimited word, or the first 3 CJK chars for Chinese queries."""
+    if not s.strip():
+        return ""
+    parts = s.split(maxsplit=1)
+    if len(parts) > 1:
+        return parts[0]
+    # Single token with no whitespace — probably Chinese; use first 3 chars
+    return s[:3]
+
+
+def _cjk_like_patterns(query: str) -> list[str]:
+    """Generate LIKE patterns for CJK queries where whitespace split is insufficient.
+
+    For a query like '回答偏好', produces patterns that match individual character
+    occurrences in content (e.g. '%答%' finds '回答' inside '简洁但有结构的回答').
+    """
+    patterns = [f"%{query}%"]
+    if not query.strip():
+        return patterns
+
+    parts = query.split()
+    if len(parts) > 1:
+        # Multi-word query — already handled by _first_word
+        return patterns
+
+    # Single token — check if it's CJK
+    cjk_count = sum(1 for ch in query if "\u4e00" <= ch <= "\u9fff" or "\u3000" <= ch <= "\u303f")
+    if cjk_count <= 1:
+        return patterns
+
+    # For CJK queries, add individual character patterns
+    chars = list(query)
+    # Add every 2nd char to catch common word boundaries
+    for i in range(1, min(len(chars), 5)):
+        patterns.append(f"%{chars[i]}%")
+
+    return patterns
 
 
 def _normalize_retrieval_results(result: Any) -> list[Any]:

@@ -1,0 +1,10 @@
+[Unit]
+Description=MemoryX Trust/Forgetting Maintenance
+After=memoryx-rest.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/lucky/memoryx
+Environment=MEMORYX_DB_PATH=/home/lucky/memoryx/data/memoryx.db
+EnvironmentFile=-/home/lucky/memoryx/.env
+ExecStart=/home/lucky/memoryx/.venv/bin/python tools/memoryx_forgetting_cycle.py
