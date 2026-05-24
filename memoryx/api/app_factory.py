@@ -11,6 +11,7 @@ Why this shape fits MemoryX + Hermes:
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import os
@@ -30,6 +31,20 @@ from memoryx.api.errors import http_exception_handler, unhandled_exception_handl
 from memoryx.api.p11_routes import create_p11_router
 from memoryx.api.p8_bootstrap import install_p8_observability
 from memoryx.api.rate_limit import EmbeddingConcurrencyGate, SlidingWindowRateLimiter
+
+# ── P14: Feishu UX Adapter ──
+try:
+    from memoryx.feishu import (
+        FeishuClient,
+        FeishuSQLiteQueue,
+        FeishuCardRenderer,
+        FeishuHermesBotService,
+        FeishuTraceStore,
+        create_feishu_router,
+    )
+    FEISHU_AVAILABLE = True
+except ImportError:
+    FEISHU_AVAILABLE = False
 from memoryx.api.rest_schemas import (
     ConsolidationRequest,
     FeedbackRequest,
@@ -96,9 +111,67 @@ def create_app(
             app.state.memoryx = await _build_default_state()
         else:
             app.state.memoryx = initial_state
+
+        # ── P14: Initialize Feishu Bot Service ──
+        feishu_task: asyncio.Task | None = None
+        if FEISHU_AVAILABLE and os.getenv("FEISHU_APP_ID"):
+            import logging
+            _log = logging.getLogger("memoryx.feishu")
+            try:
+                feishu_client = FeishuClient()
+                queue_db = os.getenv(
+                    "FEISHU_QUEUE_DB",
+                    str(Path(app.state.memoryx.repository.db.db_path).parent / "feishu_queue.db")
+                )
+                feishu_queue = FeishuSQLiteQueue(queue_db)
+                feishu_renderer = FeishuCardRenderer()
+                feishu_trace = FeishuTraceStore(queue_db)
+                feishu_bot = FeishuHermesBotService(
+                    client=feishu_client,
+                    queue=feishu_queue,
+                    renderer=feishu_renderer,
+                    trace_store=feishu_trace,
+                )
+
+                # Simple MemoryX-backed runner (placeholder — Hermes integration TBD)
+                async def _feishu_runner(job, on_delta, on_tool, on_stage=None):
+                    from memoryx.feishu.hermes_runner import RunnerStage
+                    if on_stage:
+                        await on_stage(RunnerStage.GENERATE, "MemoryX 处理中")
+                    answer = f"收到：{job.text}\n\n（MemoryX 飞书适配器已就绪）"
+                    for i in range(0, len(answer), 30):
+                        await on_delta(answer[i:i+30])
+                    return answer
+
+                # Register feishu event routes
+                app.include_router(create_feishu_router(
+                    bot_service=feishu_bot,
+                    queue_db_path=queue_db,
+                ))
+
+                # Background worker: polls feishu queue continuously
+                async def _feishu_worker():
+                    while True:
+                        try:
+                            await feishu_bot.run_worker_once(_feishu_runner)
+                        except Exception:
+                            pass
+                        await asyncio.sleep(1.0)
+
+                feishu_task = asyncio.create_task(_feishu_worker(), name="feishu-worker")
+                _log.info("Feishu bot service started")
+            except Exception as exc:
+                _log.warning("Feishu init skipped: %s", exc)
+
         try:
             yield
         finally:
+            if feishu_task is not None:
+                feishu_task.cancel()
+                try:
+                    await feishu_task
+                except asyncio.CancelledError:
+                    pass
             await _close_state(app.state.memoryx)
 
     app = FastAPI(title="MemoryX API", version="1.1.0", lifespan=lifespan)

@@ -32,10 +32,11 @@ def verify_challenge(payload: dict, verification_token: str) -> dict:
     token = payload.get("token")
     challenge = payload.get("challenge")
 
-    if not token or not challenge:
-        raise ValueError("missing token or challenge in url_verification")
+    if not challenge:
+        raise ValueError("missing challenge in url_verification")
 
-    if token != verification_token:
+    # 如果配置了 verification_token，则校验；未配置则跳过
+    if verification_token and token != verification_token:
         raise ValueError(f"verification token mismatch: expected {verification_token}, got {token}")
 
     return {"challenge": challenge}
