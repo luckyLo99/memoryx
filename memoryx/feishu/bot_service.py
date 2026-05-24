@@ -10,13 +10,16 @@ P14.3 集成：
 """
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from .client import FeishuClient
 from .queue import FeishuSQLiteQueue
 from .renderer import FeishuCardRenderer
 from .schemas import (
+    AttachmentRef,
     FeishuRenderJob,
     HermesRunState,
     ToolCallRecord,
@@ -26,6 +29,8 @@ from .schemas import (
 from .state_machine import assert_transition, STATE_VIEW
 from .update_coalescer import CardUpdateCoalescer
 from .overflow import CardOverflowPolicy, OverflowResult
+from .overflow_file import OverflowFileWriter
+from .output_policy import FeishuOutputPolicy
 from .attachment_prepare import AttachmentPreparer, PreparedAttachment
 from .trace import FeishuTraceStore
 from .hermes_runner import HermesRunner as RealHermesRunner, RunnerStage
@@ -50,6 +55,8 @@ class FeishuHermesBotService:
         renderer: FeishuCardRenderer | None = None,
         update_interval_seconds: float = 0.8,
         overflow_policy: CardOverflowPolicy | None = None,
+        overflow_file_writer: OverflowFileWriter | None = None,
+        output_policy: FeishuOutputPolicy | None = None,
         attachment_preparer: AttachmentPreparer | None = None,
         trace_store: FeishuTraceStore | None = None,
         coalescer: CardUpdateCoalescer | None = None,
@@ -59,6 +66,10 @@ class FeishuHermesBotService:
         self.renderer = renderer or FeishuCardRenderer()
         self.update_interval_seconds = update_interval_seconds
         self.overflow_policy = overflow_policy or CardOverflowPolicy()
+        self.overflow_file_writer = overflow_file_writer or OverflowFileWriter(
+            spool_dir=Path(os.getenv("FEISHU_SPOOL_DIR", "./data/feishu_spool"))
+        )
+        self.output_policy = output_policy or FeishuOutputPolicy()
         self.attachment_preparer = attachment_preparer or AttachmentPreparer()
         self.trace_store = trace_store
         self.coalescer = coalescer or CardUpdateCoalescer(min_interval=update_interval_seconds)
@@ -130,9 +141,7 @@ class FeishuHermesBotService:
         if not job:
             return False
 
-        job.state = HermesRunState.RUNNING
-
-        # 记录追踪
+        # 记录追踪（claim_next 已设 state=RUNNING, visible_state=THINKING）
         if self.trace_store:
             self.trace_store.record(
                 job_id=job.job_id,
@@ -188,17 +197,59 @@ class FeishuHermesBotService:
             if final_answer:
                 job.answer = final_answer
 
-            # P14.3: 溢出处理
+            # P14.4: 溢出处理 — 真正写文件并上传，不说谎
             overflow = self.overflow_policy.split(job.answer)
-            job.answer = overflow.card_text
-            if overflow.overflow and self.trace_store:
-                self.trace_store.record(
-                    job_id=job.job_id,
-                    trace_id=job.trace_id,
-                    phase="generate",
-                    event_type="overflow",
-                    payload={"reason": overflow.overflow_reason},
-                )
+            if overflow.overflow:
+                job.answer = overflow.card_text
+                if self.trace_store:
+                    self.trace_store.record(
+                        job_id=job.job_id,
+                        trace_id=job.trace_id,
+                        phase="generate",
+                        event_type="overflow",
+                        payload={"reason": overflow.overflow_reason},
+                    )
+                try:
+                    md_path = self.overflow_file_writer.write_markdown(
+                        job_id=job.job_id,
+                        title=job.title or "Hermes Answer",
+                        content=overflow.overflow_text,
+                    )
+                    file_key = await self.client.upload_file(
+                        path=str(md_path),
+                        file_type="stream",
+                    )
+                    job.attachments.append(AttachmentRef(
+                        kind="file",
+                        name=md_path.name,
+                        local_path=str(md_path),
+                        file_key=file_key,
+                        status="uploaded",
+                        extra={"note": "完整回答已转为 Markdown 附件"},
+                    ))
+                    if self.trace_store:
+                        self.trace_store.record(
+                            job_id=job.job_id,
+                            trace_id=job.trace_id,
+                            phase="overflow",
+                            event_type="overflow_file_uploaded",
+                            payload={"path": str(md_path), "file_key": file_key},
+                        )
+                except Exception as exc:
+                    job.answer = (
+                        overflow.card_text
+                        + "\n\n⚠️ 完整内容过长，但转附件失败。请查看系统日志或重试。"
+                    )
+                    if self.trace_store:
+                        self.trace_store.record(
+                            job_id=job.job_id,
+                            trace_id=job.trace_id,
+                            phase="overflow",
+                            event_type="overflow_file_failed",
+                            payload={"error": str(exc)[:1000]},
+                        )
+            else:
+                job.answer = overflow.card_text
 
             job.state = HermesRunState.DONE
             job.update_visible_state("done")
@@ -218,6 +269,7 @@ class FeishuHermesBotService:
                 )
         finally:
             await self._update_card(job)
+            self.queue.release_lock(job.job_id)
             self.queue.update(job)
 
             # 追踪：job 完成

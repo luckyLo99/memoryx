@@ -198,17 +198,31 @@ class FeishuSQLiteQueue:
             WHERE job_id=?;
             """, (now, now, row["job_id"]))
 
-            # 读回实际 revision（claim_next 在 SQL 里做了 revision=revision+1）
+            # 读回实际 revision
             updated_row = conn.execute(
-                "SELECT revision FROM feishu_jobs WHERE job_id=?;",
+                "SELECT revision, attempts FROM feishu_jobs WHERE job_id=?;",
                 (row["job_id"],),
             ).fetchone()
             new_revision = updated_row["revision"] if updated_row else (row["revision"] or 0) + 1
+            new_attempts = updated_row["attempts"] if updated_row else (row["attempts"] or 0) + 1
 
+            # 构建返回对象并同步所有字段（防止 SQL 改了但返回对象还旧的）
             payload = json.loads(row["payload_json"])
-            payload["state"] = HermesRunState.RUNNING
-            payload["revision"] = new_revision  # <-- 关键修复：用 SQL 里的实际 revision
-            return FeishuRenderJob.from_dict(payload)
+            job = FeishuRenderJob.from_dict(payload)
+            job.state = HermesRunState.RUNNING
+            job.visible_state = VisibleState.THINKING
+            job.phase = "prepare"
+            job.locked_at = now
+            job.attempts = new_attempts
+            job.revision = new_revision
+
+            # 将同步后的 payload 写回 DB
+            synced_payload = json.dumps(job.to_dict(), ensure_ascii=False)
+            conn.execute(
+                "UPDATE feishu_jobs SET payload_json=? WHERE job_id=?;",
+                (synced_payload, job.job_id),
+            )
+            return job
 
     def rescue_stale_jobs(self, *, stale_after_seconds: int = 120, max_attempts: int = 3) -> int:
         """救回卡住的 job：超过 stale_after_seconds 的 running/thinking 重置为 queued"""
@@ -243,13 +257,13 @@ class FeishuSQLiteQueue:
         return rescued
 
     def update(self, job: FeishuRenderJob) -> None:
-        """更新 job 状态（去掉 revision 过滤，防止状态更新被阻塞）"""
+        """更新 job 状态（不去掉 locked_at，锁由 release_lock 管理）"""
         now = time.time()
 
         with self._connect() as conn:
             conn.execute("""
             UPDATE feishu_jobs
-            SET state=?, visible_state=?, phase=?, revision=?, card_message_id=?, payload_json=?, updated_at=?, locked_at=NULL
+            SET state=?, visible_state=?, phase=?, revision=?, card_message_id=?, payload_json=?, updated_at=?
             WHERE job_id=?;
             """, (
                 str(job.state),
@@ -261,6 +275,15 @@ class FeishuSQLiteQueue:
                 now,
                 job.job_id,
             ))
+
+    def release_lock(self, job_id: str) -> None:
+        """释放 job 的锁（locked_at=NULL）。job 完成或失败时调用。"""
+        now = time.time()
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE feishu_jobs SET locked_at=NULL, updated_at=? WHERE job_id=?;",
+                (now, job_id),
+            )
 
     def mark_attachment_status(self, att_id: str, *, download_status: str, local_path: str | None = None, error_msg: str | None = None) -> None:
         """更新附件下载状态"""

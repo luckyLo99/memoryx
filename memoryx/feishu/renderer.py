@@ -15,6 +15,7 @@ from typing import Any
 
 from .schemas import AttachmentRef, FeishuRenderJob, HermesRunState, ToolCallRecord
 from .stream_sanitizer import StreamSanitizer
+from .render_text import attachment_status_text
 
 
 STATE_META = {
@@ -104,7 +105,8 @@ class FeishuCardRenderer:
         if answer:
             elements.append(self._markdown("**结构化正文**\n" + self._md(answer)))
         elif state in {HermesRunState.QUEUED, HermesRunState.RUNNING}:
-            elements.append(self._markdown(self._md(meta["hint"])))
+            hint = attachment_status_text(job.attachments)
+            elements.append(self._markdown(self._md(hint)))
 
         # 错误信息
         if job.error:
