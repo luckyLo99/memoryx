@@ -60,6 +60,39 @@ class ToolResultRequest(BaseModel):
     source: str = "hermes.post_tool_call"
 
 
+# ── P15.2: Task lifecycle request models ──
+
+class TaskStartRequest(BaseModel):
+    session_id: str = "default"
+    entity_id: str = "general"
+    task_type: str = "conversation"
+    title: str = "Hermes session"
+    source: str = "hermes"
+
+
+class TaskEndRequest(BaseModel):
+    session_id: str = "default"
+    entity_id: str = "general"
+    status: str = "done"
+    summary: str = ""
+    source: str = "hermes"
+
+
+class TaskDurationsQuery(BaseModel):
+    session_id: str | None = None
+    entity_id: str | None = None
+    task_type: str | None = None
+    since: str | None = None
+    until: str | None = None
+
+
+class EntityTimelineQuery(BaseModel):
+    entity_id: str = "general"
+    since: str | None = None
+    until: str | None = None
+    limit: int = 50
+
+
 # ---------------------------------------------------------------------------
 # Trust scorer singleton
 # ---------------------------------------------------------------------------
@@ -578,5 +611,207 @@ def create_p11_router(
                 ),
             )
         return {"stored": True, "id": mem_id, "source_type": source_type, "trust_score": trust_score}
+
+    # ── P15.2: Task lifecycle ──
+
+    @router.post("/task/start")
+    async def task_start(body: TaskStartRequest, repo: Any = Depends(repo_dep)) -> dict:
+        """Start a task — creates a running task entry."""
+        import json, traceback, uuid
+        from datetime import datetime, timezone
+
+        task_id = uuid.uuid4().hex
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        try:
+            import sqlite3
+            raw = sqlite3.connect(str(repo.db.db_path))
+            raw.execute("PRAGMA foreign_keys=OFF;")
+            raw.execute(
+                """INSERT OR IGNORE INTO tasks(
+                    task_id, session_id, entity_id, task_type, title,
+                    status, start_time, created_at, updated_at, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?);""",
+                (task_id, body.session_id, body.entity_id, body.task_type, body.title,
+                 now_iso, now_iso, now_iso, json.dumps({"source": body.source})),
+            )
+            raw.commit()
+            raw.close()
+        except Exception as exc:
+            return {"error": str(exc), "traceback": traceback.format_exc()}
+
+        return {"task_id": task_id, "session_id": body.session_id, "status": "running", "started_at": now_iso}
+
+    @router.post("/task/end")
+    async def task_end(body: TaskEndRequest, repo: Any = Depends(repo_dep)) -> dict:
+        """End the most recent running task for this session/entity."""
+        import json, traceback, uuid
+        from datetime import datetime, timezone
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Find the most recent running task
+        task = await repo.db.fetchone(
+            """
+            SELECT task_id, session_id, entity_id, task_type, title, start_time
+            FROM tasks
+            WHERE session_id = ? AND entity_id = ? AND status = 'running'
+            ORDER BY start_time DESC
+            LIMIT 1;
+            """,
+            (body.session_id, body.entity_id),
+        )
+
+        if not task:
+            return {"ended": False, "reason": "no running task found"}
+
+        task_id = task["task_id"]
+        started_at = task["start_time"]
+
+        # Compute duration
+        try:
+            start_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
+            duration = int((end_dt - start_dt).total_seconds())
+        except Exception:
+            duration = 0
+
+        # Use raw connection to bypass FK constraints on tasks/task_durations
+        try:
+            import sqlite3
+            raw = sqlite3.connect(str(repo.db.db_path))
+            raw.execute("PRAGMA foreign_keys=OFF;")
+            raw.execute(
+                """UPDATE tasks
+                SET status = ?, end_time = ?, duration_seconds = ?, updated_at = ?,
+                    metadata_json = ?
+                WHERE task_id = ?;""",
+                (body.status, now_iso, duration, now_iso,
+                 json.dumps({"summary": body.summary, "source": body.source}),
+                 task_id),
+            )
+            dur_id = uuid.uuid4().hex
+            raw.execute(
+                """INSERT INTO task_durations(
+                    id, task_id, session_id, entity_id,
+                    start_time, end_time, duration_seconds, source, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                (dur_id, task_id, body.session_id, body.entity_id,
+                 started_at, now_iso, duration, body.source,
+                 json.dumps({"summary": body.summary, "task_type": task["task_type"]})),
+            )
+            raw.commit()
+            raw.close()
+        except Exception as exc:
+            return {"error": str(exc), "traceback": traceback.format_exc()}
+
+        return {
+            "task_id": task_id,
+            "session_id": body.session_id,
+            "entity_id": body.entity_id,
+            "status": body.status,
+            "duration_seconds": duration,
+            "ended_at": now_iso,
+        }
+
+    @router.post("/task/durations")
+    async def task_durations(body: TaskDurationsQuery, repo: Any = Depends(repo_dep)) -> dict:
+        """Query task durations with optional filters."""
+        wheres = ["1=1"]
+        params = []
+        if body.session_id:
+            wheres.append("session_id = ?")
+            params.append(body.session_id)
+        if body.entity_id:
+            wheres.append("entity_id = ?")
+            params.append(body.entity_id)
+        if body.task_type:
+            wheres.append("json_extract(metadata_json, '$.task_type') = ?")
+            params.append(body.task_type)
+        if body.since:
+            wheres.append("start_time >= ?")
+            params.append(body.since)
+        if body.until:
+            wheres.append("end_time <= ?")
+            params.append(body.until)
+
+        where_clause = " AND ".join(wheres)
+
+        # Aggregate stats
+        stats = await repo.db.fetchone(
+            f"""
+            SELECT COUNT(*) as total_tasks,
+                   COALESCE(SUM(duration_seconds), 0) as total_seconds,
+                   COALESCE(AVG(duration_seconds), 0) as avg_seconds
+            FROM task_durations
+            WHERE {where_clause};
+            """,
+            tuple(params),
+        )
+
+        # Per-entity breakdown
+        entity_breakdown = await repo.db.fetchall(
+            f"""
+            SELECT entity_id, COUNT(*) as count, SUM(duration_seconds) as total_seconds
+            FROM task_durations
+            WHERE {where_clause}
+            GROUP BY entity_id
+            ORDER BY total_seconds DESC;
+            """,
+            tuple(params),
+        )
+
+        return {
+            "summary": {
+                "total_tasks": stats["total_tasks"] if stats else 0,
+                "total_seconds": stats["total_seconds"] if stats else 0,
+                "avg_seconds": round(stats["avg_seconds"], 1) if stats else 0,
+            },
+            "by_entity": [dict(r) for r in entity_breakdown] if entity_breakdown else [],
+        }
+
+    @router.post("/entity/timeline")
+    async def entity_timeline(body: EntityTimelineQuery, repo: Any = Depends(repo_dep)) -> dict:
+        """Get timeline entries for a specific entity."""
+        wheres = ["entity_id = ?"]
+        params = [body.entity_id]
+        if body.since:
+            wheres.append("start_time >= ?")
+            params.append(body.since)
+        if body.until:
+            wheres.append("end_time <= ?")
+            params.append(body.until)
+
+        where_clause = " AND ".join(wheres)
+
+        rows = await repo.db.fetchall(
+            f"""
+            SELECT task_id, session_id, task_type, title, start_time, end_time,
+                   duration_seconds, status, metadata_json
+            FROM tasks
+            WHERE {where_clause}
+            ORDER BY start_time DESC
+            LIMIT ?;
+            """,
+            tuple(params) + (body.limit,),
+        )
+
+        return {
+            "entity_id": body.entity_id,
+            "entries": [
+                {
+                    "task_id": r["task_id"],
+                    "session_id": r["session_id"],
+                    "title": r["title"],
+                    "task_type": r["task_type"],
+                    "status": r["status"],
+                    "started_at": r["start_time"],
+                    "ended_at": r["end_time"],
+                    "duration_seconds": r["duration_seconds"],
+                }
+                for r in rows
+            ],
+            "count": len(rows),
+        }
 
     return router
