@@ -18,7 +18,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-from .schemas import AttachmentRef, FeishuRenderJob, HermesRunState
+from .schemas import AttachmentRef, FeishuRenderJob, HermesRunState, VisibleState
 
 
 class FeishuSQLiteQueue:
@@ -36,7 +36,7 @@ class FeishuSQLiteQueue:
 
     def _init(self) -> None:
         with self._connect() as conn:
-            # --- feishu_jobs ---
+            # --- feishu_jobs (P14.3: 添加 revision, visible_state, phase) ---
             conn.execute("""
             CREATE TABLE IF NOT EXISTS feishu_jobs (
                 job_id TEXT PRIMARY KEY,
@@ -45,6 +45,9 @@ class FeishuSQLiteQueue:
                 message_id TEXT,
                 card_message_id TEXT,
                 state TEXT NOT NULL,
+                visible_state TEXT NOT NULL DEFAULT 'received',
+                phase TEXT NOT NULL DEFAULT 'received',
+                revision INTEGER NOT NULL DEFAULT 0,
                 priority INTEGER NOT NULL DEFAULT 100,
                 payload_json TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0,
@@ -108,9 +111,9 @@ class FeishuSQLiteQueue:
             conn.execute("""
             INSERT OR REPLACE INTO feishu_jobs(
                 job_id, chat_id, user_id, message_id, card_message_id,
-                state, priority, payload_json, attempts, locked_at,
+                state, visible_state, phase, revision, priority, payload_json, attempts, locked_at,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?);
             """, (
                 job.job_id,
                 job.chat_id,
@@ -118,6 +121,9 @@ class FeishuSQLiteQueue:
                 job.message_id,
                 job.card_message_id,
                 str(job.state),
+                str(job.visible_state),
+                job.phase,
+                job.revision,
                 priority,
                 payload,
                 now,
@@ -188,7 +194,7 @@ class FeishuSQLiteQueue:
 
             conn.execute("""
             UPDATE feishu_jobs
-            SET state='running', locked_at=?, attempts=attempts+1, updated_at=?
+            SET state='running', visible_state='thinking', phase='prepare', revision=revision+1, locked_at=?, attempts=attempts+1, updated_at=?
             WHERE job_id=?;
             """, (now, now, row["job_id"]))
 
@@ -197,20 +203,24 @@ class FeishuSQLiteQueue:
             return FeishuRenderJob.from_dict(payload)
 
     def update(self, job: FeishuRenderJob) -> None:
-        """更新 job 状态"""
+        """更新 job 状态（P14.3: 包含 revision 防乱序）"""
         now = time.time()
 
         with self._connect() as conn:
             conn.execute("""
             UPDATE feishu_jobs
-            SET state=?, card_message_id=?, payload_json=?, updated_at=?, locked_at=NULL
-            WHERE job_id=?;
+            SET state=?, visible_state=?, phase=?, revision=?, card_message_id=?, payload_json=?, updated_at=?, locked_at=NULL
+            WHERE job_id=? AND revision >= ?;
             """, (
                 str(job.state),
+                str(job.visible_state),
+                job.phase,
+                job.revision,
                 job.card_message_id,
                 json.dumps(job.to_dict(), ensure_ascii=False),
                 now,
                 job.job_id,
+                job.revision,  # 只更新 >= 当前 revision 的记录
             ))
 
     def mark_attachment_status(self, att_id: str, *, download_status: str, local_path: str | None = None, error_msg: str | None = None) -> None:

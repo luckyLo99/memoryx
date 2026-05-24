@@ -20,17 +20,17 @@ import time
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from feishu.schemas import (
+from memoryx.feishu.schemas import (
     AttachmentRef,
     FeishuRenderJob,
     HermesRunState,
     ToolCallRecord,
 )
-from feishu.stream_sanitizer import StreamSanitizer
-from feishu.renderer import FeishuCardRenderer, STATE_META
-from feishu.queue import FeishuSQLiteQueue
+from memoryx.feishu.stream_sanitizer import StreamSanitizer
+from memoryx.feishu.renderer import FeishuCardRenderer, STATE_META
+from memoryx.feishu.queue import FeishuSQLiteQueue
 
 
 def _job(**kwargs):
@@ -52,7 +52,7 @@ def test_1_plain_text():
     renderer = FeishuCardRenderer()
     card = renderer.render(job)
     assert card["header"]["template"] == "grey"
-    assert "排队中" in card["header"]["title"]["content"]
+    assert "已收到" in card["header"]["title"]["content"]
     print("✅ 场景 1: 纯文本")
 
 

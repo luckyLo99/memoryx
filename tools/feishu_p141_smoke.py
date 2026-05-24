@@ -24,18 +24,19 @@ import time
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from feishu.schemas import (
+from memoryx.feishu.schemas import (
     AttachmentRef,
     FeishuRenderJob,
     HermesRunState,
     ToolCallRecord,
+    VisibleState,
 )
-from feishu.queue import FeishuSQLiteQueue
-from feishu.dedupe import FeishuEventDedupe
-from feishu.renderer import FeishuCardRenderer
-from feishu.routes import _extract_text, _extract_attachments
+from memoryx.feishu.queue import FeishuSQLiteQueue
+from memoryx.feishu.dedupe import FeishuEventDedupe
+from memoryx.feishu.renderer import FeishuCardRenderer
+from memoryx.feishu.routes import _extract_text, _extract_attachments
 
 
 def _job(**kwargs):
@@ -312,6 +313,9 @@ def test_12_full_render():
     """场景 12: 卡片渲染完整流程"""
     job = _job(
         state=HermesRunState.RUNNING,
+        visible_state=VisibleState.THINKING,
+        phase="generate",
+        revision=3,
         title="小红书运营",
         text="帮我写一个小红书文案",
         context_summary="MemoryX 已检索 5 条相关记忆",
@@ -332,9 +336,11 @@ def test_12_full_render():
     renderer = FeishuCardRenderer()
     card = renderer.render(job)
 
-    # 验证卡片结构
+    # 验证卡片结构 (P14.3: visible_state 决定 header 颜色)
     assert card["header"]["template"] == "blue", f"应返回 blue, got {card['header']['template']}"
-    assert "处理中" in card["header"]["title"]["content"], f"应包含 '处理中'"
+    assert card["header"]["title"]["content"] == "🧠 小红书运营 · 思考中", (
+        f"应包含 '思考中', got: {card['header']['title']['content']}"
+    )
     card_str = json.dumps(card, ensure_ascii=False)
     assert "MemoryX ✅" in card_str
     assert "memoryx_search" in card_str

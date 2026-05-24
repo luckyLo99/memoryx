@@ -44,6 +44,19 @@ STATE_META = {
     },
 }
 
+# P14.3: 可见状态映射
+VISIBLE_STATE_META = {
+    "received":    {"emoji": "📥", "label": "已收到",    "color": "grey"},
+    "queued":      {"emoji": "⏳", "label": "排队中",    "color": "grey"},
+    "thinking":    {"emoji": "🧠", "label": "思考中",    "color": "blue"},
+    "using_tools": {"emoji": "🛠️", "label": "调用工具中", "color": "blue"},
+    "waiting_user":{"emoji": "🟡", "label": "等待确认",  "color": "yellow"},
+    "writing":     {"emoji": "✍️", "label": "整理答案中", "color": "blue"},
+    "done":        {"emoji": "✅", "label": "已完成",    "color": "green"},
+    "degraded":    {"emoji": "🟠", "label": "降级完成",  "color": "yellow"},
+    "error":       {"emoji": "🔴", "label": "失败",     "color": "red"},
+}
+
 
 class FeishuCardRenderer:
     def __init__(self, *, max_answer_chars: int = 9000, max_tool_rows: int = 8) -> None:
@@ -51,15 +64,20 @@ class FeishuCardRenderer:
         self.max_tool_rows = max_tool_rows
 
     def render(self, job: FeishuRenderJob) -> dict[str, Any]:
+        # P14.3: 优先使用可见状态
+        visible = job.visible_state.value if hasattr(job, 'visible_state') else job.state
+        vs_meta = VISIBLE_STATE_META.get(visible, VISIBLE_STATE_META["queued"])
         state = HermesRunState(job.state)
         meta = STATE_META[state]
         elements: list[dict[str, Any]] = []
 
-        # 头部信息
+        # 头部信息（P14.3: 显示 revision 和 phase）
+        revision_info = f" rev {job.revision}" if job.revision > 0 else ""
+        phase_info = f" · {job.phase}" if hasattr(job, 'phase') and job.phase else ""
         elements.append(self._kv_strip([
-            ("状态", f"{meta['emoji']} {meta['label']}"),
+            ("状态", f"{vs_meta['emoji']} {vs_meta['label']}{phase_info}"),
             ("任务", job.title),
-            ("Trace", job.trace_id or job.job_id[:10]),
+            ("Trace", f"{job.trace_id or job.job_id[:10]}{revision_info}"),
         ]))
 
         # MemoryX 状态徽章
@@ -102,10 +120,10 @@ class FeishuCardRenderer:
                 "enable_forward": True,
             },
             "header": {
-                "template": meta["template"],
+                "template": vs_meta["color"],
                 "title": {
                     "tag": "plain_text",
-                    "content": f"{meta['emoji']} {job.title} · {meta['label']}",
+                    "content": f"{vs_meta['emoji']} {job.title} · {vs_meta['label']}",
                 },
             },
             "elements": elements,
