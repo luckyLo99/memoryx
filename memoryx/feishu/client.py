@@ -88,12 +88,25 @@ class FeishuClient:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     resp = await client.request(method, url, **kwargs)
 
-                data = resp.json()
+                try:
+                    data = resp.json()
+                except json.JSONDecodeError:
+                    # 飞书 API 有时返回的 JSON 含额外字符，尝试宽松解析
+                    raw = resp.text.strip()
+                    if not raw:
+                        data = {}
+                    else:
+                        decoder = json.JSONDecoder()
+                        parsed, idx = decoder.raw_decode(raw)
+                        if isinstance(parsed, dict):
+                            data = parsed
+                        else:
+                            data = {}
 
                 # 判断是否可重试
                 is_retryable = (
                     resp.status_code in RETRYABLE_STATUS
-                    or data.get("code") in RETRYABLE_FEISHU_CODE
+                    or (isinstance(data, dict) and data.get("code") in RETRYABLE_FEISHU_CODE)
                 )
 
                 if is_retryable:
@@ -101,12 +114,15 @@ class FeishuClient:
                     await asyncio.sleep(backoff)
                     continue
 
-                if resp.status_code >= 400 or data.get("code", 0) != 0:
+                if resp.status_code >= 400 or (isinstance(data, dict) and data.get("code", 0) != 0):
                     raise FeishuAPIError(f"Feishu API error status={resp.status_code} body={data}")
 
+                # 非 dict 响应（如 int / bool）也视为成功并包装
+                if not isinstance(data, dict):
+                    return {"data": data}
                 return data
 
-            except httpx.HTTPError as exc:
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
                 last_error = exc
                 backoff = min(8.0, 0.5 * (2 ** attempt))
                 await asyncio.sleep(backoff)

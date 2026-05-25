@@ -26,7 +26,8 @@ from .schemas import (
     VisibleState,
     get_visible_state,
 )
-from .state_machine import assert_transition, STATE_VIEW
+from .state_update import transition_job
+from .state_machine import STATE_VIEW
 from .update_coalescer import CardUpdateCoalescer
 from .overflow import CardOverflowPolicy, OverflowResult
 from .overflow_file import OverflowFileWriter
@@ -187,6 +188,16 @@ class FeishuHermesBotService:
             await self._update_card(job)
 
         try:
+            # 追踪：runner 开始
+            if self.trace_store:
+                self.trace_store.record(
+                    job_id=job.job_id,
+                    trace_id=job.trace_id,
+                    phase="runner",
+                    event_type="runner_start",
+                    payload={"runner_type": type(runner).__name__},
+                )
+
             # 使用真实 Hermes Runner
             if isinstance(runner, RealHermesRunner):
                 final_answer = await runner.run(job, on_delta, on_tool, on_stage)
@@ -196,6 +207,16 @@ class FeishuHermesBotService:
 
             if final_answer:
                 job.answer = final_answer
+
+            # 追踪：runner 完成
+            if self.trace_store:
+                self.trace_store.record(
+                    job_id=job.job_id,
+                    trace_id=job.trace_id,
+                    phase="runner",
+                    event_type="runner_done",
+                    payload={"runner_type": type(runner).__name__, "answer_length": len(final_answer or "")},
+                )
 
             # P14.4: 溢出处理 — 真正写文件并上传，不说谎
             overflow = self.overflow_policy.split(job.answer)
@@ -251,13 +272,20 @@ class FeishuHermesBotService:
             else:
                 job.answer = overflow.card_text
 
-            job.state = HermesRunState.DONE
-            job.update_visible_state("done")
+            # 业务成功：通过 transition_job 同步到 DB
+            transition_job(
+                self.queue, self.trace_store, job,
+                state="done", visible_state="done",
+                reason="runner_completed",
+            )
 
         except Exception as exc:
-            job.state = HermesRunState.ERROR
             job.error = str(exc)
-            job.update_visible_state("error")
+            transition_job(
+                self.queue, self.trace_store, job,
+                state="error", visible_state="error",
+                reason="worker_exception",
+            )
 
             if self.trace_store:
                 self.trace_store.record(
@@ -296,7 +324,7 @@ class FeishuHermesBotService:
             message_id=job.card_message_id,
             card=card,
             revision=job.revision,
-            sender=self._do_patch,
+            sender=lambda msg_id, c: self._do_patch(msg_id, c, job=job),
         )
 
         if sent:
@@ -313,12 +341,23 @@ class FeishuHermesBotService:
             # revision 过旧或内容相同，跳过
             pass
 
-    async def _do_patch(self, message_id: str, card: dict) -> None:
-        """实际发送卡片 patch"""
+    async def _do_patch(self, message_id: str, card: dict, job: FeishuRenderJob | None = None) -> None:
+        """实际发送卡片 patch — patch 失败只记 trace，不阻断 job。"""
         try:
             await self.client.patch_message_card(
                 message_id=message_id,
                 card=card,
             )
-        except Exception:
-            pass  # 卡片更新失败不能导致 job 丢失
+        except Exception as exc:
+            if self.trace_store and job:
+                self.trace_store.record(
+                    job_id=job.job_id,
+                    trace_id=job.trace_id,
+                    phase="card_update",
+                    event_type="card_patch_failed",
+                    payload={
+                        "card_message_id": message_id,
+                        "revision": job.revision,
+                        "error": str(exc)[:1000],
+                    },
+                )
