@@ -30,6 +30,8 @@ from memoryx.api.auth import verify_api_key
 from memoryx.api.errors import http_exception_handler, unhandled_exception_handler, validation_exception_handler
 from memoryx.api.p11_routes import create_p11_router
 from memoryx.api.p8_bootstrap import install_p8_observability
+from memoryx.api.routes.learning import router as learning_router
+from memoryx.api.routes.learning import distill_router
 from memoryx.api.rate_limit import EmbeddingConcurrencyGate, SlidingWindowRateLimiter
 
 # ── P14: Feishu UX Adapter ──
@@ -64,24 +66,45 @@ class MemoryXAppState:
     query_api: Any | None = None
     self_editor: Any | None = None
     consolidation: Any | None = None
+    lance_store: Any | None = None
     owns_repository: bool = False
     owns_query_api: bool = False
+    owns_lance_store: bool = False
 
 
 def _default_db_path() -> Path:
     return Path(os.getenv("MEMORYX_DB_PATH", "./data/memoryx.db"))
 
 
+def _default_lancedb_path() -> Path:
+    return Path(os.getenv("LANCEDB_URI", "./data/lancedb"))
+
+
 async def _build_default_state() -> MemoryXAppState:
     from memoryx.api import MemoryQueryAPI
     from memoryx.storage import MemoryRepository
+    from memoryx.embeddings import LanceDBVectorStore
 
     db_path = _default_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     repo = MemoryRepository(db_path)
     await repo.open()
-    api = MemoryQueryAPI(repository=repo, vector_store=None)
-    return MemoryXAppState(repository=repo, query_api=api, owns_repository=True, owns_query_api=True)
+
+    # P0: 启用 LanceDB 向量存储
+    lancedb_path = _default_lancedb_path()
+    lancedb_path.parent.mkdir(parents=True, exist_ok=True)
+    lance_store = LanceDBVectorStore(uri=lancedb_path)
+    await lance_store.open()
+
+    api = MemoryQueryAPI(repository=repo, vector_store=lance_store)
+    return MemoryXAppState(
+        repository=repo,
+        query_api=api,
+        lance_store=lance_store,
+        owns_repository=True,
+        owns_query_api=True,
+        owns_lance_store=True,
+    )
 
 
 async def _close_state(state: MemoryXAppState) -> None:
@@ -137,10 +160,12 @@ def create_app(
                 # Build runner from FEISHU_RUNNER_MODE
                 feishu_runner = build_feishu_runner()
 
-                # Register feishu event routes
+                # Register feishu event routes (with card action support)
                 app.include_router(create_feishu_router(
                     bot_service=feishu_bot,
                     queue_db_path=queue_db,
+                    get_repository=lambda: app.state.memoryx.repository,
+                    get_vector_store=lambda: app.state.memoryx.lance_store,
                 ))
 
                 # Background worker: polls feishu queue continuously
@@ -279,6 +304,48 @@ def create_app(
             raise HTTPException(404, "not found")
         return dict(mem)
 
+    @app.get("/v1/memories")
+    async def list_memories(
+        *,
+        memory_type: str | None = None,
+        scope: str | None = None,
+        tag: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        _key: str | None = Depends(verify_api_key),
+    ) -> dict:
+        """列出记忆（支持按类型、范围、标签过滤）。"""
+        repo = await ensure_repo()
+        conditions: list[str] = []
+        params_vals: list[str] = []
+
+        if memory_type:
+            conditions.append("memory_type = ?")
+            params_vals.append(memory_type)
+        if scope:
+            conditions.append("scope = ?")
+            params_vals.append(scope)
+        if tag:
+            conditions.append("tags_json LIKE ?")
+            params_vals.append(f'%"{tag}"%')
+
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+        count_row = await repo.db.fetchone(
+            f"SELECT COUNT(*) AS cnt FROM memories{where_clause};",
+            tuple(params_vals),
+        )
+        total = int(count_row["cnt"]) if count_row else 0
+
+        # 分页查询
+        order = "ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        rows = await repo.db.fetchall(
+            f"SELECT * FROM memories{where_clause} {order};",
+            tuple(params_vals) + (limit, offset),
+        )
+        memories = [dict(r) for r in rows]
+        record_rest_request(route="/v1/memories", method="GET", status_code=200)
+        return {"memories": memories, "total": total, "limit": limit, "offset": offset}
+
     @app.patch("/v1/memories/{memory_id}")
     async def update_memory(memory_id: str, body: MemoryUpdate, _key: str | None = Depends(verify_api_key)) -> dict:
         repo = await ensure_repo()
@@ -321,9 +388,30 @@ def create_app(
     @app.post("/v1/search")
     async def search(body: SearchRequest, _key: str | None = Depends(verify_api_key)) -> dict:
         api = await ensure_api()
+        
+        # 自动生成 query embedding（如果 vector_store 可用）
+        query_vector: list[float] = []
+        if api.vector_store is not None:
+            try:
+                import aiohttp
+                api_key = os.getenv("SILICONFLOW_API_KEY") or os.getenv("MEMORYX_EMBEDDING_API_KEY")
+                if api_key:
+                    async with aiohttp.ClientSession() as s:
+                        async with s.post(
+                            "https://api.siliconflow.cn/v1/embeddings",
+                            json={"model": "Qwen/Qwen3-Embedding-8B", "input": body.query,
+                                  "encoding_format": "float", "dimensions": 4096},
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        ) as r:
+                            if r.status == 200:
+                                d = await r.json()
+                                query_vector = d["data"][0]["embedding"]
+            except Exception:
+                pass  # fallback to no vector search
+        
         kwargs = {
             "query": body.query,
-            "query_vector": [],
+            "query_vector": query_vector,
             "limit": body.limit,
             "tag_filter": body.tag_filter,
             "tag_mode": body.tag_mode,
@@ -392,6 +480,10 @@ def create_app(
             prefix="/v1/cognitive",
         )
     )
+
+    # ── P16: Learning Loop + Skill Distillation ──
+    app.include_router(learning_router)
+    app.include_router(distill_router)
 
     app.state.memoryx = initial_state
     return app

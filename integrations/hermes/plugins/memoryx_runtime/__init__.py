@@ -160,6 +160,29 @@ def _on_session_start(**kwargs) -> dict | None:
             ),
         }
     logger.info("MemoryX P13 gate OK: %s", message)
+
+    # P16: Auto-start XHS learning session
+    try:
+        session_id = _session_id(kwargs)
+        user_text = _extract_user_text(kwargs)
+        if user_text and ("小红书" in user_text or "xhs" in user_text.lower()):
+            _memoryx_post("/v1/learning/project/ensure", {
+                "project_id": "xhs-ops-2026",
+                "name": "小红书运营学习",
+                "objective": "从 0 到 1 系统掌握小红书账号定位、内容生产、数据复盘、商业转化",
+                "owner": "Drew",
+            })
+            _memoryx_post("/v1/learning/session/start", {
+                "project_id": "xhs-ops-2026",
+                "session_id": session_id,
+                "title": "小红书运营学习会话",
+                "topic": "小红书运营",
+                "goal": user_text[:300],
+                "mastery_target": "会用",
+            })
+    except Exception:
+        logger.warning("P16 on_session_start failed (non-blocking)", exc_info=True)
+
     return None
 
 
@@ -292,9 +315,29 @@ def _post_llm_call(**kwargs) -> None:
 
 
 def _on_session_end(**kwargs) -> None:
-    """Trigger narrative reflection on session end."""
+    """Trigger narrative reflection + P16 learning session end."""
     session_id = _session_id(kwargs)
+    summary = kwargs.get("summary", "")
 
+    # P16: End learning session
+    try:
+        _memoryx_post("/v1/learning/session/end", {
+            "session_id": session_id,
+            "summary": summary or "Hermes learning session ended.",
+            "artifacts": [
+                {
+                    "artifact_type": "session_summary",
+                    "title": "Session Summary",
+                    "content": summary or "",
+                    "source_type": "hermes.on_session_end",
+                    "trust_score": 0.75,
+                }
+            ],
+        }, timeout=10)
+    except Exception:
+        logger.warning("P16 on_session_end failed (non-blocking)", exc_info=True)
+
+    # Existing narrative reflection
     _memoryx_post(
         "/v1/cognitive/narrative-reflection",
         {

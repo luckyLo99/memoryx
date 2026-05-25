@@ -171,21 +171,11 @@ class FeishuHermesBotService:
                         payload={"name": prepared.name, "status": prepared.status},
                     )
 
-        await self._update_card(job)
-
-        last_update = 0.0
-
         async def on_delta(delta: str) -> None:
-            nonlocal last_update
             job.answer += delta
-            now = time.monotonic()
-            if now - last_update >= self.update_interval_seconds:
-                last_update = now
-                await self._update_card(job)
 
         async def on_tool(tool: ToolCallRecord) -> None:
             job.tools.append(tool)
-            await self._update_card(job)
 
         try:
             # 追踪：runner 开始

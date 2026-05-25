@@ -1,9 +1,51 @@
 from __future__ import annotations
 
+import os
+import sqlite3
+from datetime import datetime, timezone
 from typing import Any
 
 from memoryx.events import MemoryEventType
 from memoryx.manager import MemoryHookManager
+
+
+MEMORYX_DB = os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db")
+
+
+def _ensure_session(session_id: str) -> None:
+    """确保会话存在，不存在则创建"""
+    try:
+        conn = sqlite3.connect(MEMORYX_DB)
+        exists = conn.execute(
+            "SELECT 1 FROM sessions WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if not exists:
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+            conn.execute(
+                "INSERT OR IGNORE INTO sessions(session_id, title, start_time, status, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'active', ?, ?)",
+                (session_id, f"Session {session_id[:16]}", now, now, now),
+            )
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass  # 不要阻断 Hermes 主流程
+
+
+def _close_session(session_id: str) -> None:
+    """关闭会话并记录结束时间"""
+    try:
+        conn = sqlite3.connect(MEMORYX_DB)
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        conn.execute(
+            "UPDATE sessions SET status='closed', end_time=?, updated_at=? WHERE session_id=?",
+            (now, now, session_id),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
 
 try:
     from memoryx.hermes_bridge import HermesMemoryBridge
@@ -28,6 +70,8 @@ def register(ctx: Any) -> None:
         await manager.emit(event_type, session_id, payload)
 
     async def on_user_message(session_id: str, content: str = "", **extra: Any):
+        # 确保会话被追踪
+        _ensure_session(session_id)
         await _emit(MemoryEventType.ON_USER_MESSAGE, session_id, {"content": content, **extra})
         if bridge is not None and hasattr(bridge, "on_user_message"):
             return await bridge.on_user_message(session_id=session_id, content=content, **extra)
@@ -54,6 +98,8 @@ def register(ctx: Any) -> None:
         return None
 
     async def on_session_end(session_id: str, **extra: Any):
+        # 关闭会话
+        _close_session(session_id)
         await _emit(MemoryEventType.ON_SESSION_END, session_id, extra)
         if bridge is not None and hasattr(bridge, "on_session_end"):
             return await bridge.on_session_end(session_id=session_id, **extra)

@@ -72,33 +72,20 @@ class FeishuCardRenderer:
         meta = STATE_META[state]
         elements: list[dict[str, Any]] = []
 
-        # 头部信息（P14.3: 显示 revision 和 phase）
-        revision_info = f" rev {job.revision}" if job.revision > 0 else ""
-        phase_info = f" · {job.phase}" if hasattr(job, 'phase') and job.phase else ""
+        # 头部信息（精简版，无阶段信息）
         elements.append(self._kv_strip([
-            ("状态", f"{vs_meta['emoji']} {vs_meta['label']}{phase_info}"),
+            ("状态", f"{vs_meta['emoji']} {vs_meta['label']}"),
             ("任务", job.title),
-            ("Trace", f"{job.trace_id or job.job_id[:10]}{revision_info}"),
+            ("Trace", job.trace_id or job.job_id[:10]),
         ]))
 
         # MemoryX 状态徽章
         if job.memoryx_badges:
             elements.append(self._note(" · ".join(job.memoryx_badges[:6])))
 
-        # MemoryX 上下文
-        if job.context_summary:
-            elements.append(self._markdown("**MemoryX 上下文**\n" + self._md(job.context_summary)))
-
         # 附件
         if job.attachments:
             elements.extend(self._attachments_block(job.attachments))
-
-        # 工具调用记录
-        if job.tools:
-            elements.append(self._markdown("**工具调用记录**"))
-            elements.extend(self._tool_blocks(job.tools[: self.max_tool_rows]))
-            if len(job.tools) > self.max_tool_rows:
-                elements.append(self._note(f"还有 {len(job.tools) - self.max_tool_rows} 条工具记录已折叠。"))
 
         # 结构化正文
         answer = self.sanitizer.clean(job.answer)
