@@ -141,7 +141,14 @@ class SessionSearchEngine:
 
         result = {
             "query": query,
-            "results": [r.__dict__ for r in results],
+            "results": [{
+                "session_id": r.session_id,
+                "answer": r.answer,
+                "score": r.score,
+                "source": r.source,
+                "degraded": r.degraded,
+                "error": r.error,
+            } for r in results],
             "degraded": any(r.degraded for r in results),
             "limiter": await self.limiter.snapshot(),
             "duration_ms": duration_ms,
