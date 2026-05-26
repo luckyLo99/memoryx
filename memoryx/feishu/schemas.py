@@ -192,6 +192,7 @@ class FeishuRenderJob:
             "user_id": self.user_id,
             "message_id": self.message_id,
             "card_message_id": self.card_message_id,
+            "text": self.text,
             "state": str(self.state),
             "visible_state": str(self.visible_state),
             "phase": self.phase,
