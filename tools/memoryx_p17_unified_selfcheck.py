@@ -391,11 +391,16 @@ class SelfCheck:
             cmd = [sys.executable, str(path)]
             if "semantic_integrity" in rel:
                 cmd = [sys.executable, str(path), "--db", str(self.memoryx_db), "--include-conversations", "--json"]
+            if "feishu_p1443_card_ownership" in rel:
+                cmd = [sys.executable, str(path), "--allow-empty"]
 
             proc = self.cmd(cmd, cwd=self.root, env=env, timeout=60)
             output = (proc.stdout + proc.stderr)[-4000:]
             if proc.returncode == 0:
-                self.info("gate_pass", f"{rel} PASS", script=rel)
+                if "WARN:" in output:
+                    self.warn("gate_warn", f"{rel} WARN", script=rel, output=output[:500])
+                else:
+                    self.info("gate_pass", f"{rel} PASS", script=rel)
             else:
                 self.add("ERROR", "gate_failed", f"{rel} FAIL", script=rel, output=output)
 

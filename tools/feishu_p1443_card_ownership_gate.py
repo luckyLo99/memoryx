@@ -8,9 +8,14 @@
 4. DLQ = 0
 5. trace 包含 card_initial_sent, card_patch_done, job_done
 6. feishu_card_messages 表有记录且 outbound_card_message_id 一致
+
+用法:
+  python feishu_p1443_card_ownership_gate.py              # 硬验收（发布前）
+  python feishu_p1443_card_ownership_gate.py --allow-empty # 允许无样本（健康检查）
 """
 from __future__ import annotations
 
+import argparse
 import os
 import sqlite3
 import sys
@@ -28,7 +33,21 @@ def ok(msg: str) -> None:
     print("OK:", msg)
 
 
+def warn(msg: str) -> None:
+    print("WARN:", msg)
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="P14.4.3 Feishu Card Ownership Gate"
+    )
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="允许无真实 job 样本（健康检查模式，用于 P17 runtime gate）",
+    )
+    args = parser.parse_args()
+
     conn = sqlite3.connect(QUEUE_DB)
     conn.row_factory = sqlite3.Row
 
@@ -43,6 +62,10 @@ def main() -> int:
     ).fetchone()
 
     if not row:
+        if args.allow_empty:
+            warn("no feishu job sample found; P14.4.3 smoke pending")
+            print("\nP14.4.3 FEISHU CARD OWNERSHIP GATE: NO_SAMPLE (WARN)")
+            return 0
         fail("no feishu job found")
 
     latest = dict(row)
