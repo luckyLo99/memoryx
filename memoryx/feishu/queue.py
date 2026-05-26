@@ -276,6 +276,43 @@ class FeishuSQLiteQueue:
                 job.job_id,
             ))
 
+    def mark_done(self, job: FeishuRenderJob) -> None:
+        """标记 job 完成。**强制要求 card_message_id 非空**，否则拒绝 done。"""
+        if not job.card_message_id:
+            raise RuntimeError(
+                f"mark_done refused: job={job.job_id} card_message_id is empty. "
+                f"Card ownership not established — cannot complete job."
+            )
+
+        now = time.time()
+
+        job.state = HermesRunState.DONE
+        job.visible_state = VisibleState.DONE
+        job.phase = "done"
+        job.ended_at = job.ended_at or now
+        job.updated_at = now
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE feishu_jobs
+                SET state=?, visible_state=?, phase=?, revision=?, card_message_id=?,
+                    payload_json=?, updated_at=?, ended_at=?
+                WHERE job_id=?;
+                """,
+                (
+                    str(job.state),
+                    str(job.visible_state),
+                    job.phase,
+                    job.revision,
+                    job.card_message_id,
+                    json.dumps(job.to_dict(), ensure_ascii=False),
+                    now,
+                    job.ended_at,
+                    job.job_id,
+                ),
+            )
+
     def release_lock(self, job_id: str) -> None:
         """释放 job 的锁（locked_at=NULL）。job 完成或失败时调用。"""
         now = time.time()

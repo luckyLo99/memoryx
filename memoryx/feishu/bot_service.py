@@ -1,15 +1,16 @@
-"""飞书 → Hermes → 卡片更新服务（P14.3 增强版）。
+"""飞书 → Hermes → 卡片更新服务（P14.4.3 硬化版）。
 
-P14.3 集成：
-  - 可见状态机（防止状态倒退）
-  - 卡片更新合并器（防乱序、防闪）
-  - 溢出处理（长答案转附件）
-  - 附件预处理（确认 Hermes 能消费）
-  - 全链路追踪
-  - Hermes 真实 Runner（五阶段编排）
+P14.4.3 集成：
+  - 卡片所有权：send_interactive_card 返回 message_id 并持久化
+  - 强制约束：card_message_id 为空时拒绝 mark_done
+  - 卡片更新：patch_interactive_card 使用 PATCH /messages/{message_id}
+  - JSON 2.0：所有卡片输出 schema="2.0", config.update_multi=true
+  - 最终视图：final_view=True 只显示结果、耗时、执行摘要
+  - 内部工具：execute_code/sqlite3 等调试输出不进飞书
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -76,7 +77,7 @@ class FeishuHermesBotService:
         self.coalescer = coalescer or CardUpdateCoalescer(min_interval=update_interval_seconds)
 
     async def accept_event(self, job: FeishuRenderJob) -> str:
-        """接受飞书事件，创建排队中卡片"""
+        """接受飞书事件，发送初始交互式卡片并捕获 message_id。"""
         job.update_visible_state("received")
         self.queue.enqueue(job)
 
@@ -90,27 +91,25 @@ class FeishuHermesBotService:
                 payload={"chat_id": job.chat_id, "message_id": job.message_id},
             )
 
-        card = self.renderer.render(job)
+        # P14.4.3: 使用 send_interactive_card 发送卡片，捕获 message_id
+        card = self.renderer.render(job, final_view=False)
 
         try:
-            resp = await self.client.send_message(
-                receive_id=job.chat_id,
-                receive_id_type=job.receive_id_type,
-                msg_type="interactive",
-                content=card,
-                uuid=job.job_id,
+            result = await self.client.send_interactive_card(
+                chat_id=job.chat_id,
+                card=card,
             )
-
-            job.card_message_id = resp["data"]["message_id"]
+            job.card_message_id = result["message_id"]
             self.queue.update(job)
+
             # 追踪：卡片发送成功
             if self.trace_store:
                 self.trace_store.record(
                     job_id=job.job_id,
                     trace_id=job.trace_id,
                     phase="received",
-                    event_type="card_sent",
-                    payload={"card_message_id": job.card_message_id},
+                    event_type="card_initial_sent",
+                    payload={"card_message_id": job.card_message_id, "revision": job.revision},
                 )
         except Exception as exc:
             # 卡片发送失败不阻断入队，但记录错误
@@ -132,7 +131,7 @@ class FeishuHermesBotService:
         *,
         on_stage: Callable[[RunnerStage, str], Awaitable[None]] | None = None,
     ) -> bool:
-        """领取一个 job 并处理（P14.3 增强版）"""
+        """领取一个 job 并处理（P14.4.3 硬化版）。"""
         # 救回卡住的 stale job
         rescued = self.queue.rescue_stale_jobs(stale_after_seconds=120, max_attempts=3)
         if rescued:
@@ -262,52 +261,113 @@ class FeishuHermesBotService:
             else:
                 job.answer = overflow.card_text
 
-            # 业务成功：通过 transition_job 同步到 DB
-            transition_job(
-                self.queue, self.trace_store, job,
-                state="done", visible_state="done",
-                reason="runner_completed",
-            )
+            # P14.4.3: 更新卡片到最终视图（使用 patch_interactive_card）
+            await self._update_card(job, final_view=True)
 
-        except Exception as exc:
-            job.error = str(exc)
-            transition_job(
-                self.queue, self.trace_store, job,
-                state="error", visible_state="error",
-                reason="worker_exception",
-            )
-
+            # 追踪：job 完成前更新卡片
             if self.trace_store:
                 self.trace_store.record(
                     job_id=job.job_id,
                     trace_id=job.trace_id,
-                    phase="error",
-                    event_type="job_failed",
-                    payload={"error": str(exc)},
+                    phase="finalize",
+                    event_type="card_final_patch",
+                    payload={"card_message_id": job.card_message_id, "revision": job.revision},
                 )
-        finally:
-            await self._update_card(job)
-            self.queue.release_lock(job.job_id)
-            self.queue.update(job)
+
+            # P14.4.3: mark_done 强制要求 card_message_id 非空
+            self.queue.mark_done(job)
 
             # 追踪：job 完成
-            if self.trace_store and job.state == HermesRunState.DONE:
+            if self.trace_store:
                 self.trace_store.record(
                     job_id=job.job_id,
                     trace_id=job.trace_id,
                     phase="done",
                     event_type="job_done",
-                    payload={"answer_length": len(job.answer)},
+                    payload={
+                        "card_message_id": job.card_message_id,
+                        "answer_length": len(job.answer),
+                        "revision": job.revision,
+                    },
                 )
+
+        except Exception as exc:
+            job.error = str(exc)
+
+            # 即使失败也要更新卡片
+            try:
+                await self._update_card(job, final_view=True)
+            except Exception:
+                pass
+
+            # P14.4.3: error 状态也需要 card_message_id 才能标记
+            if job.card_message_id:
+                job.state = HermesRunState.ERROR
+                job.visible_state = VisibleState.ERROR
+                job.phase = "error"
+                job.ended_at = job.ended_at or time.time()
+                job.updated_at = time.time()
+                self.queue.update(job)
+
+                if self.trace_store:
+                    self.trace_store.record(
+                        job_id=job.job_id,
+                        trace_id=job.trace_id,
+                        phase="error",
+                        event_type="job_error",
+                        payload={
+                            "card_message_id": job.card_message_id,
+                            "error": str(exc)[:1000],
+                        },
+                    )
+            else:
+                # 没有 card_message_id 时，直接移入 DLQ
+                if self.trace_store:
+                    self.trace_store.record(
+                        job_id=job.job_id,
+                        trace_id=job.trace_id,
+                        phase="error",
+                        event_type="job_error_no_card",
+                        payload={"error": str(exc)[:1000]},
+                    )
+
+                with self.queue._connect() as conn:
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO feishu_dead_letters(
+                            job_id, payload_json, reason, attempts, last_error, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?);
+                        """,
+                        (
+                            job.job_id,
+                            json.dumps(job.to_dict(), ensure_ascii=False),
+                            "card_message_id_empty_on_error",
+                            job.attempts,
+                            str(exc),
+                            time.time(),
+                        ),
+                    )
+                    conn.execute("DELETE FROM feishu_jobs WHERE job_id=?;", (job.job_id,))
+
+        finally:
+            self.queue.release_lock(job.job_id)
 
         return True
 
-    async def _update_card(self, job: FeishuRenderJob) -> None:
-        """更新飞书卡片（P14.3: 带 revision 防乱序）"""
+    async def _update_card(self, job: FeishuRenderJob, *, final_view: bool = False) -> None:
+        """更新飞书卡片（P14.4.3: 使用 patch_interactive_card，强制 card_message_id）。"""
         if not job.card_message_id:
+            if self.trace_store:
+                self.trace_store.record(
+                    job_id=job.job_id,
+                    trace_id=job.trace_id,
+                    phase="card_update",
+                    event_type="card_patch_skipped",
+                    payload={"reason": "card_message_id is empty"},
+                )
             return
 
-        card = self.renderer.render(job)
+        card = self.renderer.render(job, final_view=final_view)
 
         # 使用 coalescer 防乱序
         sent = await self.coalescer.patch(
@@ -325,17 +385,28 @@ class FeishuHermesBotService:
                     trace_id=job.trace_id,
                     phase="card_update",
                     event_type="card_patch_done",
-                    payload={"revision": job.revision},
+                    payload={
+                        "card_message_id": job.card_message_id,
+                        "revision": job.revision,
+                        "final_view": final_view,
+                    },
                 )
         else:
             # revision 过旧或内容相同，跳过
-            pass
+            if self.trace_store:
+                self.trace_store.record(
+                    job_id=job.job_id,
+                    trace_id=job.trace_id,
+                    phase="card_update",
+                    event_type="card_patch_skipped",
+                    payload={"reason": "revision conflict or content unchanged"},
+                )
 
     async def _do_patch(self, message_id: str, card: dict, job: FeishuRenderJob | None = None) -> None:
-        """实际发送卡片 patch — patch 失败只记 trace，不阻断 job。"""
+        """实际发送卡片 patch — 使用 PATCH /messages/{message_id}。"""
         try:
-            await self.client.patch_message_card(
-                message_id=message_id,
+            await self.client.patch_interactive_card(
+                card_message_id=message_id,
                 card=card,
             )
         except Exception as exc:

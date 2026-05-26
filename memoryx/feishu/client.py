@@ -154,13 +154,97 @@ class FeishuClient:
             json=body,
         )
 
-    async def patch_message_card(self, *, message_id: str, card: dict[str, Any]) -> dict[str, Any]:
-        return await self._request_json(
-            "PATCH",
-            f"{self.base_url}/open-apis/im/v1/messages/{message_id}/card",
+    async def send_interactive_card(
+        self,
+        *,
+        chat_id: str,
+        card: dict[str, Any],
+    ) -> dict[str, Any]:
+        """发送交互式卡片，返回 message_id 用于后续 patch。"""
+        card = self._ensure_card_v2(card)
+
+        payload = {
+            "receive_id": chat_id,
+            "msg_type": "interactive",
+            "content": json.dumps(card, ensure_ascii=False),
+        }
+
+        data = await self._request_json(
+            "POST",
+            f"{self.base_url}/open-apis/im/v1/messages",
+            params={"receive_id_type": "chat_id"},
             headers={**await self._headers(), "Content-Type": "application/json"},
-            json={"content": json.dumps(card, ensure_ascii=False)},
+            json=payload,
         )
+
+        if data.get("code", 0) != 0:
+            raise FeishuAPIError(f"send_interactive_card failed: {data}")
+
+        body = data.get("data") or {}
+        message_id = (
+            body.get("message_id")
+            or (body.get("message") or {}).get("message_id")
+            or body.get("open_message_id")
+        )
+
+        if not message_id:
+            raise FeishuAPIError(f"send_interactive_card response missing message_id: {data}")
+
+        return {"message_id": message_id, "raw": data}
+
+    async def patch_interactive_card(
+        self,
+        *,
+        card_message_id: str,
+        card: dict[str, Any],
+    ) -> dict[str, Any]:
+        """更新已发送的交互式卡片。"""
+        if not card_message_id:
+            raise FeishuAPIError("patch_interactive_card requires non-empty card_message_id")
+
+        card = self._ensure_card_v2(card)
+
+        payload = {
+            "content": json.dumps(card, ensure_ascii=False),
+        }
+
+        data = await self._request_json(
+            "PATCH",
+            f"{self.base_url}/open-apis/im/v1/messages/{card_message_id}",
+            headers={**await self._headers(), "Content-Type": "application/json"},
+            json=payload,
+        )
+
+        if data.get("code", 0) != 0:
+            raise FeishuAPIError(f"patch_interactive_card failed: {data}")
+
+        return data
+
+    @staticmethod
+    def _ensure_card_v2(card: dict[str, Any]) -> dict[str, Any]:
+        """确保卡片输出 JSON 2.0 格式，带 config.update_multi=true。"""
+        card = dict(card)
+        card["schema"] = "2.0"
+
+        config = dict(card.get("config") or {})
+        config["update_multi"] = True
+        config.setdefault("width_mode", "fill")
+        card["config"] = config
+
+        # 确保 body.elements 结构
+        if "body" not in card:
+            if "elements" in card:
+                card["body"] = {"elements": card.pop("elements")}
+            else:
+                card["body"] = {"elements": []}
+        elif "elements" in card and "body" not in card:
+            card["body"] = {"elements": card.pop("elements")}
+
+        return card
+
+    async def patch_message_card(self, *, message_id: str, card: dict[str, Any]) -> dict[str, Any]:
+        """兼容旧接口：更新卡片消息。"""
+        return await self.patch_interactive_card(card_message_id=message_id, card=card)
 
     async def upload_image(self, *, path: str | Path, image_type: str = "message") -> str:
         path = Path(path)
