@@ -610,9 +610,13 @@ class SelfCheck:
                     "SELECT COUNT(*) FROM session_search_events WHERE created_at >= datetime('now','-1 hour');",
                 )
                 if recent > 0:
-                    total_llm = self.scalar(
+                    total_planned = self.scalar(
                         conn,
-                        "SELECT SUM(llm_sessions) FROM session_search_events WHERE created_at >= datetime('now','-1 hour');",
+                        "SELECT SUM(llm_planned_sessions) FROM session_search_events WHERE created_at >= datetime('now','-1 hour');",
+                    )
+                    total_actual = self.scalar(
+                        conn,
+                        "SELECT SUM(llm_actual_calls) FROM session_search_events WHERE created_at >= datetime('now','-1 hour');",
                     )
                     total_cache = self.scalar(
                         conn,
@@ -634,10 +638,11 @@ class SelfCheck:
                         conn,
                         "SELECT AVG(duration_ms) FROM session_search_events WHERE created_at >= datetime('now','-1 hour');",
                     )
-                    self.info("p18_search_events", f"1h 搜索 {recent} 次，LLM {total_llm or 0} 次，缓存命中 {total_cache or 0} 次，降级 {total_fallback or 0} 次，timeout {total_timeout or 0} 次，限频 {total_rate_limit or 0} 次，avg {avg_ms:.1f}ms" if avg_ms else "1h 搜索无数据",
-                             searches=recent, llm_calls=total_llm, cache_hits=total_cache,
-                             fallbacks=total_fallback, timeouts=total_timeout, rate_limits=total_rate_limit,
-                             avg_ms=avg_ms)
+                    self.info("p18_search_events",
+                        f"1h 搜索 {recent} 次，planned LLM {total_planned or 0} 次，actual LLM {total_actual or 0} 次，缓存命中 {total_cache or 0} 次，降级 {total_fallback or 0} 次，timeout {total_timeout or 0} 次，限频 {total_rate_limit or 0} 次，avg {avg_ms:.1f}ms" if avg_ms else "1h 搜索无数据",
+                        searches=recent, planned_llm=total_planned, actual_llm=total_actual, cache_hits=total_cache,
+                        fallbacks=total_fallback, timeouts=total_timeout, rate_limits=total_rate_limit,
+                        avg_ms=avg_ms)
                 else:
                     self.warn("p18_search_events_empty", "1h 内无搜索事件记录")
         finally:

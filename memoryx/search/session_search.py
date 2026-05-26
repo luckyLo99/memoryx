@@ -127,12 +127,15 @@ class SessionSearchEngine:
         # Count stats
         cache_hits = sum(1 for r in results if r.source == "cache")
         fallback_count = sum(1 for r in results if r.degraded)
+        llm_planned = len(top_for_llm)
+        llm_actual = sum(1 for r in results if r.source == "llm")
 
         duration_ms = int((time.perf_counter() - started) * 1000)
 
         stats = {
             "candidate_count": len(candidates),
-            "llm_sessions": len(top_for_llm),
+            "llm_planned_sessions": llm_planned,
+            "llm_actual_calls": llm_actual,
             "cache_hits": cache_hits,
             "fallback_count": fallback_count,
             "rate_limit_count": rate_limit_count,
