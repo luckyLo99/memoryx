@@ -46,7 +46,7 @@ class SelfHealingEngine:
         return report
 
     async def _repair_checksum_drift(self, *, repair: bool) -> int:
-        rows = await self.repository.db.fetchall("SELECT memory_id, content, checksum FROM memories;")
+        rows = await self.repository.db.fetchall("SELECT id AS memory_id, content, checksum FROM memories;")
         drifted = [dict(row) for row in rows if row["checksum"] != self.repository.checksum(str(row["content"]))]
         if not repair:
             return len(drifted)
@@ -68,11 +68,11 @@ class SelfHealingEngine:
     async def _repair_orphan_relations(self, *, repair: bool) -> int:
         rows = await self.repository.db.fetchall(
             """
-            SELECT r.relation_id
+            SELECT r.id AS relation_id
             FROM relations r
-            LEFT JOIN entities source ON source.entity_id = r.source_entity_id
-            LEFT JOIN entities target ON target.entity_id = r.target_entity_id
-            WHERE source.entity_id IS NULL OR target.entity_id IS NULL;
+            LEFT JOIN entities source ON source.id = r.source_entity_id
+            LEFT JOIN entities target ON target.id = r.target_entity_id
+            WHERE source.id IS NULL OR target.id IS NULL;
             """
         )
         relation_ids = [str(row["relation_id"]) for row in rows]
@@ -80,7 +80,7 @@ class SelfHealingEngine:
             return len(relation_ids)
 
         for relation_id in relation_ids:
-            await self.repository.db.execute("DELETE FROM relations WHERE relation_id = ?;", (relation_id,))
+            await self.repository.db.execute("DELETE FROM relations WHERE id = ?;", (relation_id,))
             await self.repository.append_audit(
                 "repair_orphan_relation",
                 relation_id,
@@ -91,7 +91,7 @@ class SelfHealingEngine:
     async def _mark_stale_embeddings(self, *, repair: bool) -> int:
         cutoff = datetime.now(timezone.utc) - timedelta(days=self.stale_embedding_days)
         rows = await self.repository.db.fetchall(
-            "SELECT memory_id, dimension, freshness_score, created_at FROM memory_embeddings WHERE datetime(created_at) < datetime(?);",
+            "SELECT memory_id, dimension, created_at FROM memory_embeddings WHERE datetime(created_at) < datetime(?);",
             (cutoff.isoformat(),),
         )
         stale_rows = [dict(row) for row in rows]
@@ -106,7 +106,7 @@ class SelfHealingEngine:
                 {
                     "memory_id": memory_id,
                     "dimension": row.get("dimension"),
-                    "freshness_score": row.get("freshness_score"),
+                    "created_at": row.get("created_at"),
                     "created_at": row.get("created_at"),
                 },
             )
@@ -131,7 +131,7 @@ class SelfHealingEngine:
             if not repair:
                 return actual_count - memory_count
             await self.repository.db.execute("DELETE FROM memories_fts;")
-            rows = await self.repository.db.fetchall("SELECT memory_id, content FROM memories;")
+            rows = await self.repository.db.fetchall("SELECT id AS memory_id, content FROM memories;")
             for r in rows:
                 await self.repository.db.execute(
                     "INSERT INTO memories_fts(memory_id, content) VALUES (?, ?);",

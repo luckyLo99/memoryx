@@ -77,7 +77,7 @@ class PersonaEngine:
 
         if persist:
             await self.repository.db.execute(
-                "INSERT INTO reflection_summaries(reflection_id, summary, created_at, updated_at) "
+                "INSERT INTO reflection_summaries(id, summary, created_at, updated_at) "
                 "VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
                 (__import__("uuid").uuid4().hex, markdown),
             )

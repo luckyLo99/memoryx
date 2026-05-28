@@ -241,23 +241,32 @@ class MemoryRepository:
         await self.db.execute("INSERT INTO memory_versions(id,memory_id,version,content,content_hash,checksum,valid_from,created_at,metadata_json) VALUES (?,?,?,?,?,?,?,?,?);",
             (uuid4().hex,memory_id,next_v,content,ch,checksum_val or ch,now,now,"{}"))
 
+
+    @staticmethod
+    def _row_to_dict(row: Any) -> dict[str, Any]:
+        """Convert a DB row to dict, adding memory_id alias for id."""
+        d = dict(row)
+        if 'id' in d and 'memory_id' not in d:
+            d['memory_id'] = d['id']
+        return d
+
     async def get_memory(self, memory_id: str) -> dict[str,Any]|None:
         row = await self.db.fetchone("SELECT * FROM memories WHERE id=?;",(memory_id,))
-        return dict(row) if row else None
+        return self._row_to_dict(row) if row else None
 
     async def list_memories(self, limit: int=1000) -> list[dict[str,Any]]:
         rows = await self.db.fetchall("SELECT * FROM memories ORDER BY updated_at DESC LIMIT ?;",(limit,))
-        return [dict(r) for r in rows]
+        return [self._row_to_dict(r) for r in rows]
 
     async def list_active_memories(self, limit: int=100) -> list[dict[str,Any]]:
         rows = await self.db.fetchall("SELECT * FROM memories WHERE active_state='active' ORDER BY importance_score DESC, updated_at DESC LIMIT ?;",(limit,))
-        return [dict(r) for r in rows]
+        return [self._row_to_dict(r) for r in rows]
 
     async def search_full_text(self, query: str, limit: int=20) -> list[dict[str,Any]]:
         q = self._normalize_search_query(query)
         if not q: return []
         rows = await self.db.fetchall("SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",(q,limit))
-        return [dict(r) for r in rows]
+        return [self._row_to_dict(r) for r in rows]
 
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
@@ -336,7 +345,7 @@ class MemoryRepository:
             rows = await self.db.fetchall("SELECT * FROM audit_logs WHERE action=? ORDER BY created_at ASC LIMIT ?;",(action,limit))
         else:
             rows = await self.db.fetchall("SELECT * FROM audit_logs ORDER BY created_at ASC LIMIT ?;",(limit,))
-        return [dict(r) for r in rows]
+        return [self._row_to_dict(r) for r in rows]
 
     async def export_markdown(self, output_dir: Path) -> list[Path]:
         output_dir.mkdir(parents=True, exist_ok=True)

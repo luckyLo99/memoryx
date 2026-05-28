@@ -37,7 +37,7 @@ class KnowledgeDistillationEngine:
 
         if persist:
             await self.repository.db.execute(
-                "INSERT INTO reflection_summaries(reflection_id, summary, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
+                "INSERT INTO reflection_summaries(id, summary, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
                 (uuid4().hex, artifact.summary),
             )
         return artifact

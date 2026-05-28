@@ -24,7 +24,7 @@ class PalaceEngine:
     async def ensure_wing(self, name: str, description: str = "") -> PalaceWing:
         """确保翼存在，不存在则创建。"""
         row = await self.repository.db.fetchone(
-            "SELECT wing_id, name, description, created_at FROM palace_wings WHERE name = ?;",
+            "SELECT id AS wing_id, name, description, created_at FROM palace_wings WHERE name = ?;",
             (name,),
         )
         if row:
@@ -33,7 +33,7 @@ class PalaceEngine:
                               created_at=str(dict(row).get("created_at", "")))
         wing_id = uuid4().hex
         await self.repository.db.execute(
-            "INSERT INTO palace_wings(wing_id, name, description, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
+            "INSERT INTO palace_wings(id, name, description, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
             (wing_id, name, description),
         )
         return PalaceWing(wing_id=wing_id, name=name, description=description)
@@ -41,8 +41,8 @@ class PalaceEngine:
     async def list_wings(self) -> list[PalaceWing]:
         """列出所有翼。"""
         rows = await self.repository.db.fetchall(
-            "SELECT w.wing_id, w.name, w.description, w.created_at, "
-            "(SELECT COUNT(*) FROM palace_rooms r WHERE r.wing_id = w.wing_id) AS room_count "
+            "SELECT w.id AS wing_id, w.name, w.description, w.created_at, "
+            "(SELECT COUNT(*) FROM palace_rooms r WHERE r.wing_id = w.id) AS room_count "
             "FROM palace_wings w ORDER BY w.name ASC;"
         )
         return [PalaceWing(wing_id=str(r["wing_id"]), name=str(r["name"]),
@@ -55,7 +55,7 @@ class PalaceEngine:
     async def ensure_room(self, wing_id: str, name: str, description: str = "") -> PalaceRoom:
         """确保房间存在。"""
         row = await self.repository.db.fetchone(
-            "SELECT room_id, wing_id, name, description, created_at FROM palace_rooms "
+            "SELECT id AS room_id, wing_id, name, description, created_at FROM palace_rooms "
             "WHERE wing_id = ? AND name = ?;",
             (wing_id, name),
         )
@@ -65,7 +65,7 @@ class PalaceEngine:
                               created_at=str(dict(row).get("created_at", "")))
         room_id = uuid4().hex
         await self.repository.db.execute(
-            "INSERT INTO palace_rooms(room_id, wing_id, name, description, created_at, updated_at) "
+            "INSERT INTO palace_rooms(id, wing_id, name, description, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
             (room_id, wing_id, name, description),
         )
@@ -74,8 +74,8 @@ class PalaceEngine:
     async def list_rooms(self, wing_id: str) -> list[PalaceRoom]:
         """列出某翼下的所有房间。"""
         rows = await self.repository.db.fetchall(
-            "SELECT r.room_id, r.wing_id, r.name, r.description, r.created_at, "
-            "(SELECT COUNT(*) FROM palace_drawers d WHERE d.room_id = r.room_id) AS drawer_count "
+            "SELECT r.id AS room_id, r.wing_id, r.name, r.description, r.created_at, "
+            "(SELECT COUNT(*) FROM palace_drawers d WHERE d.room_id = r.id) AS drawer_count "
             "FROM palace_rooms r WHERE r.wing_id = ? ORDER BY r.created_at DESC;",
             (wing_id,),
         )
@@ -99,7 +99,7 @@ class PalaceEngine:
         content_lines = content.split("\n")
         line_end = len(content_lines)
         await self.repository.db.execute(
-            "INSERT INTO palace_drawers(drawer_id, room_id, memory_id, content, source, line_start, line_end, created_at) "
+            "INSERT INTO palace_drawers(id, room_id, memory_id, content, source, line_start, line_end, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP);",
             (drawer_id, room_id, memory_id, content, source, 0, line_end),
         )
@@ -109,7 +109,7 @@ class PalaceEngine:
     async def list_drawers(self, room_id: str) -> list[PalaceDrawer]:
         """列出某房间的所有抽屉。"""
         rows = await self.repository.db.fetchall(
-            "SELECT drawer_id, room_id, memory_id, content, source, line_start, line_end, created_at "
+            "SELECT id AS drawer_id, room_id, memory_id, content, source, line_start, line_end, created_at "
             "FROM palace_drawers WHERE room_id = ? ORDER BY created_at ASC;",
             (room_id,),
         )
@@ -122,8 +122,8 @@ class PalaceEngine:
     async def get_drawer(self, drawer_id: str) -> PalaceDrawer | None:
         """获取单个抽屉。"""
         row = await self.repository.db.fetchone(
-            "SELECT drawer_id, room_id, memory_id, content, source, line_start, line_end, created_at "
-            "FROM palace_drawers WHERE drawer_id = ?;",
+            "SELECT id AS drawer_id, room_id, memory_id, content, source, line_start, line_end, created_at "
+            "FROM palace_drawers WHERE id = ?;",
             (drawer_id,),
         )
         if not row:
@@ -139,7 +139,7 @@ class PalaceEngine:
     async def add_tunnel(self, source_wing_id: str, target_wing_id: str, weight: float = 1.0) -> None:
         """在两个翼之间创建隧道。"""
         await self.repository.db.execute(
-            "INSERT OR REPLACE INTO palace_tunnels(tunnel_id, source_wing_id, target_wing_id, weight, created_at) "
+            "INSERT OR REPLACE INTO palace_tunnels(id, source_wing_id, target_wing_id, weight, created_at) "
             "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);",
             (uuid4().hex, source_wing_id, target_wing_id, weight),
         )
@@ -151,7 +151,7 @@ class PalaceEngine:
         queue: deque[tuple[str, int]] = deque()
 
         start = await self.repository.db.fetchone(
-            "SELECT wing_id, name, description FROM palace_wings WHERE name = ?;", (wing_name,))
+            "SELECT id AS wing_id, name, description FROM palace_wings WHERE name = ?;", (wing_name,))
         if not start:
             return results
         queue.append((str(start["wing_id"]), 0))
@@ -162,7 +162,7 @@ class PalaceEngine:
                 continue
             visited.add(current_id)
             wing = await self.repository.db.fetchone(
-                "SELECT wing_id, name, description FROM palace_wings WHERE wing_id = ?;", (current_id,))
+                "SELECT id AS wing_id, name, description FROM palace_wings WHERE id = ?;", (current_id,))
             if wing:
                 results.append({"wing_id": str(wing["wing_id"]), "name": str(wing["name"]),
                                 "description": str(wing["description"]) if wing["description"] else "", "depth": level})
@@ -182,7 +182,7 @@ class PalaceEngine:
         """在指定翼内搜索所有抽屉。"""
         query_lower = query.lower()
         wing = await self.repository.db.fetchone(
-            "SELECT wing_id FROM palace_wings WHERE name = ?;", (wing_name,))
+            "SELECT id AS wing_id FROM palace_wings WHERE name = ?;", (wing_name,))
         if not wing:
             return []
         wing_id = str(wing["wing_id"])
@@ -210,7 +210,7 @@ class PalaceNavigator:
     async def walk_to(self, wing_name: str, room_name: str | None = None) -> list[str]:
         """导航到指定位置，返回内容列表。"""
         wing = await self.engine.repository.db.fetchone(
-            "SELECT wing_id FROM palace_wings WHERE name = ?;", (wing_name,))
+            "SELECT id AS wing_id FROM palace_wings WHERE name = ?;", (wing_name,))
         if not wing:
             return []
         if room_name:

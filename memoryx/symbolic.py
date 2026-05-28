@@ -32,7 +32,7 @@ class SymbolicIndex:
         summary = self._format(entities, topics, key_sentences, emotion, flags)
         index_id = uuid4().hex
         await self.repository.db.execute(
-            "INSERT INTO reflection_summaries(reflection_id, summary, created_at, updated_at) "
+            "INSERT INTO reflection_summaries(id, summary, created_at, updated_at) "
             "VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
             (index_id, summary),
         )
@@ -48,7 +48,7 @@ class SymbolicIndex:
         """在符号化索引中搜索。返回匹配条目。"""
         query_lower = query.lower()
         rows = await self.repository.db.fetchall(
-            "SELECT reflection_id, summary, created_at FROM reflection_summaries ORDER BY created_at DESC LIMIT ?;",
+            "SELECT id AS reflection_id, summary, created_at FROM reflection_summaries ORDER BY created_at DESC LIMIT ?;",
             (limit * 5,),
         )
         scored = []

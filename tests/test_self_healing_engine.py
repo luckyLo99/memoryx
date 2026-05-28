@@ -53,8 +53,8 @@ async def test_self_healing_marks_stale_embeddings_for_refresh(tmp_path: Path) -
     await repo.open()
     await repo.store_memory(MemoryRecord(id="m2", memory_type="PROJECT", content="needs fresh vector"))
     await repo.db.execute(
-        "INSERT INTO memory_embeddings(embedding_id, memory_id, vector, dimension, freshness_score, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now', '-40 days'), datetime('now', '-40 days'));",
-        ("e2", "m2", b"vector", 2, 0.1),
+        "INSERT INTO memory_embeddings(id, memory_id, embedding_model, vector_json, dimension, checksum, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?, datetime('now', '-40 days'), '{}');",
+        ("e2", "m2", "test-model", "vector", 2, "chk"),
     )
 
     engine = SelfHealingEngine(repository=repo, stale_embedding_days=30)
