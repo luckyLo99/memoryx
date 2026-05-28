@@ -76,7 +76,7 @@ class PalaceEngine:
         rows = await self.repository.db.fetchall(
             "SELECT r.id AS room_id, r.wing_id, r.name, r.description, r.created_at, "
             "(SELECT COUNT(*) FROM palace_drawers d WHERE d.room_id = r.id) AS drawer_count "
-            "FROM palace_rooms r WHERE r.wing_id = ? ORDER BY r.created_at DESC;",
+            "FROM palace_rooms r WHERE r.id = ? ORDER BY r.created_at DESC;",
             (wing_id,),
         )
         return [PalaceRoom(room_id=str(r["room_id"]), wing_id=str(r["wing_id"]),
@@ -139,7 +139,7 @@ class PalaceEngine:
     async def add_tunnel(self, source_wing_id: str, target_wing_id: str, weight: float = 1.0) -> None:
         """在两个翼之间创建隧道。"""
         await self.repository.db.execute(
-            "INSERT OR REPLACE INTO palace_tunnels(id, source_wing_id, target_wing_id, weight, created_at) "
+            "INSERT OR REPLACE INTO palace_tunnels(id, source_room_id, target_room_id, weight, created_at) "
             "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);",
             (uuid4().hex, source_wing_id, target_wing_id, weight),
         )
@@ -187,10 +187,10 @@ class PalaceEngine:
             return []
         wing_id = str(wing["wing_id"])
         rows = await self.repository.db.fetchall(
-            "SELECT d.drawer_id, d.room_id, d.memory_id, d.content, d.source, d.line_start, d.line_end, d.created_at "
+            "SELECT d.id AS drawer_id, d.room_id, d.memory_id, d.content, d.source, d.line_start, d.line_end, d.created_at "
             "FROM palace_drawers d "
-            "JOIN palace_rooms r ON r.room_id = d.room_id "
-            "WHERE r.wing_id = ? AND lower(d.content) LIKE ? "
+            "JOIN palace_rooms r ON r.id = d.room_id "
+            "WHERE r.id = ? AND lower(d.content) LIKE ? "
             "ORDER BY d.created_at DESC LIMIT 20;",
             (wing_id, f"%{query_lower}%"),
         )
@@ -215,7 +215,7 @@ class PalaceNavigator:
             return []
         if room_name:
             room = await self.engine.repository.db.fetchone(
-                "SELECT room_id FROM palace_rooms WHERE wing_id = ? AND name = ?;",
+                "SELECT id AS room_id FROM palace_rooms WHERE wing_id = ? AND name = ?;",
                 (str(wing["wing_id"]), room_name),
             )
             if not room:

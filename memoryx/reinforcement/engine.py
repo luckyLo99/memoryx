@@ -64,7 +64,7 @@ class ImportanceReinforcementEngine:
                     (new_score, memory_id),
                 )
                 await self.repository.db.execute(
-                    "INSERT INTO reinforcement_events(reinforcement_id, memory_id, reinforcement_type, score_delta, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);",
+                    "INSERT INTO reinforcement_events(id, memory_id, event_type, reinforcement_score, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);",
                     (uuid4().hex, memory_id, "+".join(reasons) or "reinforcement", delta),
                 )
                 updated += 1

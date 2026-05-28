@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS memory_conflicts (
 CREATE TABLE IF NOT EXISTS archived_memories (
     id TEXT PRIMARY KEY,
     memory_id TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
     archived_reason TEXT NOT NULL,
     archived_at TEXT NOT NULL DEFAULT (datetime('now')),
     checksum TEXT NOT NULL,
@@ -116,6 +117,7 @@ CREATE TABLE IF NOT EXISTS reflection_summaries (
     valid_to TEXT,
     active_state TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     metadata_json TEXT NOT NULL DEFAULT '{}'
 );
 
@@ -298,14 +300,20 @@ CREATE TABLE IF NOT EXISTS palace_rooms (
 CREATE TABLE IF NOT EXISTS palace_drawers (
     id TEXT PRIMARY KEY,
     room_id TEXT NOT NULL,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
+    memory_id TEXT,
+    content TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    line_start INTEGER NOT NULL DEFAULT 0,
+    line_end INTEGER NOT NULL DEFAULT 0,
     active_state TEXT NOT NULL DEFAULT 'active',
     checksum TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     metadata_json TEXT NOT NULL DEFAULT '{}',
-    FOREIGN KEY(room_id) REFERENCES palace_rooms(id) ON DELETE CASCADE
+    FOREIGN KEY(room_id) REFERENCES palace_rooms(id) ON DELETE CASCADE,
+    FOREIGN KEY(memory_id) REFERENCES memories(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS palace_tunnels (

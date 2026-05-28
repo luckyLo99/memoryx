@@ -112,7 +112,7 @@ class HierarchicalMemoryManager:
     async def _archive_memory(self, memory: dict) -> None:
         memory_id = str(memory["memory_id"])
         await self.repository.db.execute(
-            "INSERT OR IGNORE INTO archived_memories(archive_id, memory_id, content, archived_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP);",
+            "INSERT OR IGNORE INTO archived_memories(id, memory_id, archived_reason, archived_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP);",
             (f"archive-{memory_id}-{uuid4().hex}", memory_id, str(memory.get("content", ""))),
         )
         await self.repository.rollback_memory(memory_id)

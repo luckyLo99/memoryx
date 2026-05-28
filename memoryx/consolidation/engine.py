@@ -39,7 +39,7 @@ class ConsolidationEngine:
             access_count = int(memory.get("access_count", 0))
             if decay >= 0.9 and access_count == 0 and memory.get("active_state", "active") == "active":
                 await self.repository.db.execute(
-                    "INSERT INTO archived_memories(archive_id, memory_id, content, archived_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP);",
+                    "INSERT INTO archived_memories(id, memory_id, archived_reason, archived_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP);",
                     (f"archive-{memory['memory_id']}", memory["memory_id"], memory["content"]),
                 )
                 await self.repository.rollback_memory(memory["memory_id"])
@@ -60,7 +60,7 @@ class ConsolidationEngine:
                     (new_score, memory["memory_id"]),
                 )
                 await self.repository.db.execute(
-                    "INSERT INTO reinforcement_events(reinforcement_id, memory_id, reinforcement_type, score_delta, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);",
+                    "INSERT INTO reinforcement_events(id, memory_id, event_type, reinforcement_score, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);",
                     (uuid4().hex, memory["memory_id"], "consolidation_reinforcement", 0.15),
                 )
                 reinforced += 1
