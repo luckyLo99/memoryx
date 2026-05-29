@@ -87,3 +87,4 @@ study/
 
 # MemoryX runtime
 memoryx-pure-release/
+*.tar.gz
