@@ -40,7 +40,7 @@ def test_detect_ipv4(pii: PIIFilter):
 
 
 def test_detect_api_key(pii: PIIFilter):
-    result = pii.detect("api_key="your_api_key_here"")
+    result = pii.detect('api_key=ABCDEFGHIJKLMNOPQRSTUVWXYZ')
     assert result.has_pii
     assert result.spans[0].type == "api_key"
 
@@ -72,8 +72,8 @@ def test_hmac_deterministic(pii: PIIFilter):
 
 
 def test_hmac_different_for_different_inputs(pii: PIIFilter):
-    r1 = pii.anonymize("your_email@example.com")
-    r2 = pii.anonymize("your_email@example.com")
+    r1 = pii.anonymize("alice@example.com")
+    r2 = pii.anonymize("bob@example.com")
     assert r1 != r2
 
 

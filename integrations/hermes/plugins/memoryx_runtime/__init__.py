@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-MEMORYX_ROOT = os.getenv("MEMORYX_ROOT", "/home/lucky/memoryx")
+MEMORYX_ROOT = os.getenv("MEMORYX_ROOT", os.getcwd())
 MEMORYX_DB_PATH = os.getenv("MEMORYX_DB_PATH", f"{MEMORYX_ROOT}/data/memoryx.db")
 MEMORYX_BASE_URL = os.getenv("MEMORYX_BASE_URL", "http://127.0.0.1:8080")
 P13_GATE_WRAPPER = f"{MEMORYX_ROOT}/tools/memoryx_p13_gate_wrapper.py"

@@ -9,7 +9,7 @@ from memoryx.events import MemoryEventType
 from memoryx.manager import MemoryHookManager
 
 
-MEMORYX_DB = os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db")
+MEMORYX_DB = os.getenv("MEMORYX_DB_PATH", "data/memoryx.db")
 
 
 def _ensure_session(session_id: str) -> None:

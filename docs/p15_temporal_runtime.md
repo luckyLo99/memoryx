@@ -15,7 +15,7 @@ After a Hermes session, check your time:
 python tools/memoryx_today_duration.py --entity xhs-learning
 
 # Or directly via SQL
-sqlite3 /home/lucky/memoryx/data/memoryx.db "
+sqlite3 "$MEMORYX_HOME/data/memoryx.db" "
 SELECT session_id, entity_id, task_type, title, duration_seconds,
        started_at, ended_at
 FROM tasks
@@ -178,7 +178,7 @@ baseline/p15-2-temporal-runtime-green
 ## Gate
 
 ```bash
-MEMORYX_DB_PATH=/home/lucky/memoryx/data/memoryx.db \
+MEMORYX_DB_PATH="$MEMORYX_HOME/data/memoryx.db" \
   python tools/memoryx_p152_temporal_gate.py
 ```
 

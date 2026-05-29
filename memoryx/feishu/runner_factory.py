@@ -135,7 +135,7 @@ class CLIHermesRunner:
             hermes_path
             or os.environ.get("HERMES_PATH")
             or shutil.which("hermes")
-            or "/home/lucky/.local/bin/hermes"
+            or os.getenv("HERMES_BIN", "hermes")
         )
         self.timeout = timeout
         self.trace_store = trace_store
@@ -216,7 +216,7 @@ class CLIHermesRunner:
         try:
             env = {
                 **os.environ,
-                "HERMES_HOME": os.environ.get("HERMES_HOME", "/home/lucky/.hermes"),
+                "HERMES_HOME": os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes")),
             }
             process = await asyncio.create_subprocess_exec(
                 *cmd,

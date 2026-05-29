@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("lancedb", reason="requires optional dependency: memoryx[lancedb]")
+
 from memoryx.embeddings import LanceDBVectorStore
 
 

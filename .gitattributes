@@ -7,3 +7,10 @@ study/ export-ignore
 memoryx-pure-release/ export-ignore
 scripts/test_siliconflow_embedding.py export-ignore
 tools/test_siliconflow_embedding.py export-ignore
+memoryx-pure-core-code.txt export-ignore
+production_selfcheck_report.* export-ignore
+P14.*_PLAN.md export-ignore
+verify_p*.py export-ignore
+tools/ export-ignore
+scripts/ export-ignore
+deploy/ export-ignore

@@ -103,7 +103,7 @@ async def project_progress(project_id: str):
 
 
 class WriteReviewRequest(BaseModel):
-    root: str = "/home/lucky/memoryx"
+    root: str = os.getenv("MEMORYX_ROOT", "data")
     project_id: str
     topic: str
     goal: str

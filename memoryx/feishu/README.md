@@ -43,7 +43,7 @@ error    失败    red   →  错误信息，附件仍保存在队列中
 ### Smoke 测试
 
 ```bash
-cd /home/lucky/memoryx
+cd /path/to/memoryx
 python3 tools/feishu_p14_smoke.py      # P14 模块级测试（9 场景）
 python3 tools/feishu_p141_smoke.py     # P14.1 生产硬化测试（12 场景）
 ```
@@ -54,14 +54,14 @@ python3 tools/feishu_p141_smoke.py     # P14.1 生产硬化测试（12 场景）
 from feishu import FeishuClient, FeishuSQLiteQueue, FeishuCardRenderer, FeishuHermesBotService, FeishuEventDedupe, create_feishu_router
 
 client = FeishuClient(app_id="...", app_secret="...")
-queue = FeishuSQLiteQueue("/home/lucky/memoryx/data/feishu_queue.db")
+queue = FeishuSQLiteQueue("data/feishu_queue.db")
 renderer = FeishuCardRenderer()
 service = FeishuHermesBotService(client=client, queue=queue, renderer=renderer)
-dedupe = FeishuEventDedupe("/home/lucky/memoryx/data/feishu_queue.db")
+dedupe = FeishuEventDedupe("data/feishu_queue.db")
 
 # FastAPI 路由
 app = FastAPI()
-app.include_router(create_feishu_router(bot_service=service, queue_db_path="/home/lucky/memoryx/data/feishu_queue.db"))
+app.include_router(create_feishu_router(bot_service=service, queue_db_path="data/feishu_queue.db"))
 ```
 
 ## 测试场景

@@ -31,12 +31,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+rest = [
+    "fastapi>=0.110.0",
+    "httpx>=0.24.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21.0",
     "black>=23.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
+    "fastapi>=0.110.0",
+    "httpx>=0.24.0",
 ]
 lancedb = ["lancedb>=0.19.0", "numpy>=1.26.0"]
 
