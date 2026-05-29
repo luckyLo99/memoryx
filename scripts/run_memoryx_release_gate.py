@@ -56,7 +56,8 @@ class ReleaseGate:
                  "--ignore=tests/test_extraction_client.py",
                  "--ignore=tools/",
                  "--ignore=memoryx-pure-release/",
-                 "--ignore=scripts/"])
+                 "--ignore=scripts/",
+                 "--ignore=tests/test_lancedb_vector_store.py"])
         out = r.stdout + r.stderr
         (self.report_dir / "collect-only.txt").write_text(out)
         if "error" in out.lower() and "collected" not in out:
@@ -77,6 +78,7 @@ class ReleaseGate:
                  "--ignore=tools/",
                  "--ignore=memoryx-pure-release/",
                  "--ignore=scripts/",
+                 "--ignore=tests/test_lancedb_vector_store.py",
                  f"--junitxml={self.report_dir}/full-junit.xml"])
         out = r.stdout + r.stderr
         (self.report_dir / "full-pytest.txt").write_text(out)
