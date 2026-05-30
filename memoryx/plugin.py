@@ -65,6 +65,18 @@ def register(ctx: Any) -> None:
     ctx.memoryx_manager = manager
 
     bridge = getattr(ctx, "memoryx_bridge", None)
+    memory_provider: Any = None
+    if bridge is not None and hasattr(bridge, "repository"):
+        from memoryx.hermes_provider import MemoryXHermesProvider
+        memory_provider = MemoryXHermesProvider(bridge=bridge)
+        ctx.memory_provider = memory_provider
+
+    def get_tool_schemas() -> list[dict[str, Any]]:
+        """Return memory tool schemas for the agent."""
+        if memory_provider is not None:
+            return memory_provider.get_tool_schemas()
+        return []
+    ctx.get_memory_tool_schemas = get_tool_schemas
 
     async def _emit(event_type: MemoryEventType, session_id: str, payload: dict[str, Any]) -> None:
         await manager.emit(event_type, session_id, payload)
@@ -86,9 +98,63 @@ def register(ctx: Any) -> None:
     async def on_tool_call(session_id: str, tool_name: str = "", args: dict | None = None, **extra: Any):
         payload = {"tool_name": tool_name, "args": args or {}, **extra}
         await _emit(MemoryEventType.ON_TOOL_CALL, session_id, payload)
+
+        # Always run guard evaluation first
+        tool_guard_result = None
         if bridge is not None and hasattr(bridge, "on_tool_call"):
-            return await bridge.on_tool_call(session_id=session_id, tool_name=tool_name, args=args or {}, **extra)
-        return None
+            tool_guard_result = await bridge.on_tool_call(
+                session_id=session_id, tool_name=tool_name, args=args or {}, **extra,
+            )
+        else:
+            tool_guard_result = type(
+                "ToolGuardFallback", (),
+                {"decision": "allow", "should_block": False, "guard_block": "",
+                 "metadata": {"degraded": True}, "to_dict": lambda self: {
+                     "decision": "allow", "should_block": False, "guard_block": "",
+                     "metadata": {"degraded": True},
+                     "event": "on_tool_call", "session_id": session_id,
+                 }},
+            )()
+
+        # Route memory tool through provider (after guard check)
+        if memory_provider is not None and tool_name == "memory":
+            if getattr(tool_guard_result, "should_block", False):
+                return {
+                    "ok": False,
+                    "action": args.get("action", "") if args else "",
+                    "error": "blocked by tool guard",
+                    "blocked": True,
+                    "metadata": {
+                        "tool_guard": {
+                            "decision": getattr(tool_guard_result, "decision", "block"),
+                            "should_block": True,
+                        },
+                    },
+                }
+
+            provider_result = await memory_provider.handle_tool_call(
+                tool_name=tool_name, arguments=args or {}, session_id=session_id,
+            )
+
+            # Merge guard metadata into result
+            if isinstance(provider_result, dict):
+                guard_decision = getattr(tool_guard_result, "decision", "allow")
+                guard_block = getattr(tool_guard_result, "guard_block", "")
+                guard_meta = getattr(tool_guard_result, "metadata", {})
+                provider_meta = provider_result.get("metadata", {})
+                provider_meta["tool_guard"] = {
+                    "decision": guard_decision,
+                    "guard_block": guard_block[:200] if guard_block else "",
+                    "degraded": guard_meta.get("degraded", False),
+                }
+                provider_result["metadata"] = provider_meta
+
+            return provider_result
+
+        # Non-memory tools: return guard result
+        if hasattr(tool_guard_result, "to_dict"):
+            return tool_guard_result.to_dict()
+        return tool_guard_result
 
     async def on_tool_result(session_id: str, tool_name: str = "", result: dict | str | None = None, **extra: Any):
         payload = {"tool_name": tool_name, "result": result, **extra}
