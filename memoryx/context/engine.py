@@ -17,6 +17,18 @@ def _resolve_layer_from_result(result: RetrievalResult) -> str:
     return meta.get("memory_layer", "")
 
 
+def _is_result_lesson(result: RetrievalResult) -> bool:
+    """Check if a retrieval result is a LESSON."""
+    if result.memory_type == "LESSON":
+        return True
+    raw = getattr(result, "metadata_json", "{}") or "{}"
+    try:
+        meta = json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    return meta.get("memory_class") == "lesson"
+
+
 class ContextAssemblyEngine:
     def __init__(self, max_token_budget: int = 1200) -> None:
         self.max_token_budget = max_token_budget
@@ -31,8 +43,12 @@ class ContextAssemblyEngine:
         recent_conversation: list[str],
         progressive: bool = False,
         working_context: list[str] | None = None,
+        include_lessons: bool = True,
     ) -> ContextBundle:
         deduped = self._deduplicate(route_plan.results)
+        # Filter lessons when include_lessons=False
+        if not include_lessons:
+            deduped = [r for r in deduped if not _is_result_lesson(r)]
         if progressive:
             deduped = self._auto_page(deduped)
         grouped = self._group_memories_by_layer(deduped, progressive=progressive)

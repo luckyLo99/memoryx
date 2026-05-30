@@ -67,6 +67,22 @@ def _session_matches(record: dict[str, Any], session_id: str | None) -> bool:
     return bool(mem_session) and mem_session == session_id
 
 
+def _is_lesson_memory(record: dict[str, Any]) -> bool:
+    """Check if a memory record is a LESSON.
+
+    Primary criterion: memory_type == "LESSON".
+    Fallback: metadata.memory_class == "lesson".
+    """
+    if record.get("memory_type") == "LESSON":
+        return True
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    return meta.get("memory_class") == "lesson"
+
+
 class HybridRetrievalEngine:
     def __init__(self, *, repository, vector_store) -> None:
         self.repository = repository
@@ -150,6 +166,10 @@ class HybridRetrievalEngine:
 
             # Candidate visibility filter: exclude candidate/rejected/superseded/stale
             if not _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates):
+                continue
+
+            # Lesson inclusion filter: exclude LESSON when include_lessons=False
+            if not include_lessons and _is_lesson_memory(memory):
                 continue
 
             memories.append(memory)
