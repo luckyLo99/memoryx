@@ -106,6 +106,61 @@ _CANDIDATE_META_KEYS = frozenset({
 class MemoryCandidatePolicy:
     """Policy rules for candidate memory lifecycle."""
 
+    MEMORY_TYPES_FOR_REQUIREMENT: set[str] = {"FACT", "PREFERENCE", "PROJECT", "TASK", "LESSON", "POLICY", "RULE", "GUARD"}
+
+    @staticmethod
+    def resolve_memory_layer(
+        memory_type: str,
+        scope: str,
+        source_type: str | None = None,
+        metadata: dict | None = None,
+        session_id: str | None = None,
+    ) -> str:
+        """Resolve memory_layer from memory_type, scope, metadata.
+
+        Rules (priority order):
+        1. metadata.memory_layer if present and valid takes highest priority.
+        2. metadata.memory_class in (policy, guard) → policy/guard.
+        3. memory_type in (POLICY, RULE, GUARD) as fallback → policy/guard.
+        4. memory_type in (PROJECT, TASK) or scope == project → project.
+        5. scope == session or session_id present (not global/user/project) → session.
+        6. memory_type in (PREFERENCE, PROFILE) or scope == user → long_term.
+        7. memory_type in (FACT, LESSON, EPISODIC) and scope in (global, user) → long_term.
+        8. Fallback → long_term.
+
+        Valid layers: working, session, project, long_term, policy, guard.
+        NOTE: POLICY/RULE/GUARD are NOT persisted as memory_type — only via
+        metadata.memory_class/memory_layer on existing allowed memory_types.
+        """
+        LEGAL_LAYERS = frozenset({"working", "session", "project", "long_term", "policy", "guard"})
+        meta = metadata or {}
+        explicit = meta.get("memory_layer")
+        if explicit in LEGAL_LAYERS:
+            return explicit
+
+        memory_class = meta.get("memory_class", "")
+        if memory_class == "guard":
+            return "guard"
+        if memory_class == "policy":
+            return "policy"
+
+        # Fallback: memory_type-based (backward compat for any stored POLICY memories)
+        if memory_type == "GUARD":
+            return "guard"
+        if memory_type in ("POLICY", "RULE"):
+            return "policy"
+
+        if memory_type in ("PROJECT", "TASK") or scope == "project":
+            return "project"
+
+        if scope == "session" or (session_id is not None and scope not in ("global", "user", "project")):
+            return "session"
+
+        if memory_type in ("PREFERENCE", "PROFILE") or scope == "user":
+            return "long_term"
+
+        return "long_term"
+
     @staticmethod
     def _is_release_fact(memory_type: str, metadata: dict | None) -> bool:
         """Check if this is a release fact expressed as FACT + metadata marker."""
@@ -323,9 +378,20 @@ class MemoryCandidateService:
         return datetime.now(timezone.utc).isoformat()
 
     def _build_candidate_metadata(self, request: MemoryCandidateRequest) -> dict[str, Any]:
+        layer = MemoryCandidatePolicy.resolve_memory_layer(
+            memory_type=request.memory_type,
+            scope=request.scope,
+            source_type=request.source_type,
+            metadata=request.metadata,
+            session_id=request.session_id,
+        )
+        now = self._now_iso()
         return {
             "candidate_state": CandidateState.CANDIDATE.value,
             "memory_type": request.memory_type,
+            "memory_layer": layer,
+            "layer_source": "explicit" if request.metadata.get("memory_layer") else "auto",
+            "layer_resolved_at": now,
             "evidence_level": request.evidence_level,
             "source_type": request.source_type,
             "source_event_id": request.source_event_id,

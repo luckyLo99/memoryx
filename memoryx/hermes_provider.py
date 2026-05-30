@@ -523,6 +523,7 @@ class MemoryXHermesProvider:
             "by_scope": {sc: {"total": total} for sc in set(s for t in by_type_scope.values() for s in t)},
             "approximate_content_chars": total_chars,
             "evidence_quality": await repo.evidence_quality_summary(),
+            "layer_quality": await repo.layer_quality_summary(),
             "limit_note": "Character count is approximate. DB path and secrets are not exposed.",
         }
 
@@ -606,7 +607,8 @@ class MemoryXHermesProvider:
             conf = s.get("confidence")
             conf_str = str(conf) if conf is not None else "unknown"
             stype = s.get("source_event_id") or s.get("source_type") or "unknown"
-            evidence_tag = f" evidence={ev} confidence={conf_str} source={stype}"
+            layer = s.get("memory_layer") or "unknown"
+            evidence_tag = f" evidence={ev} confidence={conf_str} source={stype} layer={layer}"
 
             entry = f"{prefix}{s.get('content', '')}{evidence_tag}"
             if s.get("memory_type") == "PREFERENCE":
@@ -677,6 +679,7 @@ class MemoryXHermesProvider:
             "scope": mem.get("scope", ""),
             "active_state": active_state,
             "candidate_state": candidate_state or None,
+            "memory_layer": metadata.get("memory_layer"),
             "evidence_level": metadata.get("evidence_level"),
             "confidence": metadata.get("confidence"),
             "source_event_id": metadata.get("source_event_id"),

@@ -326,6 +326,8 @@ def create_app(
                 "missing_evidence_count": ev_quality.get("missing_evidence_count", 0),
                 "unknown_metadata_count": ev_quality.get("unknown_metadata_count", 0),
             }
+            lq = await repo.layer_quality_summary()
+            db_stats["layer_quality"] = lq
         except Exception:
             db_stats["memory_count"] = -1
             db_stats["active_memory_count"] = -1
@@ -337,6 +339,11 @@ def create_app(
                 "e0_candidate_count": -1,
                 "missing_evidence_count": -1,
                 "unknown_metadata_count": -1,
+            }
+            db_stats["layer_quality"] = {
+                "by_memory_layer": {},
+                "missing_layer_count": -1,
+                "unknown_layer_count": -1,
             }
 
         if not all(checks.values()):
