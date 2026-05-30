@@ -319,12 +319,25 @@ def create_app(
             db_stats["candidate_count"] = by_cs.get("candidate", 0)
             db_stats["committed_count"] = by_cs.get("committed", 0)
             db_stats["stale_count"] = by_cs.get("stale", 0)
+            ev_quality = await repo.evidence_quality_summary()
+            db_stats["evidence_quality"] = {
+                "low_quality_candidate_count": ev_quality.get("low_quality_candidate_count", 0),
+                "e0_candidate_count": ev_quality.get("e0_candidate_count", 0),
+                "missing_evidence_count": ev_quality.get("missing_evidence_count", 0),
+                "unknown_metadata_count": ev_quality.get("unknown_metadata_count", 0),
+            }
         except Exception:
             db_stats["memory_count"] = -1
             db_stats["active_memory_count"] = -1
             db_stats["candidate_count"] = -1
             db_stats["committed_count"] = -1
             db_stats["stale_count"] = -1
+            db_stats["evidence_quality"] = {
+                "low_quality_candidate_count": -1,
+                "e0_candidate_count": -1,
+                "missing_evidence_count": -1,
+                "unknown_metadata_count": -1,
+            }
 
         if not all(checks.values()):
             return {

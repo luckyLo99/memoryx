@@ -367,6 +367,93 @@ class MemoryRepository:
             counts[cs] = counts.get(cs, 0) + 1
         return counts
 
+    async def count_memories_by_evidence_level(self) -> dict[str, int]:
+        """Return counts grouped by evidence_level from metadata_json.
+
+        Read-only scan.  Invalid metadata -> 'unknown'.
+        Missing evidence_level -> 'missing'.
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json FROM memories;", (),
+        )
+        counts: dict[str, int] = {}
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                counts["unknown"] = counts.get("unknown", 0) + 1
+                continue
+            el = meta.get("evidence_level", "missing")
+            counts[el] = counts.get(el, 0) + 1
+        return counts
+
+    async def count_low_quality_candidates(self) -> dict[str, int]:
+        """Return low-quality candidate statistics.
+
+        Low quality = candidate_state=='candidate' AND
+          evidence_level in {E0_MODEL_INFERENCE, missing, unknown}
+          OR confidence < 0.3
+
+        Returns dict with keys:
+          low_quality_candidate_count, e0_candidate_count,
+          missing_evidence_count, unknown_metadata_count
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json, confidence_score FROM memories;", (),
+        )
+        low_quality = 0
+        e0_candidate = 0
+        missing_evidence = 0
+        unknown_meta = 0
+
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                unknown_meta += 1
+                continue
+
+            cs = meta.get("candidate_state", "")
+            el = meta.get("evidence_level", "missing")
+            conf = meta.get("confidence", r["confidence_score"] if "confidence_score" in r.keys() else 0.0)
+            try:
+                conf = float(conf)
+            except (TypeError, ValueError):
+                conf = 0.0
+
+            if el == "missing":
+                missing_evidence += 1
+            if cs == "candidate" and el == "E0_MODEL_INFERENCE":
+                e0_candidate += 1
+            if cs == "candidate" and (
+                el in ("E0_MODEL_INFERENCE", "missing", "unknown") or conf < 0.3
+            ):
+                low_quality += 1
+
+        return {
+            "low_quality_candidate_count": low_quality,
+            "e0_candidate_count": e0_candidate,
+            "missing_evidence_count": missing_evidence,
+            "unknown_metadata_count": unknown_meta,
+        }
+
+    async def evidence_quality_summary(self) -> dict[str, Any]:
+        """Return combined evidence quality summary.
+
+        Combines evidence_level distribution, candidate_state distribution,
+        and low-quality candidate counts into a single report.
+        """
+        by_el = await self.count_memories_by_evidence_level()
+        by_cs = await self.count_memories_by_candidate_state()
+        lq = await self.count_low_quality_candidates()
+        return {
+            "by_evidence_level": by_el,
+            "by_candidate_state": by_cs,
+            **lq,
+        }
+
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
         await self.db.execute("UPDATE memories SET access_count=access_count+1, updated_at=? WHERE id=?;",(now,memory_id))
