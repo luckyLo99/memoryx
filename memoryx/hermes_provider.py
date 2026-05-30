@@ -22,7 +22,7 @@ from memoryx.services.memory_candidate_service import (
 
 logger = logging.getLogger(__name__)
 
-_VALID_ACTIONS = frozenset({"add", "read", "list", "replace", "remove", "usage"})
+_VALID_ACTIONS = frozenset({"add", "read", "list", "replace", "remove", "usage", "export"})
 _VALID_TARGETS = frozenset({"memory", "user", "project", "policy"})
 _DEFAULT_LIMIT = 20
 _MAX_LIMIT = 100
@@ -93,6 +93,11 @@ def _build_tool_schema() -> list[dict[str, Any]]:
                         "type": "boolean",
                         "description": "Include candidate/verified memories in results.",
                         "default": False,
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["memory_md", "user_md", "markdown", "json"],
+                        "description": "Output format for export action: memory_md (MEMORY.md style), user_md (USER.md style), markdown, json.",
                     },
                     "limit": {
                         "type": "integer",
@@ -515,6 +520,110 @@ class MemoryXHermesProvider:
             "approximate_content_chars": total_chars,
             "limit_note": "Character count is approximate. DB path and secrets are not exposed.",
         }
+
+    # ------------------------------------------------------------------
+    # action=export
+    # ------------------------------------------------------------------
+
+    async def _handle_export(self, args: dict[str, Any], session_id: str) -> dict[str, Any]:
+        """Export memories in human-readable format."""
+        fmt = args.get("format", "markdown").strip().lower()
+        target = args.get("target", "").strip().lower()
+        include_candidates = bool(args.get("include_candidates", False))
+        limit = _clamp_limit(args.get("limit", _DEFAULT_LIMIT))
+
+        valid_formats = {"memory_md", "user_md", "markdown", "json"}
+        if fmt not in valid_formats:
+            return {"ok": False, "error": f"invalid format '{fmt}'. Valid: {', '.join(sorted(valid_formats))}"}
+
+        repo = self.bridge.repository
+        states = {"active", "archived"} if not include_candidates else {"active", "archived", "superseded", "quarantined"}
+
+        # Fetch memories
+        if target and target in _TARGET_MAP:
+            memory_type, scope = _TARGET_MAP[target]
+            raw = await repo.list_memories_filtered(
+                limit=limit, memory_type=memory_type, scope=scope, include_states=states,
+            )
+        elif target == "policy":
+            raw = await repo.list_memories_filtered(limit=limit, include_states=states)
+            # Filter for policy via metadata
+        else:
+            raw = await repo.list_memories_filtered(limit=limit, include_states=states)
+
+        # Summarize, filtering per rules
+        summaries = []
+        for m in raw:
+            s = self._summarize_memory(m, include_candidates=include_candidates)
+            if s is not None:
+                summaries.append(s)
+
+        # Filter for policy target (needs metadata check)
+        if target == "policy":
+            summaries = [s for s in summaries if s.get("memory_class") == "policy"]
+
+        if fmt == "json":
+            return {"ok": True, "action": "export", "format": "json", "count": len(summaries), "memories": summaries}
+
+        # Build markdown
+        lines: list[str] = []
+        if fmt == "memory_md":
+            lines.append("# MemoryX MEMORY Export")
+            lines.append("")
+        elif fmt == "user_md":
+            lines.append("# MemoryX USER Export")
+            lines.append("")
+        else:
+            lines.append("# MemoryX Memory Export")
+            lines.append("")
+
+        # Group by type
+        sections: dict[str, list[str]] = {
+            "Project State": [],
+            "User Preferences": [],
+            "Facts": [],
+            "Policies / Lessons": [],
+            "Candidates": [],
+        }
+
+        for s in summaries:
+            prefix = ""
+            cs = s.get("candidate_state", "")
+            if cs == CandidateState.CANDIDATE.value or cs == CandidateState.VERIFIED.value:
+                prefix = f"[{cs.upper()}] "
+            elif cs == CandidateState.COMMITTED.value:
+                prefix = "[COMMITTED] "
+
+            entry = f"{prefix}{s.get('content', '')}"
+            if s.get("memory_type") == "PREFERENCE":
+                sections["User Preferences"].append(entry)
+            elif s.get("memory_type") == "PROJECT":
+                sections["Project State"].append(entry)
+            elif s.get("native_tool_action") == "add" and s.get("native_target") == "policy":
+                sections["Policies / Lessons"].append(entry)
+            elif cs in (CandidateState.CANDIDATE.value, CandidateState.VERIFIED.value):
+                sections["Candidates"].append(entry)
+            else:
+                sections["Facts"].append(entry)
+
+        for title, entries in sections.items():
+            if not entries:
+                continue
+            # For user_md format, only show user-related sections
+            if fmt == "user_md" and title not in ("User Preferences", "Facts", "Candidates"):
+                continue
+            # For memory_md format, only show non-user sections
+            if fmt == "memory_md" and title == "User Preferences":
+                continue
+            lines.append(f"## {title}")
+            for e in entries:
+                lines.append(f"§ {e}")
+            lines.append("")
+
+        if lines[-1] == "":
+            lines.pop()
+
+        return {"ok": True, "action": "export", "format": fmt, "text": "\\n".join(lines), "count": len(summaries)}
 
     # ------------------------------------------------------------------
     # Helpers

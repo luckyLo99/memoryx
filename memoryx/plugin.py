@@ -167,6 +167,23 @@ def register(ctx: Any) -> None:
         # 关闭会话
         _close_session(session_id)
         await _emit(MemoryEventType.ON_SESSION_END, session_id, extra)
+
+        # Extract candidates from session end if we have context
+        if memory_provider is not None:
+            try:
+                um = extra.get("user_message", "") or extra.get("content", "") or ""
+                ar = extra.get("assistant_response", "") or ""
+                tr = extra.get("tool_results", None)
+                se = extra.get("source_event_id", session_id[:16])
+                cs = memory_provider.candidate_service
+                await cs.extract_candidates_from_turn(
+                    session_id=session_id, user_message=um, assistant_response=ar,
+                    tool_results=tr, source_event_id=se, max_candidates=3,
+                    extraction_source="session_end",
+                )
+            except Exception:
+                pass  # degraded: extraction failure does not break session end
+
         if bridge is not None and hasattr(bridge, "on_session_end"):
             return await bridge.on_session_end(session_id=session_id, **extra)
         return None
