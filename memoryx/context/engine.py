@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+import json
 from memoryx.retrieval import RetrievalResult
 from memoryx.routing import RoutePlan
 
 from .models import ContextBundle
+
+
+def _resolve_layer_from_result(result: RetrievalResult) -> str:
+    """Extract memory_layer from a RetrievalResult's metadata_json if present."""
+    raw = getattr(result, "metadata_json", "{}") or "{}"
+    try:
+        meta = json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    return meta.get("memory_layer", "")
 
 
 class ContextAssemblyEngine:
@@ -19,30 +30,79 @@ class ContextAssemblyEngine:
         route_plan: RoutePlan,
         recent_conversation: list[str],
         progressive: bool = False,
+        working_context: list[str] | None = None,
     ) -> ContextBundle:
         deduped = self._deduplicate(route_plan.results)
         if progressive:
             deduped = self._auto_page(deduped)
-        grouped = self._group_memories(deduped, progressive=progressive)
+        grouped = self._group_memories_by_layer(deduped, progressive=progressive)
 
+        # Priority-ordered sections: policy -> project -> session -> long_term -> episodic
         sections: list[tuple[str, list[str]]] = [
             ("System Prompt", [system_prompt]),
             ("SOUL", [soul_prompt]),
             ("Current Task", [current_task]),
-            ("Relevant Long-Term Memory", grouped["long_term"]),
-            ("Project Context", grouped["project"]),
-            ("User Preferences", grouped["user"]),
-            ("Relevant Episodes", grouped["episodic"]),
-            ("Recent Conversation", recent_conversation),
         ]
 
+        # Policy/guard first (L4)
+        if grouped["policy"]:
+            sections.append(("Policy / Guard", grouped["policy"]))
+
+        # Working context (L0) — if provided
+        wc = working_context or []
+        if wc:
+            sections.append(("Working Context", wc))
+
+        # Project (L2)
+        if grouped["project"]:
+            sections.append(("Project Context", grouped["project"]))
+
+        # Session (L1)
+        if grouped["session"]:
+            sections.append(("Session Memory", grouped["session"]))
+
+        # Long-term (L3): facts + preferences + lessons — always emit sections for backward compat
+        sections.append(("Relevant Long-Term Memory", grouped["long_term"]))
+        sections.append(("User Preferences", grouped["user"]))
+        if grouped["lessons"]:
+            sections.append(("Lessons", grouped["lessons"]))
+
+        # Episodic — always emit for backward compat
+        sections.append(("Relevant Episodes", grouped["episodic"]))
+
+        sections.append(("Recent Conversation", recent_conversation))
+
         rendered, token_count, truncated, used_summary_fallback, section_map = self._render_with_budget(sections)
+
+        # Build layer counts
+        layer_counts: dict[str, int] = {}
+        for layer_key in ("policy", "project", "session", "long_term", "user", "lessons", "episodic"):
+            cnt = len(grouped.get(layer_key, []))
+            if cnt > 0:
+                layer_counts[layer_key] = cnt
+
         return ContextBundle(
             rendered=rendered,
             token_count=token_count,
             truncated=truncated,
             used_summary_fallback=used_summary_fallback,
             sections=section_map,
+            # Legacy fields
+            facts=grouped.get("long_term", []),
+            preferences=grouped.get("user", []),
+            lessons=grouped.get("lessons", []),
+            project_state=grouped.get("project", []),
+            warnings=[],
+            degraded=False,
+            total_candidates=0,
+            token_budget=self.max_token_budget,
+            # New layer fields
+            working_context=wc,
+            policy_context=grouped.get("policy", []),
+            session_context=grouped.get("session", []),
+            project_context=grouped.get("project", []),
+            long_term_context=grouped.get("long_term", []) + grouped.get("user", []) + grouped.get("lessons", []),
+            layer_counts=layer_counts,
         )
 
     def _deduplicate(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
@@ -56,26 +116,61 @@ class ContextAssemblyEngine:
             deduped.append(result)
         return deduped
 
-    def _group_memories(self, results: list[RetrievalResult], progressive: bool = False) -> dict[str, list[str]]:
+    def _group_memories_by_layer(self, results: list[RetrievalResult], progressive: bool = False) -> dict[str, list[str]]:
+        """Group retrieval results by memory_layer.
+
+        Falls back to old scope/memory_type logic when memory_layer is missing.
+        """
         grouped = {
-            "long_term": [],
+            "policy": [],
             "project": [],
+            "session": [],
+            "long_term": [],
             "user": [],
+            "lessons": [],
             "episodic": [],
         }
         for result in results:
+            layer = _resolve_layer_from_result(result)
             if progressive:
-                line = f"- [{result.memory_id}] ({result.memory_type}, scope={result.scope}, score={result.final_score:.2f})"
+                line = f"- [{result.memory_id}] ({result.memory_type}, scope={result.scope}, layer={layer or 'legacy'}, score={result.final_score:.2f})"
             else:
                 line = f"- ({result.memory_id}) {result.content}"
-            if result.memory_type == "EPISODIC":
-                grouped["episodic"].append(line)
-            elif result.scope == "user" or result.memory_type == "PREFERENCE":
-                grouped["user"].append(line)
-            elif result.scope == "project":
+
+            # Layer-based grouping
+            if layer in ("policy", "guard"):
+                grouped["policy"].append(line)
+            elif layer == "project":
                 grouped["project"].append(line)
+            elif layer == "session":
+                grouped["session"].append(line)
+            elif layer in ("long_term", ""):
+                # Long-term: further split into project, user/preferences, lessons, and general facts
+                if result.memory_type in ("PROJECT", "TASK") or result.scope == "project":
+                    grouped["project"].append(line)
+                elif result.memory_type == "PREFERENCE" or result.scope == "user":
+                    grouped["user"].append(line)
+                elif result.memory_type == "LESSON":
+                    grouped["lessons"].append(line)
+                elif result.memory_type == "EPISODIC":
+                    grouped["episodic"].append(line)
+                else:
+                    grouped["long_term"].append(line)
+            elif result.memory_type == "EPISODIC":
+                grouped["episodic"].append(line)
             else:
-                grouped["long_term"].append(line)
+                # Fallback: old behaviour
+                if result.scope == "user" or result.memory_type == "PREFERENCE":
+                    grouped["user"].append(line)
+                elif result.memory_type == "LESSON":
+                    grouped["lessons"].append(line)
+                elif result.scope == "project":
+                    grouped["project"].append(line)
+                elif result.memory_type == "EPISODIC":
+                    grouped["episodic"].append(line)
+                else:
+                    grouped["long_term"].append(line)
+
         return grouped
 
     def _render_with_budget(self, sections: list[tuple[str, list[str]]]) -> tuple[str, int, bool, bool, dict[str, list[str]]]:
@@ -138,7 +233,6 @@ class ContextAssemblyEngine:
         return len(text.split())
 
     def _auto_page(self, results: list) -> list:
-        """自动分页：当结果超过预算时，低分记忆进入 paged_out。"""
         if not results:
             return results
         total = sum(self._estimate_tokens(r.content) for r in results)

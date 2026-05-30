@@ -454,6 +454,41 @@ class MemoryRepository:
             **lq,
         }
 
+    async def count_memories_by_layer(self) -> dict[str, int]:
+        """Return counts grouped by memory_layer from metadata_json.
+
+        Read-only scan.  Invalid metadata -> 'unknown'.
+        Missing memory_layer -> 'missing' (backward compat).
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json FROM memories;", (),
+        )
+        counts: dict[str, int] = {}
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                counts["unknown"] = counts.get("unknown", 0) + 1
+                continue
+            layer = meta.get("memory_layer", "missing")
+            counts[layer] = counts.get(layer, 0) + 1
+        return counts
+
+    async def layer_quality_summary(self) -> dict[str, Any]:
+        """Return combined layer quality summary.
+
+        Includes by_memory_layer, missing_layer_count, unknown_layer_count.
+        """
+        by_layer = await self.count_memories_by_layer()
+        missing = by_layer.pop("missing", 0)
+        unknown = by_layer.pop("unknown", 0)
+        return {
+            "by_memory_layer": by_layer,
+            "missing_layer_count": missing,
+            "unknown_layer_count": unknown,
+        }
+
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
         await self.db.execute("UPDATE memories SET access_count=access_count+1, updated_at=? WHERE id=?;",(now,memory_id))
