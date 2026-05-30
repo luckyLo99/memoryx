@@ -342,6 +342,31 @@ class MemoryRepository:
             result[mt][sc] = r["cnt"]
         return result
 
+    async def count_memories_total(self) -> int:
+        """Return total number of memories."""
+        row = await self.db.fetchone("SELECT COUNT(*) AS cnt FROM memories;", ())
+        return int(row["cnt"]) if row else 0
+
+    async def count_memories_by_candidate_state(self) -> dict[str, int]:
+        """Return counts grouped by candidate_state from metadata_json.
+
+        Parses metadata_json for each memory.  Invalid/non-JSON metadata
+        is counted under 'unknown'.  This is a read-only scan.
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json FROM memories;", (),
+        )
+        counts: dict[str, int] = {}
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                meta = {}
+            cs = meta.get("candidate_state", "unknown")
+            counts[cs] = counts.get(cs, 0) + 1
+        return counts
+
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
         await self.db.execute("UPDATE memories SET access_count=access_count+1, updated_at=? WHERE id=?;",(now,memory_id))
