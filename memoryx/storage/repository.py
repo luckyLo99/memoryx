@@ -282,6 +282,52 @@ class MemoryRepository:
         await self.db.execute("UPDATE memories SET active_state='superseded',superseded_by=?,valid_to=?,updated_at=? WHERE id=?;",(superseded_by,now,now,memory_id))
         await self.append_audit("memories",memory_id,"supersede_memory",after_json={"superseded_by":superseded_by})
 
+    async def update_memory_metadata(self, memory_id: str, metadata_patch: dict) -> bool:
+        """Update metadata_json by merging patch into existing metadata.
+
+        Reads existing metadata_json, parses it, merges the patch dict on
+        top (patch wins), and writes back.  Unknown fields in the existing
+        metadata are preserved.  If metadata_json is empty or invalid JSON
+        it is treated as {} with an internal repair warning.
+        """
+        row = await self.db.fetchone("SELECT metadata_json FROM memories WHERE id=?;", (memory_id,))
+        if row is None:
+            return False
+
+        raw = row["metadata_json"]
+        try:
+            existing = json.loads(raw) if raw else {}
+        except (json.JSONDecodeError, ValueError):
+            existing = {"_metadata_repair_warning": "metadata_json was not valid JSON, reset to {}"}
+
+        merged = dict(existing)
+        merged.update(metadata_patch)
+
+        new_meta = json.dumps(merged, ensure_ascii=False)
+        now = self._now_iso()
+        await self.db.execute(
+            "UPDATE memories SET metadata_json=?, updated_at=? WHERE id=?;",
+            (new_meta, now, memory_id),
+        )
+        return True
+
+    async def update_memory_active_state(self, memory_id: str, active_state: str) -> bool:
+        """Update active_state with validation — only existing legal values allowed.
+
+        Legal values: active, archived, superseded, quarantined.
+        Returns False if state is not legal or memory not found.
+        """
+        LEGAL = frozenset({"active", "archived", "superseded", "quarantined"})
+        if active_state not in LEGAL:
+            return False
+
+        now = self._now_iso()
+        n = await self.db.execute(
+            "UPDATE memories SET active_state=?, updated_at=? WHERE id=?;",
+            (active_state, now, memory_id),
+        )
+        return n > 0
+
     async def add_conflict(self, memory_id: str, conflicting_memory_id: str, reason: str) -> None:
         now = self._now_iso()
         await self.db.execute("INSERT INTO memory_conflicts(id,memory_id,conflicting_memory_id,contradiction_reason,checksum,resolved_state,created_at,metadata_json) VALUES (?,?,?,?,?,?,?,?);",
