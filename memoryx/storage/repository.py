@@ -271,6 +271,77 @@ class MemoryRepository:
         rows = await self.db.fetchall("SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",(q,limit))
         return [self._row_to_dict(r) for r in rows]
 
+    async def search_memories_text(
+        self, query: str, limit: int = 20,
+        include_states: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search memories with optional active_state filter.
+
+        include_states: if set, only return memories whose active_state is in this set.
+        Default (None): only 'active' and 'archived' (excludes superseded/quarantined).
+        """
+        q = self._normalize_search_query(query)
+        if not q:
+            return []
+        states = include_states if include_states is not None else {"active", "archived"}
+        placeholders = ",".join("?" for _ in states)
+        rows = await self.db.fetchall(
+            f"SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+            f"WHERE memories_fts MATCH ? AND m.active_state IN ({placeholders}) "
+            f"ORDER BY bm25(memories_fts) LIMIT ?;",
+            (q, *states, limit),
+        )
+        return [self._row_to_dict(r) for r in rows]
+
+    async def list_memories_filtered(
+        self, limit: int = 20, memory_type: str | None = None,
+        scope: str | None = None, include_states: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """List memories with optional filtering.
+
+        include_states: if set, only return memories whose active_state is in this set.
+        Default (None): only 'active' and 'archived'.
+        """
+        conditions = []
+        params: list[Any] = []
+        states = include_states if include_states is not None else {"active", "archived"}
+        state_placeholders = ",".join("?" for _ in states)
+        conditions.append(f"active_state IN ({state_placeholders})")
+        params.extend(states)
+        if memory_type:
+            conditions.append("memory_type=?")
+            params.append(memory_type)
+        if scope:
+            conditions.append("scope=?")
+            params.append(scope)
+        where = " AND ".join(conditions)
+        rows = await self.db.fetchall(
+            f"SELECT * FROM memories WHERE {where} ORDER BY updated_at DESC LIMIT ?;",
+            (*params, limit),
+        )
+        return [self._row_to_dict(r) for r in rows]
+
+    async def count_memories_by_state(self) -> dict[str, int]:
+        """Return counts of memories grouped by active_state."""
+        rows = await self.db.fetchall(
+            "SELECT active_state, COUNT(*) AS cnt FROM memories GROUP BY active_state;"
+        )
+        return {r["active_state"]: r["cnt"] for r in rows}
+
+    async def count_memories_by_type_scope(self) -> dict[str, dict[str, int]]:
+        """Return counts grouped by memory_type -> scope."""
+        rows = await self.db.fetchall(
+            "SELECT memory_type, scope, COUNT(*) AS cnt FROM memories GROUP BY memory_type, scope ORDER BY memory_type;"
+        )
+        result: dict[str, dict[str, int]] = {}
+        for r in rows:
+            mt = r["memory_type"]
+            sc = r["scope"]
+            if mt not in result:
+                result[mt] = {}
+            result[mt][sc] = r["cnt"]
+        return result
+
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
         await self.db.execute("UPDATE memories SET access_count=access_count+1, updated_at=? WHERE id=?;",(now,memory_id))
