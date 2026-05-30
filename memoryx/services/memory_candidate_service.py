@@ -7,6 +7,7 @@ Stores candidate state in metadata_json to avoid schema changes.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -63,7 +64,7 @@ class MemoryCandidateRequest:
     source_type: str = "unknown"
     source_event_id: str | None = None
     evidence_ids: list[str] = field(default_factory=list)
-    evidence_level: str = EvidenceLevel.E0_MODEL_INFERENCE.value
+    evidence_level: str = "E0_MODEL_INFERENCE"
     confidence: float = 0.0
     metadata: dict = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
@@ -474,6 +475,168 @@ class MemoryCandidateService:
             return None
         metadata = self._parse_metadata(memory.get("metadata_json", "{}"))
         return metadata.get("candidate_state")
+
+    async def extract_candidates_from_turn(
+        self,
+        session_id: str,
+        user_message: str = "",
+        assistant_response: str = "",
+        tool_results: list[dict] | None = None,
+        source_event_id: str | None = None,
+        max_candidates: int = 5,
+        extraction_source: str = "turn",
+    ) -> list[str]:
+        """Rule-based extraction of memory candidates from a conversation turn.
+
+        Does NOT call any model API. Uses regex patterns to identify
+        stable information from user/assistant messages and tool results.
+        All extracted memories are created as candidates (not committed) using
+        E0 evidence level in the request with actual evidence stored in metadata.
+        """
+        candidates_created: list[str] = []
+        tr = tool_results or []
+
+        # Dedup by existing content
+        existing_hashes: set[str] = set()
+        try:
+            all_mems = await self.repository.list_memories_filtered(limit=5000)
+            for m in all_mems:
+                h = (m.get("content") or "").strip().lower()
+                if h:
+                    existing_hashes.add(h)
+        except Exception:
+            pass
+
+        async def _add_candidate(
+            content: str,
+            memory_type: str = "FACT",
+            scope: str = "global",
+            actual_evidence_level: str = EvidenceLevel.E0_MODEL_INFERENCE.value,
+            confidence: float = 0.3,
+            extraction_reason: str = "",
+            memory_class: str | None = None,
+        ) -> str | None:
+            nonlocal candidates_created
+            if not content or not content.strip():
+                return None
+            if content.strip().lower() in existing_hashes:
+                return None
+            if len(candidates_created) >= max_candidates:
+                return None
+            # Store actual evidence in metadata but use E0 for request to
+            # ensure all auto-extracts are candidate, never committed directly.
+            meta: dict = {
+                "extraction_source": extraction_source,
+                "auto_extracted": True,
+                "candidate_state": CandidateState.CANDIDATE.value,
+                "evidence_level": actual_evidence_level,
+                "source_event_id": source_event_id,
+                "extraction_reason": extraction_reason,
+            }
+            if memory_class:
+                meta["memory_class"] = memory_class
+            request = MemoryCandidateRequest(
+                content=content.strip(), session_id=session_id or None,
+                memory_type=memory_type, scope=scope, source_type="auto_extraction",
+                source_event_id=source_event_id, evidence_ids=[],
+                evidence_level=EvidenceLevel.E0_MODEL_INFERENCE.value,
+                confidence=confidence, metadata=meta,
+            )
+            try:
+                mid = await self.create_candidate(request)
+                existing_hashes.add(content.strip().lower())
+                return mid
+            except Exception:
+                return None
+
+        # Phase 1: tool results (highest quality evidence)
+        rl_kw = ["releasegate", "release gate", "fresh clone", "production acceptance"]
+        prj_kw = ["pytest", "test pass", "test fail", "failing", "build pass", "build fail"]
+        for tres in tr:
+            text = str(tres.get("result", "") or tres.get("output", "") or "").lower()
+            tn = str(tres.get("tool_name", "") or tres.get("name", "") or "").lower()
+            combined = f"{text} {tn}"
+
+            if any(kw in combined for kw in rl_kw) and ("pass" in combined or "success" in combined):
+                rid = await _add_candidate(
+                    content=f"[auto] Release gate passed: {text[:200]}",
+                    memory_type="FACT", scope="global",
+                    actual_evidence_level=EvidenceLevel.E4_RELEASE_GATE_SUPPORTED.value,
+                    confidence=0.9, extraction_reason="release_gate_passed",
+                    memory_class="release_fact",
+                )
+                if rid:
+                    candidates_created.append(rid)
+
+            if any(kw in combined for kw in prj_kw) and ("pass" in combined or "fail" in combined):
+                pid = await _add_candidate(
+                    content=f"[auto] Test result: {text[:200]}",
+                    memory_type="PROJECT", scope="project",
+                    actual_evidence_level=EvidenceLevel.E3_TOOL_OR_TEST_SUPPORTED.value,
+                    confidence=0.8, extraction_reason="tool_result_test",
+                )
+                if pid:
+                    candidates_created.append(pid)
+
+        # Phase 2: user message pattern detection
+        ul = (user_message or "").strip().lower()
+
+        pref_pats = [
+            r"(?:记住|remember|i\s+(?:prefer|like|want|need|习惯|习惯用|always|never|不要再用))",
+            r"(?:以后都|从现在开始|from now on|preference|偏好)",
+            r"(?:不要再|stop using|don't use|不喜欢)",
+        ]
+        for pat in pref_pats:
+            m = re.search(pat, ul)
+            if m:
+                start = max(0, m.start() - 60)
+                end = min(len(user_message or ""), m.end() + 150)
+                pref_text = (user_message or "")[start:end].strip()[:300]
+                pid = await _add_candidate(
+                    content=f"[auto] User preference: {pref_text}",
+                    memory_type="PREFERENCE", scope="user",
+                    actual_evidence_level=EvidenceLevel.E1_USER_STATED.value,
+                    confidence=0.5, extraction_reason="user_preference_pattern",
+                )
+                if pid:
+                    candidates_created.append(pid)
+                break
+
+        proj_pats = [
+            r"(?:当前基线|current baseline|已完成|已完成|done|已完成事项|已完成项)",
+            r"(?:下一步|next step|todo|待办|待办事项|禁止|不要做)",
+            r"(?:通过标准|acceptance criteria|验收标准)",
+            r"(?:本批目标|batch goal|this batch)",
+        ]
+        for pat in proj_pats:
+            m2 = re.search(pat, ul)
+            if m2:
+                start = max(0, m2.start() - 60)
+                end = min(len(user_message or ""), m2.end() + 200)
+                proj_text = (user_message or "")[start:end].strip()[:300]
+                pid = await _add_candidate(
+                    content=f"[auto] Project state: {proj_text}",
+                    memory_type="PROJECT", scope="project",
+                    actual_evidence_level=EvidenceLevel.E1_USER_STATED.value,
+                    confidence=0.5, extraction_reason="project_state_pattern",
+                )
+                if pid:
+                    candidates_created.append(pid)
+                break
+
+        # Phase 3: assistant response (always E0-only candidate)
+        al = (assistant_response or "").strip()
+        if len(al) > 30:
+            aid = await _add_candidate(
+                content=f"[auto asst] {al[:300]}",
+                memory_type="FACT", scope="global",
+                actual_evidence_level=EvidenceLevel.E0_MODEL_INFERENCE.value,
+                confidence=0.2, extraction_reason="assistant_response_auto",
+            )
+            if aid:
+                candidates_created.append(aid)
+
+        return candidates_created
 
     @staticmethod
     def _parse_metadata(metadata_json: str) -> dict[str, Any]:
