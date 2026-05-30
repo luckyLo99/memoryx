@@ -42,6 +42,31 @@ def _is_visible_memory_for_retrieval(
     return False
 
 
+def _is_session_scoped_memory(record: dict[str, Any]) -> bool:
+    """Check if a memory is session-scoped (scope=session or memory_layer=session).
+
+    Returns True if the memory belongs to a specific session.
+    Does NOT check if it matches the current session_id.
+    """
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    return record.get("scope") == "session" or meta.get("memory_layer") == "session"
+
+
+def _session_matches(record: dict[str, Any], session_id: str | None) -> bool:
+    """Check if a memory's session_id matches the given session_id.
+
+    Returns False if either side is None.
+    """
+    if not session_id:
+        return False
+    mem_session = record.get("session_id")
+    return bool(mem_session) and mem_session == session_id
+
+
 class HybridRetrievalEngine:
     def __init__(self, *, repository, vector_store) -> None:
         self.repository = repository
@@ -59,6 +84,7 @@ class HybridRetrievalEngine:
         include_global: bool = True,
         include_lessons: bool = True,
         include_candidates: bool = False,
+        session_only: bool = False,
         explain_scores: bool = False,
         tag_filter: list[str] | None = None,
         tag_mode: str = "any",
@@ -69,6 +95,7 @@ class HybridRetrievalEngine:
             session_id=session_id,
             scope_filter=scope_filter,
             include_global=include_global,
+            session_only=session_only,
         )
 
         vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
@@ -107,6 +134,16 @@ class HybridRetrievalEngine:
             elif not include_global:
                 if mem_scope == "global":
                     continue
+
+            # Session scope hardening (24.3C)
+            if _is_session_scoped_memory(memory):
+                if not _session_matches(memory, session_id):
+                    continue  # foreign session-scoped memory never visible
+            if session_only:
+                if not _is_session_scoped_memory(memory):
+                    continue  # session_only excludes global/user/project
+                if not _session_matches(memory, session_id):
+                    continue  # must also match session_id
 
             if tag_filter and not self._match_tags(memory.get("tags_json", "[]"), tag_filter, tag_mode):
                 continue
@@ -189,12 +226,25 @@ class HybridRetrievalEngine:
         session_id: str | None,
         scope_filter: str | None,
         include_global: bool = True,
+        session_only: bool = False,
     ) -> tuple[str, list[Any]]:
         """Build WHERE clause for session/scope visibility filtering."""
         clauses = ["active_state = 'active'"]
         params: list[Any] = []
 
         visible: list[str] = []
+
+        if session_only:
+            # Broad SQL pass — don't filter on scope here. The final eligibility
+            # is enforced in the memory loop via _is_session_scoped_memory().
+            # This avoids false negatives for scope='global' + memory_layer='session'.
+            if session_id:
+                visible.append("session_id = ?")
+                params.append(session_id)
+            elif visible:
+                visible.append("1=0")
+            clauses.append("(" + " OR ".join(visible) + ")")
+            return " AND ".join(clauses), params
 
         if session_id:
             visible.append("session_id = ?")

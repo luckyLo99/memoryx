@@ -53,6 +53,7 @@ class MemoryQueryAPI:
         include_global: bool = True,
         include_lessons: bool = True,
         include_candidates: bool = False,
+        session_only: bool = False,
         explain_scores: bool = False,
     ) -> list[dict]:
         kwargs = {
@@ -69,6 +70,7 @@ class MemoryQueryAPI:
             "include_global": include_global,
             "include_lessons": include_lessons,
             "include_candidates": include_candidates,
+            "session_only": session_only,
             "explain_scores": explain_scores,
         }.items():
             if key in sig.parameters:
