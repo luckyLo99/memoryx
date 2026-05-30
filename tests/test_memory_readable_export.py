@@ -207,3 +207,71 @@ async def test_export_target_filter(fake_bridge, seeded_repo) -> None:
     result = await provider.handle_tool_call("memory", {"action": "export", "format": "json", "target": "memory"})
     assert result["ok"] is True
     assert result["format"] == "json"
+
+
+# ===================================================================
+# 12. markdown export annotates evidence_level
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_export_annotates_evidence_level(fake_bridge, seeded_repo) -> None:
+    provider = MemoryXHermesProvider(bridge=fake_bridge)
+    result = await provider.handle_tool_call("memory", {"action": "export", "format": "markdown"})
+    assert result["ok"] is True
+    text = result.get("text", "")
+    assert "evidence=" in text
+
+
+# ===================================================================
+# 13. markdown export annotates confidence
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_export_annotates_confidence(fake_bridge, seeded_repo) -> None:
+    provider = MemoryXHermesProvider(bridge=fake_bridge)
+    result = await provider.handle_tool_call("memory", {"action": "export", "format": "markdown"})
+    assert result["ok"] is True
+    text = result.get("text", "")
+    assert "confidence=" in text
+
+
+# ===================================================================
+# 14. markdown export annotates source type
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_export_annotates_source_type(fake_bridge, seeded_repo) -> None:
+    provider = MemoryXHermesProvider(bridge=fake_bridge)
+    result = await provider.handle_tool_call("memory", {"action": "export", "format": "markdown"})
+    assert result["ok"] is True
+    text = result.get("text", "")
+    assert "source=" in text
+
+
+# ===================================================================
+# 15. include_candidates=true also annotates candidate evidence
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_export_candidate_evidence_annotation(fake_bridge, seeded_repo) -> None:
+    provider = MemoryXHermesProvider(bridge=fake_bridge)
+    result = await provider.handle_tool_call("memory", {"action": "export", "format": "markdown", "include_candidates": True})
+    assert result["ok"] is True
+    text = result.get("text", "")
+    # Candidate entries should also have evidence annotation
+    assert "[CANDIDATE]" in text
+    assert "evidence=E0_MODEL_INFERENCE" in text
+
+
+# ===================================================================
+# 16. export does not expose secret/token/api_key
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_export_markdown_no_secrets(fake_bridge, seeded_repo) -> None:
+    provider = MemoryXHermesProvider(bridge=fake_bridge)
+    result = await provider.handle_tool_call("memory", {"action": "export", "format": "markdown"})
+    text = result.get("text", "")
+    assert "api_key" not in text.lower()
+    assert "token" not in text.lower()
+

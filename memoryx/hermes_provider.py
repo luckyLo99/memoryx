@@ -522,6 +522,7 @@ class MemoryXHermesProvider:
             "by_memory_type": by_type,
             "by_scope": {sc: {"total": total} for sc in set(s for t in by_type_scope.values() for s in t)},
             "approximate_content_chars": total_chars,
+            "evidence_quality": await repo.evidence_quality_summary(),
             "limit_note": "Character count is approximate. DB path and secrets are not exposed.",
         }
 
@@ -567,7 +568,9 @@ class MemoryXHermesProvider:
             summaries = [s for s in summaries if s.get("memory_class") == "policy"]
 
         if fmt == "json":
-            return {"ok": True, "action": "export", "format": "json", "count": len(summaries), "memories": summaries}
+            repo2 = self.bridge.repository
+            ev_quality = await repo2.evidence_quality_summary()
+            return {"ok": True, "action": "export", "format": "json", "count": len(summaries), "memories": summaries, "evidence_quality": ev_quality}
 
         # Build markdown
         lines: list[str] = []
@@ -598,7 +601,14 @@ class MemoryXHermesProvider:
             elif cs == CandidateState.COMMITTED.value:
                 prefix = "[COMMITTED] "
 
-            entry = f"{prefix}{s.get('content', '')}"
+            # Evidence quality annotation
+            ev = s.get("evidence_level") or "unknown"
+            conf = s.get("confidence")
+            conf_str = str(conf) if conf is not None else "unknown"
+            stype = s.get("source_event_id") or s.get("source_type") or "unknown"
+            evidence_tag = f" evidence={ev} confidence={conf_str} source={stype}"
+
+            entry = f"{prefix}{s.get('content', '')}{evidence_tag}"
             if s.get("memory_type") == "PREFERENCE":
                 sections["User Preferences"].append(entry)
             elif s.get("memory_type") == "PROJECT":
@@ -674,6 +684,7 @@ class MemoryXHermesProvider:
             "entities": metadata.get("entities", mem.get("entities_json", "[]")),
             "native_target": metadata.get("native_target"),
             "native_tool_action": metadata.get("native_tool_action"),
+            "source_type": metadata.get("source_type"),
             "created_at": mem.get("created_at", ""),
             "updated_at": mem.get("updated_at", ""),
         }
