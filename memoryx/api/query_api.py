@@ -52,6 +52,7 @@ class MemoryQueryAPI:
         scope_filter: str | None = None,
         include_global: bool = True,
         include_lessons: bool = True,
+        include_candidates: bool = False,
         explain_scores: bool = False,
     ) -> list[dict]:
         kwargs = {
@@ -67,6 +68,7 @@ class MemoryQueryAPI:
             "scope_filter": scope_filter,
             "include_global": include_global,
             "include_lessons": include_lessons,
+            "include_candidates": include_candidates,
             "explain_scores": explain_scores,
         }.items():
             if key in sig.parameters:

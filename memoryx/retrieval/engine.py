@@ -1,10 +1,45 @@
 from __future__ import annotations
 
+import json
+import logging
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
 from .models import RetrievalIntent, RetrievalResult
+
+logger = logging.getLogger(__name__)
+
+
+def _is_visible_memory_for_retrieval(
+    record: dict[str, Any],
+    include_candidates: bool = False,
+) -> bool:
+    """Determine if a memory record should be visible in retrieval results.
+
+    Rules:
+    - metadata_json has no candidate_state: legacy committed, visible
+    - candidate_state in [committed, verified]: visible
+    - candidate_state == "candidate": only if include_candidates=True
+    - candidate_state in [rejected, superseded, stale]: never visible
+    - metadata_json invalid: conservatively visible (avoid killing old data)
+    """
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        return True  # conservative: don't kill old data on parse failure
+
+    cs = meta.get("candidate_state")
+    if cs is None:
+        return True  # legacy committed, always visible
+
+    if cs in ("committed", "verified"):
+        return True
+    if cs == "candidate":
+        return include_candidates
+    # rejected, superseded, stale — never visible
+    return False
 
 
 class HybridRetrievalEngine:
@@ -23,6 +58,7 @@ class HybridRetrievalEngine:
         session_id: str | None = None,
         include_global: bool = True,
         include_lessons: bool = True,
+        include_candidates: bool = False,
         explain_scores: bool = False,
         tag_filter: list[str] | None = None,
         tag_mode: str = "any",
@@ -38,7 +74,9 @@ class HybridRetrievalEngine:
         vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
         vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
 
-        keyword_hits = await self.repository.search_full_text(query, limit=max(limit * 3, 10))
+        # Fetch more candidates to account for post-filtering
+        fetch_limit = max(limit * 3, 30)
+        keyword_hits = await self.repository.search_full_text(query, limit=fetch_limit)
         keyword_map = {item["memory_id"]: item for item in keyword_hits}
 
         candidate_ids = list(dict.fromkeys([*vector_scores.keys(), *keyword_map.keys()]))
@@ -72,6 +110,11 @@ class HybridRetrievalEngine:
 
             if tag_filter and not self._match_tags(memory.get("tags_json", "[]"), tag_filter, tag_mode):
                 continue
+
+            # Candidate visibility filter: exclude candidate/rejected/superseded/stale
+            if not _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates):
+                continue
+
             memories.append(memory)
 
         weights = self._intent_weights(intent)

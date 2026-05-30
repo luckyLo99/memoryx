@@ -266,11 +266,11 @@ class MemoryXHermesProvider:
         if memory_id:
             mem = await repo.get_memory(memory_id)
             if mem is None:
-                return {"ok": False, "error": f"memory not found: {memory_id}"}
+                return {"ok": False, "action": "read", "error": "memory_not_found", "memory_id": memory_id, "memories": []}
             result = self._summarize_memory(mem, include_candidates=include_candidates)
             if result is None:
-                return {"ok": False, "error": "memory is not available"}
-            return {"ok": True, "action": "read", "memories": [result]}
+                return {"ok": True, "action": "read", "memory_id": memory_id, "memories": [], "filtered": True, "filter_reason": "candidate_state_hidden"}
+            return {"ok": True, "action": "read", "memory_id": memory_id, "memories": [result]}
 
         if query:
             raw = await repo.search_memories_text(query, limit=limit)
@@ -318,7 +318,7 @@ class MemoryXHermesProvider:
 
         results = []
         for m in raw:
-            r = self._summarize_memory(m, include_candidates=True)
+            r = self._summarize_memory(m, include_candidates=include_candidates)
             if r is not None:
                 results.append(r)
 
@@ -482,6 +482,7 @@ class MemoryXHermesProvider:
         candidate_count = 0
         verified_count = 0
         rejected_count = 0
+        stale_count = 0
         cand_rows = await repo.list_memories_filtered(limit=_MAX_LIMIT * 10)
         for r in cand_rows:
             m = self._parse_metadata(r.get("metadata_json", "{}"))
@@ -492,6 +493,8 @@ class MemoryXHermesProvider:
                 verified_count += 1
             elif cs == CandidateState.REJECTED.value:
                 rejected_count += 1
+            elif cs == "stale":
+                stale_count += 1
 
         # Rough char estimate from content length
         total_chars = 0
@@ -515,6 +518,7 @@ class MemoryXHermesProvider:
             "candidate_count": candidate_count,
             "verified_count": verified_count,
             "rejected_count": rejected_count,
+            "stale_count": stale_count,
             "by_memory_type": by_type,
             "by_scope": {sc: {"total": total} for sc in set(s for t in by_type_scope.values() for s in t)},
             "approximate_content_chars": total_chars,
@@ -641,10 +645,12 @@ class MemoryXHermesProvider:
         metadata = self._parse_metadata(mem.get("metadata_json", "{}"))
         candidate_state = metadata.get("candidate_state", "")
 
-        # Default: hide rejected/superseded
+        # Default: hide rejected/superseded/stale and non-verified candidates
         if not include_candidates:
-            if candidate_state in (CandidateState.REJECTED.value, CandidateState.SUPERSEDED.value):
+            if candidate_state in (CandidateState.REJECTED.value, CandidateState.SUPERSEDED.value, "stale"):
                 return None
+            if candidate_state == CandidateState.CANDIDATE.value:
+                return None  # candidates hidden by default
             if active_state == "superseded":
                 return None
             if active_state == "quarantined" and candidate_state != CandidateState.CANDIDATE.value:

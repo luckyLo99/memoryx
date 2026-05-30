@@ -476,6 +476,88 @@ class MemoryCandidateService:
         metadata = self._parse_metadata(memory.get("metadata_json", "{}"))
         return metadata.get("candidate_state")
 
+    async def mark_stale_candidates(
+        self, max_age_days: int = 14, limit: int = 100, dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Mark old candidate memories as stale.
+
+        Only processes metadata.candidate_state == 'candidate'.
+        Sets candidate_state to 'stale', active_state to 'quarantined'.
+        """
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        cutoff_iso = cutoff.isoformat()
+
+        all_mems = await self.repository.list_memories_filtered(
+            limit=limit * 5, include_states={"active", "archived", "quarantined"},
+        )
+        results: list[str] = []
+        for m in all_mems:
+            if len(results) >= limit:
+                break
+            meta = self._parse_metadata(m.get("metadata_json", "{}"))
+            if meta.get("candidate_state") != CandidateState.CANDIDATE.value:
+                continue
+            updated = m.get("updated_at") or m.get("created_at") or ""
+            if updated >= cutoff_iso:
+                continue  # too recent
+            results.append(m["id"])
+
+        if dry_run:
+            return {"count": len(results), "memory_ids": results, "dry_run": True, "max_age_days": max_age_days}
+
+        now = self._now_iso()
+        marked = 0
+        for mid in results:
+            ok = await self.repository.update_memory_metadata(mid, {
+                "candidate_state": "stale",
+                "stale_reason": "candidate_ttl_expired",
+                "stale_at": now,
+            })
+            if ok:
+                await self.repository.update_memory_active_state(mid, "quarantined")
+                marked += 1
+
+        return {"count": marked, "memory_ids": results, "dry_run": False, "max_age_days": max_age_days}
+
+    async def reject_stale_candidates(
+        self, max_age_days: int = 30, limit: int = 100, dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Reject old candidate memories via reject_candidate.
+
+        Only processes metadata.candidate_state == 'candidate'.
+        Uses reject_candidate (no physical delete).
+        """
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        cutoff_iso = cutoff.isoformat()
+
+        all_mems = await self.repository.list_memories_filtered(
+            limit=limit * 5, include_states={"active", "archived", "quarantined"},
+        )
+        results: list[str] = []
+        for m in all_mems:
+            if len(results) >= limit:
+                break
+            meta = self._parse_metadata(m.get("metadata_json", "{}"))
+            if meta.get("candidate_state") != CandidateState.CANDIDATE.value:
+                continue
+            updated = m.get("updated_at") or m.get("created_at") or ""
+            if updated >= cutoff_iso:
+                continue
+            results.append(m["id"])
+
+        if dry_run:
+            return {"count": len(results), "memory_ids": results, "dry_run": True, "max_age_days": max_age_days}
+
+        rejected = 0
+        for mid in results:
+            ok = await self.reject_candidate(mid, "candidate_ttl_expired")
+            if ok:
+                rejected += 1
+
+        return {"count": rejected, "memory_ids": results, "dry_run": False, "max_age_days": max_age_days}
+
     async def extract_candidates_from_turn(
         self,
         session_id: str,
