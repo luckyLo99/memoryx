@@ -318,11 +318,13 @@ def create_app(
             by_cs = await repo.count_memories_by_candidate_state()
             db_stats["candidate_count"] = by_cs.get("candidate", 0)
             db_stats["committed_count"] = by_cs.get("committed", 0)
+            db_stats["stale_count"] = by_cs.get("stale", 0)
         except Exception:
             db_stats["memory_count"] = -1
             db_stats["active_memory_count"] = -1
             db_stats["candidate_count"] = -1
             db_stats["committed_count"] = -1
+            db_stats["stale_count"] = -1
 
         if not all(checks.values()):
             return {
