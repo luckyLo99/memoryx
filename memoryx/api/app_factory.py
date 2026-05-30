@@ -279,7 +279,7 @@ def create_app(
             repo = await ensure_repo()
         except HTTPException:
             return {
-                "status": "degraded",
+                "status": "degraded", "ready": False,
                 "source": "rest",
                 "warning": "repository not configured",
                 "db": {"path": str(_default_db_path()), "exists": _default_db_path().exists()},
@@ -326,7 +326,7 @@ def create_app(
 
         if not all(checks.values()):
             return {
-                "status": "degraded",
+                "status": "degraded", "ready": False,
                 "source": "rest",
                 "warning": "some tables missing",
                 "checks": checks, "db": db_stats,
@@ -334,7 +334,7 @@ def create_app(
             }
 
         return {
-            "status": "ready",
+            "status": "ready", "ready": True,
             "source": "rest",
             "checks": checks,
             "db": db_stats,
