@@ -94,6 +94,11 @@ def _build_tool_schema() -> list[dict[str, Any]]:
                         "description": "Include candidate/verified memories in results.",
                         "default": False,
                     },
+                    "session_only": {
+                        "type": "boolean",
+                        "description": "Only include session-scoped memories (no global/user/project).",
+                        "default": False,
+                    },
                     "format": {
                         "type": "string",
                         "enum": ["memory_md", "user_md", "markdown", "json"],
@@ -259,6 +264,7 @@ class MemoryXHermesProvider:
         memory_id = args.get("memory_id", "").strip()
         query = args.get("query", "").strip()
         include_candidates = bool(args.get("include_candidates", False))
+        session_only = bool(args.get("session_only", False))
         limit = _clamp_limit(args.get("limit", _DEFAULT_LIMIT))
 
         repo = self.bridge.repository
@@ -270,6 +276,11 @@ class MemoryXHermesProvider:
             result = self._summarize_memory(mem, include_candidates=include_candidates)
             if result is None:
                 return {"ok": True, "action": "read", "memory_id": memory_id, "memories": [], "filtered": True, "filter_reason": "candidate_state_hidden"}
+            # session_only check for direct memory_id read
+            if session_only:
+                from memoryx.retrieval.engine import _is_session_scoped_memory, _session_matches
+                if not _is_session_scoped_memory(mem) or not _session_matches(mem, session_id):
+                    return {"ok": True, "action": "read", "memory_id": memory_id, "memories": [], "filtered": True, "filter_reason": "session_only_filtered"}
             return {"ok": True, "action": "read", "memory_id": memory_id, "memories": [result]}
 
         if query:
@@ -300,6 +311,7 @@ class MemoryXHermesProvider:
     async def _handle_list(self, args: dict[str, Any], session_id: str) -> dict[str, Any]:
         target = args.get("target", "").strip().lower()
         include_candidates = bool(args.get("include_candidates", False))
+        session_only = bool(args.get("session_only", False))
         limit = _clamp_limit(args.get("limit", _DEFAULT_LIMIT))
 
         repo = self.bridge.repository
@@ -315,6 +327,11 @@ class MemoryXHermesProvider:
             )
         else:
             raw = await repo.list_memories_filtered(limit=limit, include_states=states)
+
+        # Post-filter for session_only
+        if session_only and session_id:
+            from memoryx.retrieval.engine import _is_session_scoped_memory, _session_matches
+            raw = [m for m in raw if _is_session_scoped_memory(m) and _session_matches(m, session_id)]
 
         results = []
         for m in raw:
