@@ -45,10 +45,12 @@ def fake_bridge(ready_repo: MemoryRepository):
 @pytest.fixture
 async def seeded_repo(ready_repo: MemoryRepository) -> MemoryRepository:
     """Seed with committed and candidate memories."""
+    # Committed FACT (24.3D-C: create_candidate always CANDIDATE, must promote)
     svc = MemoryCandidateService(repository=ready_repo, policy=MemoryCandidatePolicy())
-    # Committed FACT
     mid1 = await svc.create_candidate(MemoryCandidateRequest(content="User prefers dark mode.", memory_type="FACT", source_type="user", evidence_level=EvidenceLevel.E2_USER_CONFIRMED.value, confidence=0.95))
     assert mid1 is not None
+    await svc.verify_candidate(mid1, EvidenceLevel.E2_USER_CONFIRMED.value, ["ev-1"])
+    await svc.commit_candidate(mid1)
     # Candidate - E0
     mid2 = await svc.create_candidate(MemoryCandidateRequest(content="Possible fact: user likes Go.", memory_type="FACT", source_type="assistant_inference", evidence_level=EvidenceLevel.E0_MODEL_INFERENCE.value, confidence=0.3, metadata={"native_target": "memory"}))
     assert mid2 is not None

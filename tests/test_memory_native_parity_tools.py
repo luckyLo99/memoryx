@@ -73,6 +73,9 @@ async def sample_memory_committed(ready_repo: MemoryRepository) -> str:
             confidence=0.95,
         )
     )
+    # 24.3D-C: promote to committed via manual verify+commit (no auto-promotion metadata)
+    await svc.verify_candidate(mid, EvidenceLevel.E2_USER_CONFIRMED.value, ["test-init"])
+    await svc.commit_candidate(mid)
     return mid
 
 

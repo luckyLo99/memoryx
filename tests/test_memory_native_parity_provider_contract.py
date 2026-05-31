@@ -107,6 +107,9 @@ async def test_remove_does_not_delete_original(fake_bridge, ready_repo) -> None:
 async def test_read_usable(fake_bridge, ready_repo) -> None:
     cs = MemoryCandidateService(repository=ready_repo, policy=MemoryCandidatePolicy())
     mid = await cs.create_candidate(MemoryCandidateRequest(content="Agent test memory.", memory_type="FACT", source_type="user", evidence_level=EvidenceLevel.E2_USER_CONFIRMED.value, confidence=0.95))
+    # 24.3D-C: promote candidate manually for read visibility
+    await cs.verify_candidate(mid, EvidenceLevel.E2_USER_CONFIRMED.value, ["test"])
+    await cs.commit_candidate(mid)
     provider = MemoryXHermesProvider(bridge=fake_bridge)
     result = await provider.handle_tool_call("memory", {"action": "read", "memory_id": mid})
     assert result["ok"] is True
