@@ -363,6 +363,52 @@ class MemoryRepository:
                 continue  # FTS syntax error → next plan
         return []
 
+    async def search_full_text_with_trace(
+        self, query: str, limit: int = 20,
+    ) -> tuple[list[dict[str, Any]], dict]:
+        """Full-text search returning (results, trace).  Trace has:
+        query_plan_used, fallback_steps, raw_hit_count.
+        """
+        tokens = tokenize_query_terms(query)
+        if not tokens:
+            return [], {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": 0}
+
+        plan_defs = [
+            ("phrase", _build_fts_query(tokens, "PHRASE")),
+            ("and",    _build_fts_query(tokens, "AND")),
+            ("or",     _build_fts_query(tokens, "OR")),
+        ]
+        expanded = expand_with_aliases(tokens)
+        alias_q = _build_fts_query(expanded, "OR")
+        plan_defs.append(("alias", alias_q))
+
+        fallback_steps: list[str] = []
+        for plan_name, fts_q in plan_defs:
+            if not fts_q:
+                continue
+            try:
+                rows = await self.db.fetchall(
+                    "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+                    "WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",
+                    (fts_q, limit),
+                )
+                count = len(rows)
+                if count > 0:
+                    return [self._row_to_dict(r) for r in rows], {
+                        "query_plan_used": plan_name,
+                        "fallback_steps": fallback_steps,
+                        "raw_hit_count": count,
+                    }
+                fallback_steps.append(f"{plan_name}:0")
+            except Exception:
+                fallback_steps.append(f"{plan_name}:error")
+                continue
+        return [], {
+            "query_plan_used": None,
+            "fallback_steps": fallback_steps,
+            "raw_hit_count": 0,
+        }
+
     async def search_memories_text(
         self, query: str, limit: int = 20,
         include_states: set[str] | None = None,

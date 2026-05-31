@@ -356,11 +356,23 @@ def create_app(
                 "env": {"cwd": _os.getcwd(), "memoryx_home": _os.environ.get("MEMORYX_HOME", "")},
             }
 
+        vector_store = state().lance_store
+        vector_available = vector_store is not None
+
         return {
             "status": "ready", "ready": True,
             "source": "rest",
             "checks": checks,
             "db": db_stats,
+            "retrieval_capabilities": {
+                "fts_fallback_enabled": True,
+                "query_tokenizer_enabled": True,
+                "alias_expansion_enabled": True,
+                "layer_boost_enabled": True,
+                "retrieval_dedup_enabled": True,
+                "trace_enabled": True,
+                "vector_store_available": vector_available,
+            },
             "env": {"cwd": _os.getcwd(), "memoryx_home": _os.environ.get("MEMORYX_HOME", "")},
         }
 
