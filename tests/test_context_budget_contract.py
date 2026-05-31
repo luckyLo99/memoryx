@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from memoryx.context.engine import ContextAssemblyEngine, _annotate_line, _resolve_layer_from_result, _is_result_lesson
+from memoryx.context.engine import ContextAssemblyEngine, _annotate_line, _resolve_layer_from_result, _is_result_lesson, _compress_priority_key
 from memoryx.context.models import ContextBundle, ContextBudgetPolicy
 from memoryx.retrieval.models import RetrievalResult
 
@@ -311,3 +311,111 @@ def test_prompt_order() -> None:
     session_idx = text.find("<session_context>")
     long_term_idx = text.find("<long_term_context>")
     assert policy_idx < working_idx < project_idx < session_idx < long_term_idx
+
+
+# ===================================================================
+# 24.5-C: compression priority by evidence_level
+# ===================================================================
+
+# --- helper: build a tight-budget policy suitable for compression tests ---
+def _tight_policy() -> ContextBudgetPolicy:
+    """Return a policy with small quotas that trigger compression on ~15 lines."""
+    return ContextBudgetPolicy(
+        max_tokens=300,
+        hard_reserve_working=10,
+        hard_reserve_warnings=10,
+        hard_reserve_policy=10,
+        max_long_term=80,
+        max_project=20,
+        max_session=20,
+        evidence_annotation=False,
+    )
+
+
+def test_compress_priority_key_e4_above_e1() -> None:
+    """E4 ranks strictly above E1 regardless of final_score."""
+    e4 = FakeResult(memory_id="e4", evidence_level="E4", final_score=0.3)
+    e1 = FakeResult(memory_id="e1", evidence_level="E1", final_score=0.99)
+    assert _compress_priority_key(e4) > _compress_priority_key(e1)
+
+
+def test_compress_priority_key_same_evidence_higher_score_wins() -> None:
+    """Within the same evidence tier, higher final_score ranks higher."""
+    a = FakeResult(memory_id="a", evidence_level="E3", final_score=0.6)
+    b = FakeResult(memory_id="b", evidence_level="E3", final_score=0.9)
+    assert _compress_priority_key(b) > _compress_priority_key(a)
+
+
+def test_compress_priority_key_unknown_last() -> None:
+    """Unknown / missing evidence ranks below E0 and E1."""
+    unknown = FakeResult(memory_id="u", evidence_level=None, final_score=0.99)
+    e0 = FakeResult(memory_id="e0", evidence_level="E0", final_score=0.1)
+    e1 = FakeResult(memory_id="e1", evidence_level="E1", final_score=0.1)
+    uk_key = _compress_priority_key(unknown)
+    assert _compress_priority_key(e0) > uk_key
+    assert _compress_priority_key(e1) > uk_key
+
+
+def test_compression_keeps_high_evidence_over_low() -> None:
+    """When quota forces truncation, E4 items survive while E0 items are dropped."""
+    results = [
+        FakeResult(memory_id="m1", content="High-evidence memory.", memory_type="FACT", scope="global",
+                   evidence_level="E4", final_score=0.5),
+        FakeResult(memory_id="m2", content="Low-evidence speculative guess.", memory_type="FACT", scope="global",
+                   evidence_level="E0", final_score=0.99),
+    ]
+    # Fill enough lines to trigger truncation in long_term quota
+    for i in range(20):
+        results.append(
+            FakeResult(memory_id=f"f{i}", content=f"filler data point {i}", memory_type="FACT", scope="global",
+                       evidence_level="E1", final_score=0.5),
+        )
+    from memoryx.routing import RoutePlan, RoutingIntent
+    route = RoutePlan(intent=RoutingIntent.CODING, primary_route="coding", results=results)
+    engine = ContextAssemblyEngine(policy=_tight_policy())
+    bundle = engine.assemble(
+        system_prompt="S", soul_prompt="S", current_task="T",
+        route_plan=route, recent_conversation=[],
+    )
+    rendered = bundle.rendered
+    assert "High-evidence memory" in rendered, "E4 item must survive compression"
+    # The E4 item should appear before the E0 item in the rendered output
+    e4_idx = rendered.find("High-evidence memory")
+    e0_idx = rendered.find("Low-evidence speculative guess")
+    if e4_idx >= 0 and e0_idx >= 0:
+        assert e4_idx < e0_idx, "E4 must appear before E0 in compressed context"
+
+
+def test_compression_does_not_change_section_order() -> None:
+    """Evidence-priority sorting must not reorder sections."""
+    results = [
+        FakeResult(memory_id="e4", content="E4 item", memory_type="FACT", scope="global",
+                   evidence_level="E4", final_score=0.9),
+        FakeResult(memory_id="p1", content="Policy item", memory_type="POLICY", scope="global",
+                   evidence_level="E4", final_score=1.0,
+                   metadata_json='{"memory_layer": "policy"}'),
+    ]
+    from memoryx.routing import RoutePlan, RoutingIntent
+    route = RoutePlan(intent=RoutingIntent.CODING, primary_route="coding", results=results)
+    engine = ContextAssemblyEngine(policy=_tight_policy())
+    bundle = engine.assemble(
+        system_prompt="S", soul_prompt="S", current_task="T",
+        route_plan=route, recent_conversation=[],
+        working_context=["wc1"],
+    )
+    text = bundle.to_prompt_text()
+    policy_idx = text.find("<policy_context>")
+    working_idx = text.find("<working_context>")
+    # Sections exist in order: policy > working > project > session > long_term
+    assert policy_idx >= 0, "policy_context section must be present"
+    assert working_idx >= 0, "working_context section must be present"
+    assert policy_idx < working_idx, \
+        "section order must be policy > working > project > session > long_term"
+
+
+def test_no_semantic_compression_engine_imported() -> None:
+    """Context engine must NOT import or call SemanticCompressionEngine."""
+    engine_path = Path(__file__).parent.parent / "memoryx" / "context" / "engine.py"
+    text = engine_path.read_text()
+    assert "SemanticCompressionEngine" not in text, \
+        "engine.py must not import or reference SemanticCompressionEngine"

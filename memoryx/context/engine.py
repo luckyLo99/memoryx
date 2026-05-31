@@ -29,6 +29,34 @@ def _is_result_lesson(result: RetrievalResult) -> bool:
     return meta.get("memory_class") == "lesson"
 
 
+# === 24.5-C: compression priority by evidence_level ===================================
+# Evidence rank: E4 > E3 > E2 > E1 > E0 > unknown
+# Same evidence → higher final_score wins.
+# This sort key is used before compression/truncation to retain high-evidence items.
+_EVIDENCE_RANK: dict[str, int] = {"E4": 5, "E3": 4, "E2": 3, "E1": 2, "E0": 1}
+
+
+def _compress_priority_key(result: RetrievalResult) -> tuple[int, float]:
+    """Sort key: (evidence_rank, final_score) — higher is better.
+
+    Used by compression/truncation to prioritise high-evidence items.
+    Unknown / missing evidence ranks last (0).
+    Does NOT change retrieval final_score — only affects which items survive truncation.
+    """
+    ev = getattr(result, "evidence_level", None)
+    if not ev:
+        raw = getattr(result, "metadata_json", "{}") or "{}"
+        try:
+            meta = json.loads(raw) if raw else {}
+        except (json.JSONDecodeError, ValueError):
+            meta = {}
+        ev = meta.get("evidence_level")
+    ev_str = str(ev).upper() if ev else ""
+    rank = _EVIDENCE_RANK.get(ev_str, 0)
+    score = getattr(result, "final_score", 0.0)
+    return (rank, score)
+
+
 def _annotate_line(result: RetrievalResult, *, evidence: bool, source: bool, layer: bool) -> str:
     """Add evidence/source/layer annotation to a memory line (24.5-B)."""
     parts = [f"- ({result.memory_id}) {result.content}"]
@@ -167,7 +195,7 @@ class ContextAssemblyEngine:
             if available <= 0:
                 # Still try to summarize if section has content and summary fits globally
                 if lines:
-                    summarized = self._summarize_lines(lines)
+                    summarized = self._summarize_lines(lines, policy=policy)
                     sum_est = self._token_count("\n".join(summarized))
                     if sum_est > 0 and sum_est <= max_tokens and summarized != lines:
                         # Summary fits in global budget - allow small overflow
@@ -204,7 +232,7 @@ class ContextAssemblyEngine:
 
             if est > available:
                 # Try summarize first, then truncate
-                summarized = self._summarize_lines(chosen)
+                summarized = self._summarize_lines(chosen, policy=policy)
                 sum_est = self._token_count("\n".join(summarized))
                 if sum_est <= available and summarized != chosen:
                     chosen = summarized
@@ -289,7 +317,13 @@ class ContextAssemblyEngine:
         return deduped
 
     def _group_memories_by_layer(self, results: list[RetrievalResult], progressive: bool = False) -> dict[str, list[str]]:
-        """Group retrieval results by memory_layer."""
+        """Group retrieval results by memory_layer.
+
+        Results are sorted by compression priority (evidence_level → final_score)
+        before formatting, so that truncation keeps high-evidence items first.
+        """
+        # 24.5-C: sort by evidence priority so compression/truncation favours high-evidence items
+        ordered = sorted(results, key=_compress_priority_key, reverse=True)
         grouped = {
             "policy": [],
             "project": [],
@@ -299,7 +333,7 @@ class ContextAssemblyEngine:
             "lessons": [],
             "episodic": [],
         }
-        for result in results:
+        for result in ordered:
             layer = _resolve_layer_from_result(result)
             if progressive:
                 line = f"- [{result.memory_id}] ({result.memory_type}, scope={result.scope}, layer={layer or 'legacy'}, score={result.final_score:.2f})"
@@ -385,13 +419,15 @@ class ContextAssemblyEngine:
             kept.append(line)
         return kept
 
-    def _summarize_lines(self, lines: list[str]) -> list[str]:
+    def _summarize_lines(self, lines: list[str], *, policy: ContextBudgetPolicy | None = None) -> list[str]:
         if not lines:
             return []
+        line_limit = policy.summarize_line_limit if policy else 3
+        token_limit = policy.summarize_token_limit_per_line if policy else 8
         summaries: list[str] = []
-        for line in lines[:3]:
+        for line in lines[:line_limit]:
             tokens = line.split()
-            summaries.append(" ".join(tokens[:8]))
+            summaries.append(" ".join(tokens[:token_limit]))
         return [f"- Summary: {' | '.join(summaries)}"]
 
     def _trim_rendered(self, rendered: str) -> str:
