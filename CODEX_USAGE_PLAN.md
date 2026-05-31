@@ -8,6 +8,8 @@
 
 This document describes how OpenAI Codex (and associated GPT models via API credits) will be used for **OSS maintainer automation** in the MemoryX project. Codex/GPT is **not integrated into MemoryX runtime** and does not serve as a default retrieval, memory, or context engine path.
 
+See also: `docs/MAINTAINER_WORKFLOW.md`, `docs/ISSUE_TRIAGE_GUIDE.md`, `docs/PR_REVIEW_GUIDE.md`, `RELEASE_CHECKLIST.md`.
+
 ## Approved Use Cases
 
 ### 1. Pull Request Review
