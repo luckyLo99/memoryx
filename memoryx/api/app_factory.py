@@ -193,7 +193,7 @@ def create_app(
                     pass
             await _close_state(app.state.memoryx)
 
-    app = FastAPI(title="MemoryX API", version="1.1.0", lifespan=lifespan)
+    app = FastAPI(title="MemoryX API", version="2.0.0", lifespan=lifespan)
 
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
@@ -239,7 +239,7 @@ def create_app(
 
     @app.get("/live")
     async def live() -> dict:
-        return {"status": "ok", "live": True, "version": "1.1.0"}
+        return {"status": "ok", "live": True, "version": "2.0.0"}
 
     @app.get("/ready")
     async def ready(_key: str | None = Depends(verify_api_key)) -> dict:
@@ -267,7 +267,7 @@ def create_app(
 
     @app.get("/health")
     async def health() -> dict:
-        return {"status": "ok", "version": "1.1.0"}
+        return {"status": "ok", "version": "2.0.0"}
 
     @app.get("/health/auth-required")
     async def health_auth_required(_key: str | None = Depends(verify_api_key)) -> dict:
