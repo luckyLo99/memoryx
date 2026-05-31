@@ -186,10 +186,14 @@ class HybridRetrievalEngine:
         hidden_lessons = 0
         hidden_state = 0
         dedup_dropped = 0
+        hydrated_count = 0
+        get_memory_count = 0
         for memory_id in candidate_ids:
+            get_memory_count += 1
             memory = await self.repository.get_memory(memory_id)
             if memory is None:
                 continue
+            hydrated_count += 1
 
             # Session isolation: filter by session_id and scope
             mem_scope = str(memory.get("scope", "global"))
@@ -321,9 +325,11 @@ class HybridRetrievalEngine:
             more_hits = await self.repository.search_full_text(query, limit=fallback_fetch)
             new_ids = {m["memory_id"] for m in more_hits} - {r.memory_id for r in results}
             for memory_id in new_ids:
+                get_memory_count += 1
                 memory = await self.repository.get_memory(memory_id)
                 if memory is None:
                     continue
+                hydrated_count += 1
                 if _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates) is False:
                     continue
                 if not include_lessons and _is_lesson_memory(memory):
@@ -394,6 +400,8 @@ class HybridRetrievalEngine:
                 layer_boost_applied=layer_boost_applied,
                 fetch_limit=base_fetch,
                 fallback_fetch_limit=fallback_fetch if fallback_used else None,
+                hydrated_count=hydrated_count,
+                get_memory_count=get_memory_count,
             )
             return results, trace.to_dict()
 
