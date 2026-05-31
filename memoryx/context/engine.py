@@ -44,6 +44,7 @@ class ContextAssemblyEngine:
         progressive: bool = False,
         working_context: list[str] | None = None,
         include_lessons: bool = True,
+        open_conflicts: list[str] | None = None,
     ) -> ContextBundle:
         deduped = self._deduplicate(route_plan.results)
         # Filter lessons when include_lessons=False
@@ -96,6 +97,10 @@ class ContextAssemblyEngine:
             cnt = len(grouped.get(layer_key, []))
             if cnt > 0:
                 layer_counts[layer_key] = cnt
+
+        # Build warnings from open conflicts
+        oc = open_conflicts or []
+        warnings = list(oc)
 
         return ContextBundle(
             rendered=rendered,

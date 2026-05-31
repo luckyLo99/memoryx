@@ -490,7 +490,52 @@ class MemoryCandidateService:
         }
         meta_ok = await self.repository.update_memory_metadata(memory_id, patch)
         state_ok = await self.repository.update_memory_active_state(memory_id, "active")
+
+        # 24.3D-D: If this is a replacement commit, auto-supersede original
+        if meta_ok and state_ok:
+            replace_target_id = metadata.get("replace_target_id")
+            if replace_target_id:
+                await self._handle_replacement_commit(memory_id, replace_target_id, metadata)
+
         return meta_ok and state_ok
+
+    async def _handle_replacement_commit(
+        self, new_memory_id: str, old_memory_id: str, new_meta: dict,
+    ) -> None:
+        """After a replacement commit, supersede the original and record conflict.
+
+        Writes metadata markers to the new memory for observability.
+        Does NOT block the commit if supersede fails.
+        """
+        target_memory = await self.repository.get_memory(old_memory_id)
+        if target_memory is None:
+            await self.repository.update_memory_metadata(new_memory_id, {
+                "replacement_target_missing": True,
+                "replacement_supersede_status": "target_missing",
+            })
+            return
+
+        sup_ok = await self.supersede_candidate(
+            old_memory_id,
+            superseded_by=new_memory_id,
+            reason=new_meta.get("replacement_reason", "replacement_committed"),
+        )
+
+        add_meta: dict[str, object] = {
+            "replacement_supersede_status": "success" if sup_ok else "failed",
+            "replacement_supersede_error": None if sup_ok else "supersede returned False",
+        }
+        await self.repository.update_memory_metadata(new_memory_id, add_meta)
+
+        # Write conflict record (best effort)
+        try:
+            await self.repository.add_conflict(
+                memory_id=old_memory_id,
+                conflicting_memory_id=new_memory_id,
+                reason=new_meta.get("replacement_reason", "replacement_committed"),
+            )
+        except Exception:
+            pass  # degraded: conflict record write failed
 
     async def reject_candidate(self, memory_id: str, reason: str) -> bool:
         """Reject a candidate. Uses 'quarantined' or 'archived' active_state."""

@@ -99,6 +99,22 @@ class HermesMemoryBridge:
         if working_lines:
             working_block = "<working_context>\n" + "\n".join(working_lines) + "\n</working_context>"
             context_block = working_block + "\n\n" + context_block
+
+        # Inject open conflict warning (24.3D-D)
+        conflict_warning: str | None = None
+        if hasattr(self.repository, "count_open_conflicts"):
+            try:
+                oc = await self.repository.count_open_conflicts()
+                if oc > 0:
+                    conflict_warning = (
+                        "<conflict_warning>\n"
+                        f"- {oc} open memory conflict(s) require review.\n"
+                        "</conflict_warning>"
+                    )
+            except Exception:
+                pass  # degraded
+        if conflict_warning:
+            context_block = conflict_warning + "\n\n" + context_block
         return HermesBridgeResult(
             event="on_user_message",
             session_id=session_id,
