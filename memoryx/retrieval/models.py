@@ -30,3 +30,4 @@ class RetrievalResult:
     episodic_score: float
     final_score: float
     explanation: str
+    layer_boost: float = 0.0
