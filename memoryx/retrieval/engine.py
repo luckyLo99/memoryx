@@ -187,10 +187,12 @@ class HybridRetrievalEngine:
         hidden_state = 0
         dedup_dropped = 0
         hydrated_count = 0
-        get_memory_count = 0
+        get_memory_count = len(candidate_ids)
+        batch_hydration_count = 0
+        memory_map = await self.repository.batch_get_memories(candidate_ids)
+        batch_hydration_count += 1
         for memory_id in candidate_ids:
-            get_memory_count += 1
-            memory = await self.repository.get_memory(memory_id)
+            memory = memory_map.get(memory_id)
             if memory is None:
                 continue
             hydrated_count += 1
@@ -324,9 +326,14 @@ class HybridRetrievalEngine:
             fallback_used = True
             more_hits = await self.repository.search_full_text(query, limit=fallback_fetch)
             new_ids = {m["memory_id"] for m in more_hits} - {r.memory_id for r in results}
+            if new_ids:
+                get_memory_count += len(new_ids)
+                more_memory_map = await self.repository.batch_get_memories(list(new_ids))
+                batch_hydration_count += 1
+            else:
+                more_memory_map = {}
             for memory_id in new_ids:
-                get_memory_count += 1
-                memory = await self.repository.get_memory(memory_id)
+                memory = more_memory_map.get(memory_id)
                 if memory is None:
                     continue
                 hydrated_count += 1
@@ -402,6 +409,7 @@ class HybridRetrievalEngine:
                 fallback_fetch_limit=fallback_fetch if fallback_used else None,
                 hydrated_count=hydrated_count,
                 get_memory_count=get_memory_count,
+                batch_hydration_count=batch_hydration_count,
             )
             return results, trace.to_dict()
 

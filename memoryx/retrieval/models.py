@@ -56,6 +56,7 @@ class RetrievalTrace:
     fallback_fetch_limit: int | None = None
     hydrated_count: int = 0
     get_memory_count: int = 0
+    batch_hydration_count: int = 0  # 24.6-B: number of batch_get_memories calls
 
     def to_dict(self) -> dict:
         return {
@@ -75,4 +76,5 @@ class RetrievalTrace:
             "fallback_fetch_limit": self.fallback_fetch_limit,
             "hydrated_count": self.hydrated_count,
             "get_memory_count": self.get_memory_count,
+            "batch_hydration_count": self.batch_hydration_count,
         }
