@@ -3,6 +3,56 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+@dataclass(frozen=True)
+class ContextBudgetPolicy:
+    """Deterministic context budget allocation (24.5-B).
+
+    max_tokens: global token budget for rendered context.
+    hard_reserve_*: tokens guaranteed for working/warnings/policy.
+    min_*/max_*: quota bounds for project/session/long_term.
+    evidence_annotation / source_annotation / layer_annotation: toggle annotation.
+    summarize_line_limit / summarize_token_limit_per_line: truncation params.
+    """
+    max_tokens: int = 1200
+
+    hard_reserve_working: int = 120
+    hard_reserve_warnings: int = 120
+    hard_reserve_policy: int = 240
+
+    min_project: int = 180
+    max_project: int = 300
+
+    min_session: int = 140
+    max_session: int = 240
+
+    min_long_term: int = 120
+    max_long_term: int = 300
+
+    evidence_annotation: bool = True
+    source_annotation: bool = True
+    layer_annotation: bool = True
+
+    summarize_line_limit: int = 3
+    summarize_token_limit_per_line: int = 8
+
+    @classmethod
+    def from_max_token_budget(cls, max_token_budget: int) -> "ContextBudgetPolicy":
+        """Build a policy scaled from a legacy max_token_budget value."""
+        ratio = max_token_budget / 1200
+        return cls(
+            max_tokens=max_token_budget,
+            hard_reserve_working=max(60, int(120 * ratio)),
+            hard_reserve_warnings=max(60, int(120 * ratio)),
+            hard_reserve_policy=max(120, int(240 * ratio)),
+            min_project=max(60, int(180 * ratio)),
+            max_project=max(120, int(300 * ratio)),
+            min_session=max(60, int(140 * ratio)),
+            max_session=max(120, int(240 * ratio)),
+            min_long_term=max(60, int(120 * ratio)),
+            max_long_term=max(120, int(300 * ratio)),
+        )
+
+
 @dataclass(slots=True)
 class ContextBundle:
     rendered: str
@@ -29,6 +79,10 @@ class ContextBundle:
     long_term_context: list[str] = field(default_factory=list)
     layer_counts: dict[str, int] = field(default_factory=dict)
 
+    # 24.5-B: budget observability
+    budget_report: dict = field(default_factory=dict)
+    truncation_reason: str | None = None
+
     def to_dict(self) -> dict:
         return {
             "rendered": self.rendered,
@@ -50,6 +104,8 @@ class ContextBundle:
             "project_context": self.project_context,
             "long_term_context": self.long_term_context,
             "layer_counts": self.layer_counts,
+            "budget_report": self.budget_report,
+            "truncation_reason": self.truncation_reason,
         }
 
     def to_json(self) -> str:

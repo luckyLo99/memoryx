@@ -4,7 +4,7 @@ import json
 from memoryx.retrieval import RetrievalResult
 from memoryx.routing import RoutePlan
 
-from .models import ContextBundle
+from .models import ContextBundle, ContextBudgetPolicy
 
 
 def _resolve_layer_from_result(result: RetrievalResult) -> str:
@@ -29,9 +29,28 @@ def _is_result_lesson(result: RetrievalResult) -> bool:
     return meta.get("memory_class") == "lesson"
 
 
+def _annotate_line(result: RetrievalResult, *, evidence: bool, source: bool, layer: bool) -> str:
+    """Add evidence/source/layer annotation to a memory line (24.5-B)."""
+    parts = [f"- ({result.memory_id}) {result.content}"]
+    tags = []
+    if evidence:
+        ev = getattr(result, "evidence_level", None) or "unknown"
+        tags.append(f"evidence={ev}")
+    if source:
+        stype = getattr(result, "source_type", None) or "unknown"
+        tags.append(f"source={stype}")
+    if layer:
+        lyr = _resolve_layer_from_result(result) or "legacy"
+        tags.append(f"layer={lyr}")
+    if tags:
+        parts.append(" [" + " ".join(tags) + "]")
+    return "".join(parts)
+
+
 class ContextAssemblyEngine:
-    def __init__(self, max_token_budget: int = 1200) -> None:
+    def __init__(self, max_token_budget: int = 1200, policy: ContextBudgetPolicy | None = None) -> None:
         self.max_token_budget = max_token_budget
+        self.policy = policy or ContextBudgetPolicy.from_max_token_budget(max_token_budget)
 
     def assemble(
         self,
@@ -46,6 +65,7 @@ class ContextAssemblyEngine:
         include_lessons: bool = True,
         open_conflicts: list[str] | None = None,
     ) -> ContextBundle:
+        policy = self.policy
         deduped = self._deduplicate(route_plan.results)
         # Filter lessons when include_lessons=False
         if not include_lessons:
@@ -54,42 +74,42 @@ class ContextAssemblyEngine:
             deduped = self._auto_page(deduped)
         grouped = self._group_memories_by_layer(deduped, progressive=progressive)
 
-        # Priority-ordered sections: policy -> project -> session -> long_term -> episodic
-        sections: list[tuple[str, list[str]]] = [
-            ("System Prompt", [system_prompt]),
-            ("SOUL", [soul_prompt]),
-            ("Current Task", [current_task]),
+        # Annotate lines if policy says so
+        if policy.evidence_annotation or policy.source_annotation or policy.layer_annotation:
+            annotated_grouped = {}
+            for key, lines in grouped.items():
+                annotated_grouped[key] = self._annotate_lines(
+                    deduped, lines, key,
+                    evidence=policy.evidence_annotation,
+                    source=policy.source_annotation,
+                    layer=policy.layer_annotation,
+                )
+            grouped = annotated_grouped
+
+        wc = working_context or []
+        oc = open_conflicts or []
+        warnings_lines = list(oc)
+
+        # Build ordered sections with quota info
+        section_specs: list[dict] = [
+            {"title": "System Prompt", "lines": [system_prompt], "quota": 9999, "hard": False, "key": "system"},
+            {"title": "SOUL", "lines": [soul_prompt], "quota": 9999, "hard": False, "key": "soul"},
+            {"title": "Current Task", "lines": [current_task], "quota": 9999, "hard": False, "key": "task"},
+            {"title": "Working Context", "lines": wc, "quota": policy.hard_reserve_working, "hard": True, "key": "working_context"},
+            {"title": "Warnings", "lines": warnings_lines, "quota": policy.hard_reserve_warnings, "hard": True, "key": "warnings"},
+            {"title": "Policy / Guard", "lines": grouped.get("policy", []), "quota": policy.hard_reserve_policy, "hard": True, "key": "policy_context"},
+            {"title": "Project Context", "lines": grouped.get("project", []), "quota": policy.max_project, "hard": False, "key": "project_context"},
+            {"title": "Session Memory", "lines": grouped.get("session", []), "quota": policy.max_session, "hard": False, "key": "session_context"},
+            {"title": "Relevant Long-Term Memory", "lines": grouped.get("long_term", []), "quota": policy.max_long_term, "hard": False, "key": "long_term"},
+            {"title": "User Preferences", "lines": grouped.get("user", []), "quota": policy.max_long_term, "hard": False, "key": "user"},
+            {"title": "Lessons", "lines": grouped.get("lessons", []), "quota": policy.max_long_term, "hard": False, "key": "lessons"},
+            {"title": "Relevant Episodes", "lines": grouped.get("episodic", []), "quota": policy.max_long_term, "hard": False, "key": "episodic"},
+            {"title": "Recent Conversation", "lines": recent_conversation, "quota": 9999, "hard": False, "key": "recent"},
         ]
 
-        # Policy/guard first (L4)
-        if grouped["policy"]:
-            sections.append(("Policy / Guard", grouped["policy"]))
-
-        # Working context (L0) — if provided
-        wc = working_context or []
-        if wc:
-            sections.append(("Working Context", wc))
-
-        # Project (L2)
-        if grouped["project"]:
-            sections.append(("Project Context", grouped["project"]))
-
-        # Session (L1)
-        if grouped["session"]:
-            sections.append(("Session Memory", grouped["session"]))
-
-        # Long-term (L3): facts + preferences + lessons — always emit sections for backward compat
-        sections.append(("Relevant Long-Term Memory", grouped["long_term"]))
-        sections.append(("User Preferences", grouped["user"]))
-        if grouped["lessons"]:
-            sections.append(("Lessons", grouped["lessons"]))
-
-        # Episodic — always emit for backward compat
-        sections.append(("Relevant Episodes", grouped["episodic"]))
-
-        sections.append(("Recent Conversation", recent_conversation))
-
-        rendered, token_count, truncated, used_summary_fallback, section_map = self._render_with_budget(sections)
+        rendered, token_count, trunc_reason, budget_report, section_map = self._render_with_budget_policy(
+            section_specs, policy=policy,
+        )
 
         # Build layer counts
         layer_counts: dict[str, int] = {}
@@ -98,33 +118,164 @@ class ContextAssemblyEngine:
             if cnt > 0:
                 layer_counts[layer_key] = cnt
 
-        # Build warnings from open conflicts
-        oc = open_conflicts or []
-        warnings = list(oc)
-
         return ContextBundle(
             rendered=rendered,
             token_count=token_count,
-            truncated=truncated,
-            used_summary_fallback=used_summary_fallback,
+            truncated=trunc_reason is not None,
+            used_summary_fallback=any(s.get("summarized") for s in budget_report.get("sections", {}).values()),
             sections=section_map,
             # Legacy fields
             facts=grouped.get("long_term", []),
             preferences=grouped.get("user", []),
             lessons=grouped.get("lessons", []),
             project_state=grouped.get("project", []),
-            warnings=[],
+            warnings=warnings_lines,
             degraded=False,
             total_candidates=0,
-            token_budget=self.max_token_budget,
-            # New layer fields
+            token_budget=policy.max_tokens,
+            # Layer fields
             working_context=wc,
             policy_context=grouped.get("policy", []),
             session_context=grouped.get("session", []),
             project_context=grouped.get("project", []),
             long_term_context=grouped.get("long_term", []) + grouped.get("user", []) + grouped.get("lessons", []),
             layer_counts=layer_counts,
+            # 24.5-B budget observability
+            budget_report=budget_report,
+            truncation_reason=trunc_reason,
         )
+
+    def _render_with_budget_policy(
+        self, section_specs: list[dict], *, policy: ContextBudgetPolicy,
+    ) -> tuple[str, int, str | None, dict, dict[str, list[str]]]:
+        """Render sections with quota-based budget allocation (24.5-B)."""
+        max_tokens = policy.max_tokens
+        used = 0
+        section_map: dict[str, list[str]] = {}
+        report_sections: dict[str, dict] = {}
+        trunc_reason: str | None = None
+        parts: list[str] = []
+
+        for spec in section_specs:
+            title = spec["title"]
+            lines = spec["lines"]
+            quota = spec["quota"]
+            hard = spec["hard"]
+            key = spec["key"]
+
+            available = min(quota, max_tokens - used)
+            if available <= 0:
+                # Still try to summarize if section has content and summary fits globally
+                if lines:
+                    summarized = self._summarize_lines(lines)
+                    sum_est = self._token_count("\n".join(summarized))
+                    if sum_est > 0 and sum_est <= max_tokens and summarized != lines:
+                        # Summary fits in global budget - allow small overflow
+                        chosen = summarized
+                        sec_text = f"[{title}]\n" + "\n".join(chosen) + "\n"
+                        sec_tokens = self._token_count(sec_text)
+                        section_map[title] = chosen
+                        used += sec_tokens
+                        report_sections[key] = {
+                            "allocated": 0,
+                            "used": sec_tokens,
+                            "truncated": False,
+                            "summarized": True,
+                        }
+                        parts.append(f"[{title}]")
+                        parts.extend(chosen)
+                        parts.append("")
+                        continue
+                if trunc_reason is None:
+                    trunc_reason = f"{key}_exhausted"
+                section_map[title] = []
+                report_sections[key] = {"allocated": 0, "used": 0, "truncated": True}
+                continue
+
+            chosen = list(lines)
+            est = self._token_count("\n".join(chosen))
+
+            report_sections[key] = {
+                "allocated": available,
+                "used": 0,
+                "truncated": False,
+                "summarized": False,
+            }
+
+            if est > available:
+                # Try summarize first, then truncate
+                summarized = self._summarize_lines(chosen)
+                sum_est = self._token_count("\n".join(summarized))
+                if sum_est <= available and summarized != chosen:
+                    chosen = summarized
+                    report_sections[key]["summarized"] = True
+                else:
+                    chosen = self._fit_lines_to_budget(chosen, available)
+                if len(chosen) < len(lines):
+                    if trunc_reason is None:
+                        trunc_reason = f"{key}_truncated"
+
+            section_map[title] = chosen
+            sec_text = f"[{title}]\n" + "\n".join(chosen) + "\n"
+            sec_tokens = self._token_count(sec_text)
+            used += sec_tokens
+
+            report_sections[key]["used"] = sec_tokens
+            report_sections[key]["truncated"] = len(chosen) < len(lines)
+
+            parts.append(f"[{title}]")
+            parts.extend(chosen)
+            parts.append("")
+
+        rendered = "\n".join(parts).strip() + "\n"
+        token_count = self._token_count(rendered)
+        if token_count > max_tokens:
+            trunc_reason = "global_overflow"
+            rendered = " ".join(rendered.split()[:max_tokens])
+            token_count = self._token_count(rendered)
+
+        budget_report = {
+            "max_tokens": max_tokens,
+            "used": used,
+            "sections": report_sections,
+        }
+        return rendered, token_count, trunc_reason, budget_report, section_map
+
+    def _fit_lines_to_budget(self, lines: list[str], budget: int) -> list[str]:
+        """Fit lines to a token budget."""
+        kept: list[str] = []
+        total = 0
+        for line in lines:
+            cost = self._token_count(line)
+            if total + cost > budget:
+                break
+            kept.append(line)
+            total += cost
+        return kept
+
+    def _annotate_lines(
+        self, results: list[RetrievalResult], lines: list[str], group_key: str,
+        *, evidence: bool, source: bool, layer: bool,
+    ) -> list[str]:
+        """Add evidence/source/layer tags to lines based on matching results."""
+        # Build lookup from content snippet to result
+        result_map: dict[str, RetrievalResult] = {}
+        for r in results:
+            snippet = r.content.strip()[:80].lower()
+            result_map[snippet] = r
+
+        annotated: list[str] = []
+        for line in lines:
+            matched = None
+            for snippet, r in result_map.items():
+                if snippet in line.lower():
+                    matched = r
+                    break
+            if matched:
+                annotated.append(_annotate_line(matched, evidence=evidence, source=source, layer=layer))
+            else:
+                annotated.append(line)
+        return annotated
 
     def _deduplicate(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
         seen: set[str] = set()
@@ -138,10 +289,7 @@ class ContextAssemblyEngine:
         return deduped
 
     def _group_memories_by_layer(self, results: list[RetrievalResult], progressive: bool = False) -> dict[str, list[str]]:
-        """Group retrieval results by memory_layer.
-
-        Falls back to old scope/memory_type logic when memory_layer is missing.
-        """
+        """Group retrieval results by memory_layer."""
         grouped = {
             "policy": [],
             "project": [],

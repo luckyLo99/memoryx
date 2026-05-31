@@ -272,5 +272,8 @@ class HermesMemoryBridge:
                 memory_type = item.get("memory_type", "MEMORY")
                 score = item.get("final_score", "")
                 content = str(item.get("content", "")).strip().replace("\n", " ")
-                lines.append(f"- [{memory_type} score={score}] {content[:500]}")
+                ev = item.get("evidence_level") or "unknown"
+                stype = item.get("source_type") or "unknown"
+                lyr = item.get("memory_layer") or "unknown"
+                lines.append(f"- [{memory_type} score={score} evidence={ev} source={stype} layer={lyr}] {content[:500]}")
         return "\n".join(lines).strip() + "\n"
