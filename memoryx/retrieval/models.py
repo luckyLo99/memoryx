@@ -54,6 +54,8 @@ class RetrievalTrace:
     layer_boost_applied: int = 0
     fetch_limit: int | None = None
     fallback_fetch_limit: int | None = None
+    hydrated_count: int = 0
+    get_memory_count: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -71,4 +73,6 @@ class RetrievalTrace:
             "layer_boost_applied": self.layer_boost_applied,
             "fetch_limit": self.fetch_limit,
             "fallback_fetch_limit": self.fallback_fetch_limit,
+            "hydrated_count": self.hydrated_count,
+            "get_memory_count": self.get_memory_count,
         }
