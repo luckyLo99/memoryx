@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections import Counter
@@ -83,6 +84,48 @@ def _is_lesson_memory(record: dict[str, Any]) -> bool:
     return meta.get("memory_class") == "lesson"
 
 
+def _layer_score_boost(record: dict[str, Any]) -> float:
+    """Return a deterministic layer-based score boost (24.4-B).
+
+    Only applies to memories that have already passed eligibility.
+    policy/guard get highest boost, project moderate, session slight.
+    long_term and legacy get no boost.
+    """
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    layer = meta.get("memory_layer", "")
+    if layer in ("policy", "guard"):
+        return 0.30
+    if layer == "project":
+        return 0.15
+    if layer == "session":
+        return 0.10
+    return 0.0
+
+
+def _retrieval_dedup_key(record: dict[str, Any], memory_type: str = "") -> str:
+    """Return a deduplication key for a memory record.
+
+    Based on content + memory_type + layer. Not a cryptographic hash,
+    just a deterministic grouping key.
+    """
+    content = (record.get("content") or "").strip().lower()
+    mt = memory_type or record.get("memory_type", "")
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    layer = meta.get("memory_layer", "")
+    return hashlib.sha256(f"{mt}|{layer}|{content}".encode("utf-8")).hexdigest()
+
+
+MIN_FINAL_SCORE = 0.05
+
+
 class HybridRetrievalEngine:
     def __init__(self, *, repository, vector_store) -> None:
         self.repository = repository
@@ -117,13 +160,15 @@ class HybridRetrievalEngine:
         vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
         vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
 
-        # Fetch more candidates to account for post-filtering
-        fetch_limit = max(limit * 3, 30)
-        keyword_hits = await self.repository.search_full_text(query, limit=fetch_limit)
+        # 24.4-B: fetch_limit optimization — base 2x, fallback 3x if needed
+        base_fetch = max(limit * 2, 30)
+        fallback_fetch = max(limit * 3, 30)
+        keyword_hits = await self.repository.search_full_text(query, limit=base_fetch)
         keyword_map = {item["memory_id"]: item for item in keyword_hits}
 
         candidate_ids = list(dict.fromkeys([*vector_scores.keys(), *keyword_map.keys()]))
         memories: list[dict[str, Any]] = []
+        seen_dedup: dict[str, float] = {}  # dedup_key -> best_score (24.4-B)
         for memory_id in candidate_ids:
             memory = await self.repository.get_memory(memory_id)
             if memory is None:
@@ -172,6 +217,14 @@ class HybridRetrievalEngine:
             if not include_lessons and _is_lesson_memory(memory):
                 continue
 
+            # 24.4-B: retrieval-level dedup
+            dk = _retrieval_dedup_key(memory)
+            est_score = vector_scores.get(memory_id, 0.0)
+            if dk in seen_dedup:
+                if est_score <= seen_dedup[dk]:
+                    continue  # lower or equal score, skip
+            seen_dedup[dk] = est_score
+
             memories.append(memory)
 
         weights = self._intent_weights(intent)
@@ -198,6 +251,10 @@ class HybridRetrievalEngine:
                 + episodic_score * weights["episodic"]
             )
 
+            # 24.4-B: layer-aware score boost
+            layer_boost = _layer_score_boost(memory)
+            final_score += layer_boost
+
             explanation = self._build_explanation(
                 semantic_score=semantic_score,
                 keyword_score=keyword_score,
@@ -207,6 +264,9 @@ class HybridRetrievalEngine:
                 episodic_score=episodic_score,
                 intent=intent,
             )
+            if layer_boost:
+                explanation += f", layer_boost={layer_boost:.2f}"
+
             results.append(
                 RetrievalResult(
                     memory_id=memory_id,
@@ -225,6 +285,54 @@ class HybridRetrievalEngine:
             )
 
         results.sort(key=lambda item: item.final_score, reverse=True)
+
+        # 24.4-B: fallback fetch if results < limit and base_fetch was fully utilized
+        if len(results) < limit and len(keyword_hits) >= base_fetch:
+            more_hits = await self.repository.search_full_text(query, limit=fallback_fetch)
+            new_ids = {m["memory_id"] for m in more_hits} - {r.memory_id for r in results}
+            for memory_id in new_ids:
+                memory = await self.repository.get_memory(memory_id)
+                if memory is None:
+                    continue
+                if _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates) is False:
+                    continue
+                if not include_lessons and _is_lesson_memory(memory):
+                    continue
+                dk = _retrieval_dedup_key(memory)
+                vs = vector_scores.get(memory_id, 0.0)
+                if dk in seen_dedup and vs <= seen_dedup[dk]:
+                    continue
+                seen_dedup[dk] = vs
+
+                content = str(memory["content"])
+                keyword_score = self._keyword_overlap(self._tokens(query), self._tokens(content))
+                importance_score = float(memory.get("importance_score", 0.0))
+                final_score = (
+                    vs * weights["semantic"]
+                    + keyword_score * weights["keyword"]
+                    + self._temporal_score(str(memory.get("valid_from") or memory.get("updated_at") or ""), now) * weights["temporal"]
+                    + self._entity_overlap(self._tokens(query), memory.get("entities_json", "[]")) * weights["entity"]
+                    + importance_score * weights["importance"]
+                    + (0.15 if str(memory.get("memory_type", "")) == "EPISODIC" else 0.0) * weights["episodic"]
+                )
+                final_score += _layer_score_boost(memory)
+                results.append(RetrievalResult(
+                    memory_id=memory_id, content=content,
+                    memory_type=str(memory.get("memory_type", "")),
+                    scope=str(memory.get("scope", "global")),
+                    semantic_score=vs, keyword_score=keyword_score,
+                    temporal_score=0.0, entity_score=0.0,
+                    importance_score=importance_score, episodic_score=0.0,
+                    final_score=final_score, explanation="fallback_fetch",
+                ))
+
+        results.sort(key=lambda item: item.final_score, reverse=True)
+
+        # 24.4-B: min score threshold trimming (only when results > limit)
+        if len(results) > limit:
+            results = [r for r in results if r.final_score >= MIN_FINAL_SCORE]
+            if not results:
+                results = []  # empty is safe
 
         # LESSON fusion: boost matching lesson memories
         if include_lessons:
