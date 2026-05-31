@@ -99,6 +99,11 @@ def _build_tool_schema() -> list[dict[str, Any]]:
                         "description": "Only include session-scoped memories (no global/user/project).",
                         "default": False,
                     },
+                    "explain": {
+                        "type": "boolean",
+                        "description": "Include retrieval trace/explain in response (debug only).",
+                        "default": False,
+                    },
                     "format": {
                         "type": "string",
                         "enum": ["memory_md", "user_md", "markdown", "json"],
@@ -281,9 +286,11 @@ class MemoryXHermesProvider:
         query = args.get("query", "").strip()
         include_candidates = bool(args.get("include_candidates", False))
         session_only = bool(args.get("session_only", False))
+        explain = bool(args.get("explain", False))
         limit = _clamp_limit(args.get("limit", _DEFAULT_LIMIT))
 
         repo = self.bridge.repository
+        explain_data: dict | None = None
 
         if memory_id:
             mem = await repo.get_memory(memory_id)
@@ -300,7 +307,9 @@ class MemoryXHermesProvider:
             return {"ok": True, "action": "read", "memory_id": memory_id, "memories": [result]}
 
         if query:
-            raw = await repo.search_memories_text(query, limit=limit)
+            raw, trace = await repo.search_full_text_with_trace(query, limit=limit)
+            if explain:
+                explain_data = trace
         else:
             states = {"active", "archived"}
             if include_candidates:
@@ -313,12 +322,15 @@ class MemoryXHermesProvider:
             if r is not None:
                 results.append(r)
 
-        return {
+        result = {
             "ok": True,
             "action": "read",
             "count": len(results),
             "memories": results,
         }
+        if explain_data is not None:
+            result["explain"] = explain_data
+        return result
 
     # ------------------------------------------------------------------
     # action=list

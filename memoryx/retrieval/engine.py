@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
-from .models import RetrievalIntent, RetrievalResult
+from .models import RetrievalIntent, RetrievalResult, RetrievalTrace
 
 logger = logging.getLogger(__name__)
 
@@ -158,9 +158,11 @@ class HybridRetrievalEngine:
         )
 
         vector_hits: list[dict] = []
+        vector_available = False
         if self.vector_store is not None:
             try:
                 vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+                vector_available = True
             except Exception:
                 vector_hits = []  # degraded: vector unavailable
         vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
@@ -168,12 +170,22 @@ class HybridRetrievalEngine:
         # 24.4-B: fetch_limit optimization — base 2x, fallback 3x if needed
         base_fetch = max(limit * 2, 30)
         fallback_fetch = max(limit * 3, 30)
-        keyword_hits = await self.repository.search_full_text(query, limit=base_fetch)
+        if explain_scores:
+            keyword_hits, fts_trace = await self.repository.search_full_text_with_trace(query, limit=base_fetch)
+        else:
+            keyword_hits = await self.repository.search_full_text(query, limit=base_fetch)
+            fts_trace = {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": len(keyword_hits)}
         keyword_map = {item["memory_id"]: item for item in keyword_hits}
 
         candidate_ids = list(dict.fromkeys([*vector_scores.keys(), *keyword_map.keys()]))
+        raw_hit_count = len(candidate_ids)
         memories: list[dict[str, Any]] = []
         seen_dedup: dict[str, float] = {}  # dedup_key -> best_score (24.4-B)
+        hidden_candidates = 0
+        hidden_session = 0
+        hidden_lessons = 0
+        hidden_state = 0
+        dedup_dropped = 0
         for memory_id in candidate_ids:
             memory = await self.repository.get_memory(memory_id)
             if memory is None:
@@ -196,19 +208,24 @@ class HybridRetrievalEngine:
                 elif include_global and mem_scope == "global":
                     pass
                 else:
+                    hidden_session += 1
                     continue  # different session, exclude
             elif not include_global:
                 if mem_scope == "global":
+                    hidden_state += 1
                     continue
 
             # Session scope hardening (24.3C)
             if _is_session_scoped_memory(memory):
                 if not _session_matches(memory, session_id):
+                    hidden_session += 1
                     continue  # foreign session-scoped memory never visible
             if session_only:
                 if not _is_session_scoped_memory(memory):
+                    hidden_session += 1
                     continue  # session_only excludes global/user/project
                 if not _session_matches(memory, session_id):
+                    hidden_session += 1
                     continue  # must also match session_id
 
             if tag_filter and not self._match_tags(memory.get("tags_json", "[]"), tag_filter, tag_mode):
@@ -216,10 +233,12 @@ class HybridRetrievalEngine:
 
             # Candidate visibility filter: exclude candidate/rejected/superseded/stale
             if not _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates):
+                hidden_candidates += 1
                 continue
 
             # Lesson inclusion filter: exclude LESSON when include_lessons=False
             if not include_lessons and _is_lesson_memory(memory):
+                hidden_lessons += 1
                 continue
 
             # 24.4-B: retrieval-level dedup
@@ -227,6 +246,7 @@ class HybridRetrievalEngine:
             est_score = vector_scores.get(memory_id, 0.0)
             if dk in seen_dedup:
                 if est_score <= seen_dedup[dk]:
+                    dedup_dropped += 1
                     continue  # lower or equal score, skip
             seen_dedup[dk] = est_score
 
@@ -236,6 +256,8 @@ class HybridRetrievalEngine:
         results: list[RetrievalResult] = []
         now = datetime.now(timezone.utc)
         query_tokens = self._tokens(query)
+        layer_boost_applied = 0
+        fallback_used = False
 
         for memory in memories:
             memory_id = str(memory.get("id") or memory.get("memory_id"))
@@ -259,6 +281,8 @@ class HybridRetrievalEngine:
             # 24.4-B: layer-aware score boost
             layer_boost = _layer_score_boost(memory)
             final_score += layer_boost
+            if layer_boost:
+                layer_boost_applied += 1
 
             explanation = self._build_explanation(
                 semantic_score=semantic_score,
@@ -293,6 +317,7 @@ class HybridRetrievalEngine:
 
         # 24.4-B: fallback fetch if results < limit and base_fetch was fully utilized
         if len(results) < limit and len(keyword_hits) >= base_fetch:
+            fallback_used = True
             more_hits = await self.repository.search_full_text(query, limit=fallback_fetch)
             new_ids = {m["memory_id"] for m in more_hits} - {r.memory_id for r in results}
             for memory_id in new_ids:
@@ -351,7 +376,28 @@ class HybridRetrievalEngine:
                 limit=limit,
             )
 
-        return results[:limit]
+        results = results[:limit]
+
+        if explain_scores:
+            trace = RetrievalTrace(
+                query_plan_used=fts_trace.get("query_plan_used"),
+                fallback_steps=fts_trace.get("fallback_steps", []),
+                fallback_used=fallback_used,
+                vector_available=vector_available,
+                raw_hits=raw_hit_count,
+                visible_hits=len(results),
+                dedup_dropped=dedup_dropped,
+                hidden_candidates=hidden_candidates,
+                hidden_session=hidden_session,
+                hidden_lessons=hidden_lessons,
+                hidden_state=hidden_state,
+                layer_boost_applied=layer_boost_applied,
+                fetch_limit=base_fetch,
+                fallback_fetch_limit=fallback_fetch if fallback_used else None,
+            )
+            return results, trace.to_dict()
+
+        return results
 
     @staticmethod
     def _build_visibility_filter(
