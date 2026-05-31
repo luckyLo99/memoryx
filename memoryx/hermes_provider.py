@@ -557,6 +557,7 @@ class MemoryXHermesProvider:
             "approximate_content_chars": total_chars,
             "evidence_quality": await repo.evidence_quality_summary(),
             "layer_quality": await repo.layer_quality_summary(),
+            "conflict_count": await repo.count_open_conflicts(),
             "limit_note": "Character count is approximate. DB path and secrets are not exposed.",
         }
 
@@ -641,7 +642,14 @@ class MemoryXHermesProvider:
             conf_str = str(conf) if conf is not None else "unknown"
             stype = s.get("source_event_id") or s.get("source_type") or "unknown"
             layer = s.get("memory_layer") or "unknown"
-            evidence_tag = f" evidence={ev} confidence={conf_str} source={stype} layer={layer}"
+            replaces = s.get("replace_target_id")
+            replaced_by = s.get("superseded_by")
+            lineage = ""
+            if replaces:
+                lineage += f" replaces={replaces}"
+            if replaced_by:
+                lineage += f" replaced_by={replaced_by}"
+            evidence_tag = f" evidence={ev} confidence={conf_str} source={stype} layer={layer}{lineage}"
 
             entry = f"{prefix}{s.get('content', '')}{evidence_tag}"
             if s.get("memory_type") == "PREFERENCE":
@@ -721,6 +729,8 @@ class MemoryXHermesProvider:
             "native_target": metadata.get("native_target"),
             "native_tool_action": metadata.get("native_tool_action"),
             "source_type": metadata.get("source_type"),
+            "replace_target_id": metadata.get("replace_target_id"),
+            "superseded_by": metadata.get("superseded_by"),
             "created_at": mem.get("created_at", ""),
             "updated_at": mem.get("updated_at", ""),
         }

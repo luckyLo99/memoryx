@@ -328,6 +328,7 @@ def create_app(
             }
             lq = await repo.layer_quality_summary()
             db_stats["layer_quality"] = lq
+            db_stats["open_conflict_count"] = await repo.count_open_conflicts()
         except Exception:
             db_stats["memory_count"] = -1
             db_stats["active_memory_count"] = -1

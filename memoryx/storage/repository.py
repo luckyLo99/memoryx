@@ -489,6 +489,20 @@ class MemoryRepository:
             "unknown_layer_count": unknown,
         }
 
+    async def count_open_conflicts(self) -> int:
+        """Return number of open (unresolved) conflicts."""
+        rows = await self.db.fetchall(
+            "SELECT COUNT(*) AS cnt FROM memory_conflicts WHERE resolved_state = 'open';", (),
+        )
+        return int(rows[0]["cnt"]) if rows else 0
+
+    async def count_conflicts_by_state(self) -> dict[str, int]:
+        """Return conflict counts grouped by resolved_state."""
+        rows = await self.db.fetchall(
+            "SELECT resolved_state, COUNT(*) AS cnt FROM memory_conflicts GROUP BY resolved_state;", (),
+        )
+        return {r["resolved_state"]: r["cnt"] for r in rows} if rows else {}
+
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
         await self.db.execute("UPDATE memories SET access_count=access_count+1, updated_at=? WHERE id=?;",(now,memory_id))
