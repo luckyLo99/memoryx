@@ -226,6 +226,12 @@ class MemoryXHermesProvider:
         if target == "policy":
             metadata["memory_class"] = "policy"
 
+        # 24.3D-C: Set trusted promotion source for user-initiated adds
+        if target in ("memory", "user"):
+            metadata["promotion_source"] = "user_explicit"
+            metadata["promotion_trusted"] = True
+            metadata["promotion_policy_version"] = "24.3D-C"
+
         request = MemoryCandidateRequest(
             content=content,
             session_id=session_id or None,
@@ -248,13 +254,23 @@ class MemoryXHermesProvider:
 
         state = await self.candidate_service.get_candidate_state(memory_id) or CandidateState.CANDIDATE.value
 
-        return {
+        # 24.3D-C: Attempt safe auto promotion for trusted candidates
+        promotion = await self.candidate_service.promote_candidate_if_safe(
+            memory_id, auto_commit=True,
+        )
+
+        result = {
             "ok": True,
             "action": "add",
-            "state": state,
+            "state": promotion.get("committed", False) and CandidateState.COMMITTED.value or state,
             "memory_id": memory_id,
-            "message": "已创建候选记忆，等待验证后提交",
+            "message": "已创建候选记忆，等待验证后提交"
+            if not promotion.get("promoted")
+            else "记忆已自动提交" if promotion.get("committed")
+            else "候选记忆已验证",
+            "promotion": promotion,
         }
+        return result
 
     # ------------------------------------------------------------------
     # action=read

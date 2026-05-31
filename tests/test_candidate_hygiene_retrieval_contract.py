@@ -43,14 +43,16 @@ def fake_bridge(ready_repo):
 async def seeded(ready_repo: MemoryRepository):
     """Seed with committed + candidate memories."""
     svc = MemoryCandidateService(repository=ready_repo, policy=MemoryCandidatePolicy())
-    # committed via E2
-    await svc.create_candidate(MemoryCandidateRequest(
+    # committed via E2 (24.3D-C: must promote)
+    mid = await svc.create_candidate(MemoryCandidateRequest(
         content="Committed fact.",
         memory_type="FACT",
         source_type="user",
         evidence_level=EvidenceLevel.E2_USER_CONFIRMED.value,
         confidence=0.95,
     ))
+    await svc.verify_candidate(mid, EvidenceLevel.E2_USER_CONFIRMED.value, ["ev-init"])
+    await svc.commit_candidate(mid)
     # candidate via E0
     await svc.create_candidate(MemoryCandidateRequest(
         content="Candidate inference.",

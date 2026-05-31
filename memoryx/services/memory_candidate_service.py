@@ -440,15 +440,10 @@ class MemoryCandidateService:
             entities_json=json.dumps(request.entities, ensure_ascii=False),
         )
 
-        # Set state per decision
-        if decision.state == CandidateState.COMMITTED.value:
-            record.active_state = "active"
-            merged["candidate_state"] = CandidateState.COMMITTED.value
-            merged["committed_at"] = self._now_iso()
-            record.metadata_json = json.dumps(merged, ensure_ascii=False)
-        else:
-            record.active_state = "active"
-            record.metadata_json = json.dumps(merged, ensure_ascii=False)
+        # Set state: always candidate initially (24.3D-C: create = create only)
+        record.active_state = "active"
+        merged["candidate_state"] = CandidateState.CANDIDATE.value
+        record.metadata_json = json.dumps(merged, ensure_ascii=False)
 
         memory_id = await self.repository.store_memory(record)
         return memory_id
@@ -541,6 +536,153 @@ class MemoryCandidateService:
             return None
         metadata = self._parse_metadata(memory.get("metadata_json", "{}"))
         return metadata.get("candidate_state")
+
+    # ------------------------------------------------------------------
+    # 24.3D-C: Candidate Promotion Contract
+    # ------------------------------------------------------------------
+
+    PROMOTION_POLICY_VERSION = "24.3D-C"
+
+    _AUTO_VERIFY_LEVELS: dict[str, dict[str, str]] = {
+        "user_explicit": {
+            "FACT": EvidenceLevel.E2_USER_CONFIRMED.value,
+            "PREFERENCE": EvidenceLevel.E2_USER_CONFIRMED.value,
+        },
+        "tool_verified": {
+            "FACT": EvidenceLevel.E3_TOOL_OR_TEST_SUPPORTED.value,
+            "PROJECT": EvidenceLevel.E3_TOOL_OR_TEST_SUPPORTED.value,
+            "TASK": EvidenceLevel.E3_TOOL_OR_TEST_SUPPORTED.value,
+        },
+    }
+
+    _BLOCKED_MEMORY_CLASSES: frozenset[str] = frozenset({"policy", "guard", "release_fact"})
+    _BLOCKED_SOURCE_TYPES: frozenset[str] = frozenset({
+        "assistant", "assistant_inference", "model_inference", "summary",
+    })
+
+    @staticmethod
+    def _is_auto_promotion_blocked(memory: dict) -> bool:
+        """Check if a candidate memory is blocked from auto promotion."""
+        raw_meta = memory.get("metadata_json", "{}")
+        try:
+            meta = json.loads(raw_meta) if raw_meta else {}
+        except (json.JSONDecodeError, ValueError):
+            meta = {}
+
+        memory_class = str(meta.get("memory_class", "")).lower()
+        if memory_class in MemoryCandidateService._BLOCKED_MEMORY_CLASSES:
+            return True
+
+        source_type = str(memory.get("source_type", meta.get("source_type", ""))).lower()
+        if source_type in MemoryCandidateService._BLOCKED_SOURCE_TYPES:
+            return True
+
+        evidence_level = str(meta.get("evidence_level", ""))
+        if evidence_level.startswith("E0"):
+            return True
+
+        try:
+            confidence = float(meta.get("confidence", memory.get("confidence_score", 0.0)))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < 0.3:
+            return True
+
+        candidate_state = meta.get("candidate_state")
+        if candidate_state == CandidateState.COMMITTED.value:
+            return False  # already committed, not blocked — just already done
+        if candidate_state not in (None, CandidateState.CANDIDATE.value):
+            return True
+
+        # Check operation type
+        operation = str(meta.get("candidate_operation", meta.get("native_tool_action", ""))).lower()
+        if operation in ("replace", "replacement", "delete", "deletion", "remove"):
+            return True
+
+        return False
+
+    @staticmethod
+    def _resolve_promotion_source(memory: dict) -> str | None:
+        """Return the trusted promotion source, or None if untrusted."""
+        raw_meta = memory.get("metadata_json", "{}")
+        try:
+            meta = json.loads(raw_meta) if raw_meta else {}
+        except (json.JSONDecodeError, ValueError):
+            meta = {}
+        if meta.get("promotion_trusted") is not True:
+            return None
+        source = meta.get("promotion_source")
+        if source in ("user_explicit", "tool_verified"):
+            return source
+        return None
+
+    async def promote_candidate_if_safe(
+        self,
+        memory_id: str,
+        *,
+        auto_commit: bool = True,
+    ) -> dict:
+        """Safely promote a candidate: verify then optionally commit.
+
+        Returns a dict with keys: promoted, verified, committed, candidate_id, reason.
+        Does NOT bypass existing verify_candidate() / commit_candidate() gates.
+        """
+        memory = await self.repository.get_memory(memory_id)
+        if memory is None:
+            return {"promoted": False, "reason": "not_found", "candidate_id": memory_id}
+
+        if self._is_auto_promotion_blocked(memory):
+            return {"promoted": False, "reason": "blocked", "candidate_id": memory_id}
+
+        promotion_source = self._resolve_promotion_source(memory)
+        if promotion_source is None:
+            return {"promoted": False, "reason": "untrusted_source", "candidate_id": memory_id}
+
+        raw_meta = memory.get("metadata_json", "{}")
+        try:
+            meta = json.loads(raw_meta) if raw_meta else {}
+        except (json.JSONDecodeError, ValueError):
+            meta = {}
+
+        # If already committed (defensive: should not happen in 24.3D-C pipeline),
+        # report as promoted=False with reason
+        if meta.get("candidate_state") == CandidateState.COMMITTED.value:
+            return {
+                "promoted": False, "verified": False, "committed": True,
+                "candidate_id": memory_id, "reason": "already_committed",
+            }
+
+        memory_type = memory.get("memory_type", meta.get("memory_type", "")) or ""
+        target_level = self._AUTO_VERIFY_LEVELS.get(promotion_source, {}).get(memory_type)
+        if target_level is None:
+            return {"promoted": False, "reason": "unsupported_memory_type", "candidate_id": memory_id}
+
+        # Step 1: auto verify
+        verified = await self.verify_candidate(
+            memory_id,
+            evidence_level=target_level,
+            evidence_ids=[f"auto:{promotion_source}:{self._now_iso()}"],
+            verified_by=f"system:auto_promotion:{promotion_source}",
+        )
+        if not verified:
+            return {"promoted": False, "reason": "verify_failed", "candidate_id": memory_id}
+
+        # Step 2: auto commit (if requested and gate allows)
+        if not auto_commit:
+            return {
+                "promoted": True, "verified": True, "committed": False,
+                "candidate_id": memory_id,
+                "reason": "verified_by_policy",
+            }
+
+        committed = await self.commit_candidate(memory_id)
+        return {
+            "promoted": True,
+            "verified": True,
+            "committed": bool(committed),
+            "candidate_id": memory_id,
+            "reason": "committed_by_policy" if committed else "commit_gate_blocked",
+        }
 
     async def mark_stale_candidates(
         self, max_age_days: int = 14, limit: int = 100, dry_run: bool = False,

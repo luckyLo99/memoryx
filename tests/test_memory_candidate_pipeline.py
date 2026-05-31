@@ -120,7 +120,11 @@ async def test_e2_user_confirmed_fact_commits_directly(
     )
     mid = await service.create_candidate(request)
     state = await service.get_candidate_state(mid)
-    assert state == CandidateState.COMMITTED.value
+    assert state == CandidateState.CANDIDATE.value
+    v = await service.verify_candidate(mid, EvidenceLevel.E2_USER_CONFIRMED.value, ["evt-user-123"])
+    assert v is True
+    c = await service.commit_candidate(mid)
+    assert c is True
 
     mem = await ready_repo.get_memory(mid)
     assert mem is not None
@@ -148,11 +152,22 @@ async def test_e3_tool_supported_project_verify_then_commit(
     )
     mid = await service.create_candidate(request)
     state = await service.get_candidate_state(mid)
-    assert state == CandidateState.COMMITTED.value
+    assert state == CandidateState.CANDIDATE.value, "24.3D-C: create_candidate always creates CANDIDATE"
+
+    # Manual verify + commit (this test validates the pipeline, not auto promote)
+    verified = await service.verify_candidate(mid, EvidenceLevel.E3_TOOL_OR_TEST_SUPPORTED.value, ["test-run-789"])
+    assert verified is True
+    state2 = await service.get_candidate_state(mid)
+    assert state2 == CandidateState.VERIFIED.value
+
+    committed = await service.commit_candidate(mid)
+    assert committed is True
 
     mem = await ready_repo.get_memory(mid)
     assert mem is not None
     assert mem["active_state"] == "active"
+    final_state = await service.get_candidate_state(mid)
+    assert final_state == CandidateState.COMMITTED.value
 
 
 # ===================================================================
@@ -176,7 +191,13 @@ async def test_e4_release_fact_verify_then_commit(
     )
     mid = await service.create_candidate(request)
     state = await service.get_candidate_state(mid)
-    assert state == CandidateState.COMMITTED.value
+    # 24.3D-C: release_fact is blocked from auto promote, but manual verify+commit works
+    assert state == CandidateState.CANDIDATE.value
+    # Manual verify + commit
+    verified = await service.verify_candidate(mid, EvidenceLevel.E4_RELEASE_GATE_SUPPORTED.value, ["release-2026-05-30"])
+    assert verified is True
+    committed = await service.commit_candidate(mid)
+    assert committed is True
 
     mem = await ready_repo.get_memory(mid)
     assert mem is not None
@@ -675,6 +696,10 @@ async def test_committed_cannot_be_recommitted(
         confidence=0.95,
     )
     mid = await service.create_candidate(request)
+    assert await service.get_candidate_state(mid) == CandidateState.CANDIDATE.value
+    # Manual verify+commit (no auto-promotion metadata)
+    await service.verify_candidate(mid, EvidenceLevel.E2_USER_CONFIRMED.value, ["test-id"])
+    await service.commit_candidate(mid)
     assert await service.get_candidate_state(mid) == CandidateState.COMMITTED.value
 
     ok = await service.commit_candidate(mid)
