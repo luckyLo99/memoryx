@@ -19,6 +19,70 @@ MEMORY_TYPES = {
     "OPINION_SHIFT", "LESSON",
 }
 
+_QUERY_ALIASES: dict[str, list[str]] = {
+    "pytest": ["py test", "python test"],
+    "rust": ["rust programming", "rust language"],
+    "js": ["javascript"],
+    "ts": ["typescript"],
+    "sqlite": ["sqlite3", "fts5"],
+    "db": ["database"],
+    "deploy": ["release", "deployment"],
+    "build": ["compile"],
+}
+
+
+def tokenize_query_terms(query: str) -> list[str]:
+    """Deterministic query tokenizer for FTS5 searches (24.4-C).
+
+    Supports camelCase, snake_case, kebab-case, dot, slash, version numbers.
+    Original words are preserved alongside split forms.
+    """
+    if not query or not query.strip():
+        return []
+    raw = query.strip()
+    import re as _re
+    segments = _re.split(r"[-_.\\/]", raw)
+    tokens: list[str] = []
+    for seg in segments:
+        if not seg:
+            continue
+        # Split camelCase
+        parts = _re.sub(r"([a-z])([A-Z])", r"\1 \2", seg).lower().split()
+        for p in parts:
+            p = _re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", p)
+            if p and p not in tokens:
+                tokens.append(p)
+    # Preserve original raw query (for LIKE fallback, not FTS5 MATCH)
+    # raw_lower = raw.lower().strip()
+    # if raw_lower and raw_lower not in tokens:
+    #     tokens.insert(0, raw_lower)
+    return tokens
+
+
+def _build_fts_query(tokens: list[str], operator: str = "AND") -> str:
+    """Build a safe FTS5 MATCH query from tokens. Returns empty string if no safe tokens."""
+    safe = [t.replace('"', '""') for t in tokens if t]
+    if not safe:
+        return ""
+    if operator == "AND":
+        return " AND ".join(safe)
+    elif operator == "OR":
+        return " OR ".join(safe)
+    elif operator == "PHRASE":
+        return '"' + safe[0] + '"' if len(safe) == 1 else " NEAR/0 ".join(safe)
+    return " OR ".join(safe)
+
+
+def expand_with_aliases(tokens: list[str]) -> list[str]:
+    """Expand tokens using static alias map. Returns up to 16 unique tokens."""
+    expanded = list(tokens)
+    for t in tokens:
+        for alias in _QUERY_ALIASES.get(t, []):
+            for sub in alias.split():
+                if sub and sub not in expanded:
+                    expanded.append(sub)
+    return expanded[:16]
+
 
 @dataclass(init=False)
 class MemoryRecord:
@@ -266,10 +330,38 @@ class MemoryRepository:
         return [self._row_to_dict(r) for r in rows]
 
     async def search_full_text(self, query: str, limit: int=20) -> list[dict[str,Any]]:
-        q = self._normalize_search_query(query)
-        if not q: return []
-        rows = await self.db.fetchall("SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",(q,limit))
-        return [self._row_to_dict(r) for r in rows]
+        """Full-text search with fallback plan: phrase → AND → OR → alias OR (24.4-C)."""
+        tokens = tokenize_query_terms(query)
+        if not tokens:
+            return []
+
+        plans = []
+        phrase_q = _build_fts_query(tokens, "PHRASE")
+        if phrase_q:
+            plans.append(phrase_q)
+        and_q = _build_fts_query(tokens, "AND")
+        if and_q and and_q != phrase_q:
+            plans.append(and_q)
+        or_q = _build_fts_query(tokens, "OR")
+        if or_q and or_q not in (phrase_q, and_q):
+            plans.append(or_q)
+        expanded = expand_with_aliases(tokens)
+        alias_or = _build_fts_query(expanded, "OR")
+        if alias_or and alias_or != or_q:
+            plans.append(alias_or)
+
+        for fts_q in plans:
+            try:
+                rows = await self.db.fetchall(
+                    "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+                    "WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",
+                    (fts_q, limit),
+                )
+                if rows:
+                    return [self._row_to_dict(r) for r in rows]
+            except Exception:
+                continue  # FTS syntax error → next plan
+        return []
 
     async def search_memories_text(
         self, query: str, limit: int = 20,

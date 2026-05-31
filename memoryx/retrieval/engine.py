@@ -157,7 +157,12 @@ class HybridRetrievalEngine:
             session_only=session_only,
         )
 
-        vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+        vector_hits: list[dict] = []
+        if self.vector_store is not None:
+            try:
+                vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+            except Exception:
+                vector_hits = []  # degraded: vector unavailable
         vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
 
         # 24.4-B: fetch_limit optimization — base 2x, fallback 3x if needed
