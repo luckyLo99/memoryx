@@ -497,6 +497,19 @@ class MemoryCandidateService:
             if replace_target_id:
                 await self._handle_replacement_commit(memory_id, replace_target_id, metadata)
 
+        # 24.3D-E: If PROJECT/TASK with project_id/state_key, supersede old versions
+        if meta_ok and state_ok:
+            project_id = metadata.get("project_id")
+            state_key = metadata.get("state_key")
+            mem_type = memory.get("memory_type")
+            if project_id and state_key and mem_type in ("PROJECT", "TASK"):
+                await self._handle_project_state_supersede(
+                    new_memory_id=memory_id,
+                    memory_type=mem_type,
+                    project_id=project_id,
+                    state_key=state_key,
+                )
+
         return meta_ok and state_ok
 
     async def _handle_replacement_commit(
@@ -536,6 +549,50 @@ class MemoryCandidateService:
             )
         except Exception:
             pass  # degraded: conflict record write failed
+
+    async def _handle_project_state_supersede(
+        self, new_memory_id: str, memory_type: str,
+        project_id: str, state_key: str,
+    ) -> None:
+        """After a PROJECT/TASK commit with project_id+state_key, supersede old versions.
+
+        Uses Python filtering (no SQLite JSON1). Does NOT block the commit if
+        supersede fails. Writes metadata markers for observability.
+        """
+        try:
+            old_versions = await self.repository.list_memories_filtered(
+                limit=100, memory_type=memory_type, scope="project",
+                include_states={"active", "archived", "quarantined", "superseded"},
+            )
+        except Exception:
+            old_versions = []
+
+        count = 0
+        for old in old_versions:
+            old_id = old.get("id") or old.get("memory_id")
+            if old_id == new_memory_id:
+                continue
+            old_raw = old.get("metadata_json", "{}")
+            try:
+                old_meta = json.loads(old_raw) if old_raw else {}
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if old_meta.get("project_id") == project_id and old_meta.get("state_key") == state_key:
+                try:
+                    await self.supersede_candidate(old_id, new_memory_id, "project_state_update")
+                    count += 1
+                except Exception:
+                    pass
+
+        add_meta: dict[str, object] = {
+            "project_lifecycle_policy_version": "24.3D-E",
+            "project_state_supersede_status": "success" if count > 0 else "no_previous",
+            "project_state_superseded_count": count,
+        }
+        try:
+            await self.repository.update_memory_metadata(new_memory_id, add_meta)
+        except Exception:
+            pass
 
     async def reject_candidate(self, memory_id: str, reason: str) -> bool:
         """Reject a candidate. Uses 'quarantined' or 'archived' active_state."""
@@ -603,6 +660,7 @@ class MemoryCandidateService:
     _BLOCKED_MEMORY_CLASSES: frozenset[str] = frozenset({"policy", "guard", "release_fact"})
     _BLOCKED_SOURCE_TYPES: frozenset[str] = frozenset({
         "assistant", "assistant_inference", "model_inference", "summary",
+        "auto_extraction", "session_end_rule_extract",
     })
 
     @staticmethod
@@ -862,6 +920,8 @@ class MemoryCandidateService:
             # ensure all auto-extracts are candidate, never committed directly.
             meta: dict = {
                 "extraction_source": extraction_source,
+                "lifecycle_source": extraction_source,
+                "lifecycle_policy_version": "24.3D-E",
                 "auto_extracted": True,
                 "candidate_state": CandidateState.CANDIDATE.value,
                 "evidence_level": actual_evidence_level,
@@ -870,9 +930,13 @@ class MemoryCandidateService:
             }
             if memory_class:
                 meta["memory_class"] = memory_class
+            # session_end extracts: cap evidence at E1, never auto commit
+            source_type = "auto_extraction"
+            if extraction_source == "session_end":
+                source_type = "session_end_rule_extract"
             request = MemoryCandidateRequest(
                 content=content.strip(), session_id=session_id or None,
-                memory_type=memory_type, scope=scope, source_type="auto_extraction",
+                memory_type=memory_type, scope=scope, source_type=source_type,
                 source_event_id=source_event_id, evidence_ids=[],
                 evidence_level=EvidenceLevel.E0_MODEL_INFERENCE.value,
                 confidence=confidence, metadata=meta,
