@@ -57,6 +57,8 @@ class RetrievalTrace:
     hydrated_count: int = 0
     get_memory_count: int = 0
     batch_hydration_count: int = 0  # 24.6-B: number of batch_get_memories calls
+    cache_hit_count: int = 0   # 24.7-B: hydration_cache hits within request
+    cache_miss_count: int = 0  # 24.7-B: hydration_cache misses within request
 
     def to_dict(self) -> dict:
         return {
@@ -77,4 +79,6 @@ class RetrievalTrace:
             "hydrated_count": self.hydrated_count,
             "get_memory_count": self.get_memory_count,
             "batch_hydration_count": self.batch_hydration_count,
+            "cache_hit_count": self.cache_hit_count,
+            "cache_miss_count": self.cache_miss_count,
         }

@@ -189,10 +189,18 @@ class HybridRetrievalEngine:
         hydrated_count = 0
         get_memory_count = len(candidate_ids)
         batch_hydration_count = 0
+        cache_hit_count = 0
+        cache_miss_count = 0
+        # 24.7-B: per-request hydration_cache — avoids same-request re-hydration
+        hydration_cache: dict[str, dict[str, Any]] = {}
         memory_map = await self.repository.batch_get_memories(candidate_ids)
         batch_hydration_count += 1
+        cache_miss_count += len(candidate_ids)
+        hydration_cache.update(memory_map)
         for memory_id in candidate_ids:
-            memory = memory_map.get(memory_id)
+            memory = hydration_cache.get(memory_id)
+            if memory is not None:
+                cache_hit_count += 1
             if memory is None:
                 continue
             hydrated_count += 1
@@ -327,13 +335,21 @@ class HybridRetrievalEngine:
             more_hits = await self.repository.search_full_text(query, limit=fallback_fetch)
             new_ids = {m["memory_id"] for m in more_hits} - {r.memory_id for r in results}
             if new_ids:
+                # 24.7-B: fallback checks per-request hydration_cache first
                 get_memory_count += len(new_ids)
-                more_memory_map = await self.repository.batch_get_memories(list(new_ids))
-                batch_hydration_count += 1
+                miss_ids = [mid for mid in new_ids if mid not in hydration_cache]
+                cache_hit_count += len(new_ids) - len(miss_ids)
+                if miss_ids:
+                    cache_miss_count += len(miss_ids)
+                    more_memory_map = await self.repository.batch_get_memories(miss_ids)
+                    batch_hydration_count += 1
+                    hydration_cache.update(more_memory_map)
             else:
                 more_memory_map = {}
             for memory_id in new_ids:
-                memory = more_memory_map.get(memory_id)
+                memory = hydration_cache.get(memory_id)
+                if memory is not None:
+                    cache_hit_count += 1
                 if memory is None:
                     continue
                 hydrated_count += 1
@@ -410,6 +426,8 @@ class HybridRetrievalEngine:
                 hydrated_count=hydrated_count,
                 get_memory_count=get_memory_count,
                 batch_hydration_count=batch_hydration_count,
+                cache_hit_count=cache_hit_count,
+                cache_miss_count=cache_miss_count,
             )
             return results, trace.to_dict()
 
