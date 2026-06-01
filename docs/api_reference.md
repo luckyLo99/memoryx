@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档提供 Mnemosyne-X 的完整 API 参考。
+本文档提供 MemoryX 的完整 API 参考。
 
 ---
 

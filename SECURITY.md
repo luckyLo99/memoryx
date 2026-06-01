@@ -4,15 +4,15 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.1.x   | ✅ Yes |
-| < 1.1   | ❌ No |
+| 2.0.x   | ✅ Yes |
+| < 2.0   | ❌ No  |
 
 ## Reporting a Vulnerability
 
 Please do **not** open a public issue for security vulnerabilities.
 
 Use GitHub private vulnerability reporting if enabled, or email:
-your_email@example.com
+GitHub Security Advisories for this repository
 
 Include:
 - Affected version or commit SHA

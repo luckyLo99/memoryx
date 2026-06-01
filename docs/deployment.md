@@ -15,7 +15,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/lucky99/memoryx.git
+git clone https://github.com/luckyl214/memoryx.git
 cd memoryx
 
 # 创建虚拟环境
@@ -77,7 +77,7 @@ python3 -m memoryx.server --prod
 # 创建服务文件
 sudo tee /etc/systemd/system/memoryx.service > /dev/null <<EOF
 [Unit]
-Description=Mnemosyne-X Memory Service
+Description=MemoryX Memory Service
 After=network.target
 
 [Service]

@@ -385,5 +385,5 @@ MIT License - 详见 [LICENSE](LICENSE) 文件。
 
 ## 联系
 
-- GitHub Issues: https://github.com/lucky99/memoryx/issues
-- 文档: https://github.com/lucky99/memoryx/tree/main/docs
+- GitHub Issues: https://github.com/luckyl214/memoryx/issues
+- 文档: https://github.com/luckyl214/memoryx/tree/main/docs
