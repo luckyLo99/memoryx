@@ -1,7 +1,7 @@
 name: memoryx
 version: 0.1.0
 kind: standalone
-description: Mnemosyne-X Phase 1 Hermes hook layer
+description: MemoryX Hermes hook layer
 provides_hooks:
   - on_user_message
   - on_assistant_response
