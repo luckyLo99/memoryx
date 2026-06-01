@@ -7,6 +7,27 @@
 
 OpenAI Codex for Open Source covers: PR review, maintainer automation, release workflows, API credits, ChatGPT Pro with Codex, and case-by-case Codex Security. The following artifacts demonstrate active OSS maintenance suitable for application.
 
+## Current Development Model (Hermes)
+
+MemoryX development is orchestrated through **Hermes** — a CLI AI agent that serves as the project's long-term memory, batch planner, issue/PR pipeline coordinator, and release discipline enforcer. Hermes enforces:
+- Numbered batch system (24.4 → current)
+- Scope discipline (allowed/forbidden file lists per batch)
+- Contract-test-gated development
+- ReleaseGate + repo_guard pre-commit/pre-release checks
+- Evidence capture for public PR transition
+
+## Intended Codex Role (post-award)
+
+Codex would add a dedicated review and maintenance layer:
+- **PR review**: Code-level analysis for regression, scope violations, and contract compliance
+- **Issue triage**: Label suggestions based on area/type/priority classification
+- **Regression-test generation**: Contract tests for new batch scopes
+- **Release validation**: Pre-release audit report against ReleaseGate/repo_guard/checklist
+- **Security-sensitive review**: Threat model consistency, auth boundary, dependency risks
+- **Docs/changelog alignment**: Validating PR descriptions, CHANGELOG entries, and docs
+
+Codex would NOT be part of the runtime path — it would only support maintainer workflows around the repository.
+
 ### 1. Active Maintenance — 857 commits, numbered batch system
 
 - 24.4 → 24.9 batches completed on `feature/24.0-runtime-replay`
