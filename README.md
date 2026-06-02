@@ -1,5 +1,8 @@
 # memoryx — 认知记忆操作系统
 
+> Hermes users: for the verified MemoryX authoritative integration, see [`docs/HERMES_MEMORYX_AUTHORITATIVE.md`](docs/HERMES_MEMORYX_AUTHORITATIVE.md). This documents the MemoryX provider, the authoritative native `memory()` patch, verification, and post-Hermes-update recovery steps.
+
+
 > **让 Agent 拥有真正的生产级认知记忆：不仅记住，还能理解、反思和自我优化。**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
@@ -123,12 +126,14 @@ cp .env.example .env
 
 ### 3. 初始化数据库
 
-```bash
-# 创建数据库
-python3 scripts/init_db.py
+```python
+# 数据库由 MemoryRepository.open() 自动创建
+from memoryx.storage import MemoryRepository
+repo = MemoryRepository.open()
 
 # 验证
-python3 scripts/verify_memoryx.py
+from memoryx.tools import verify_memoryx
+verify_memoryx()
 ```
 
 ### 4. 基本使用

@@ -88,3 +88,53 @@ study/
 # MemoryX runtime
 memoryx-pure-release/
 *.tar.gz
+
+# local private config
+.env
+.env.*
+!.env.example
+
+# local runtime data
+db/
+logs/
+cache/
+archive/
+exports/
+markdown/
+runtime/
+tmp/
+temp/
+
+# Hermes and MemoryX local runtime
+.hermes/
+.memoryx/
+memoryx_data/
+provider_index.json
+
+# databases and vector stores
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.lancedb/
+*.lance/
+*.parquet
+
+# traces, sessions, reports, generated artifacts
+*.log
+*.trace
+*.jsonl
+reports/
+artifacts/
+coverage/
+htmlcov/
+
+# local credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+token*
+secret*

@@ -1,0 +1,7 @@
+name: memoryx
+version: 1.0.0
+description: "MemoryX local authoritative memory provider for Hermes Agent."
+hooks:
+  - prefetch
+  - sync_turn
+  - on_memory_write
