@@ -213,10 +213,49 @@ class MemoryXProvider(MemoryProvider):
             await repo.close()
 
     def system_prompt_block(self) -> str:
-        return (
-            "MemoryX is active as the external memory provider. "
-            "Durable user/profile facts and agent notes are stored in MemoryX."
-        )
+        """Return formatted memory blocks from MemoryX for system prompt injection.
+
+        Queries the MemoryX database for active FACT (memory) and PERSONA (user)
+        entries, then renders them in the same format as the built-in MemoryStore.
+
+        Returns empty string on any failure, so the caller can fall back to
+        the built-in MemoryStore (MEMORY.md/USER.md).
+        """
+        try:
+            rows = _run_async(self._list_async(limit=300))
+        except Exception as exc:
+            logger.warning("MemoryX system_prompt_block fetch failed: %s", exc)
+            return ""
+
+        if not rows:
+            return ""
+
+        facts: List[str] = []
+        personas: List[str] = []
+        for row in rows:
+            content = (row.get("content") or "").strip()
+            if not content:
+                continue
+            mtype = row.get("memory_type", "FACT")
+            if mtype == "PERSONA":
+                personas.append(content)
+            else:
+                facts.append(content)
+
+        separator = "═" * 46
+        blocks: List[str] = []
+
+        if facts:
+            header = f"MEMORY (your personal notes) [MemoryX — {len(facts)} entries]"
+            content = "\n§\n".join(facts)
+            blocks.append(f"{separator}\n{header}\n{separator}\n{content}")
+
+        if personas:
+            header = f"USER PROFILE (who the user is) [MemoryX — {len(personas)} entries]"
+            content = "\n§\n".join(personas)
+            blocks.append(f"{separator}\n{header}\n{separator}\n{content}")
+
+        return "\n\n".join(blocks)
 
     def prefetch(self, query: str, *, session_id: str = "") -> str:
         if not query:
