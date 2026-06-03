@@ -27,7 +27,7 @@ _KEY_PATTERN = re.compile(
     r"(?i)\b(openai_api_key|siliconflow_api_key|api_key|apikey|access_token|refresh_token|token|password|passwd|secret|authorization|cookie)\b\s*[:=]\s*(?:Bearer\s+)?[^\s,;\]\}\)\"']+"
 )
 _BEARER_PATTERN = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+\-/=]+")
-_MEMORYX_PATH_PATTERN = re.compile(r"/home/lucky/\.memoryx(?:/[^\s,;\]\}\)\"']*)?")
+_MEMORYX_PATH_PATTERN = re.compile(r"/home/[^/]+/\.memoryx(?:/[^\s,;\]\}\)\"']*)?")
 _ENV_PATH_PATTERN = re.compile(r"(?i)(?:^|[\s:=])([^\s,;\]\}\)\"']*\.env)(?=$|[\s,;\]\}\)\"'])")
 
 

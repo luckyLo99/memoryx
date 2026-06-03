@@ -42,6 +42,7 @@
 
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT_NAME="$(basename "$0")"
 
 MEMORYX_REPO_SLUG="${MEMORYX_REPO_SLUG:-luckyl214/memoryx}"
@@ -301,7 +302,7 @@ scan_tree_for_hygiene() {
   pass "$label forbidden runtime/private path scan clean"
 
   local hits
-  hits="$(grep -RInE '(/home/lucky|/Users/|C:\\|OPENAI_API_KEY|SILICONFLOW_API_KEY|api[_-]?key\s*=|secret\s*=|token\s*=|password\s*=)' "$tree" 2>/dev/null || true)"
+  hits="$(grep -RInE '(/home/[^/]+/|/Users/|C:\\|OPENAI_API_KEY|SILICONFLOW_API_KEY|api[_-]?key\s*=|secret\s*=|token\s*=|password\s*=)' "$tree" 2>/dev/null || true)"
   hits="$(printf '%s\n' "$hits" | grep -Ev '(your_|placeholder|example|\.env\.example|AGENT_RULES|memoryx_production_acceptance|memoryx_patch_flow|memoryx_repo_guard|SILICONFLOW_API_KEY|MEMORYX_EMBEDDING_API_KEY|FEISHU_APP_SECRET|FEISHU_VERIFICATION_TOKEN|api_key=|api_key =|\.api_key|app_secret|_token\b|test_key|test-secret|memoryx-pii-default|token = f"|token = payload|verification_token|event_security)' || true)"
 
   if [[ -n "$hits" ]]; then

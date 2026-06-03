@@ -6,14 +6,16 @@ import os
 import sys
 from pathlib import Path
 
+REPO_DIR = Path(__file__).resolve().parent.parent
+
 # 加载 .env
-for line in open('/home/lucky/memoryx/.env'):
+for line in open(REPO_DIR / '.env'):
     line = line.strip()
     if line and not line.startswith('#') and '=' in line:
         k, v = line.split('=', 1)
         os.environ.setdefault(k.strip(), v.strip())
 
-sys.path.insert(0, '/home/lucky/memoryx')
+sys.path.insert(0, str(REPO_DIR))
 
 from memoryx.storage import MemoryRepository
 from memoryx.embeddings import LanceDBVectorStore
@@ -23,9 +25,9 @@ from memoryx.feishu.client import FeishuClient
 
 async def main():
     # 收集数据
-    repo = MemoryRepository(Path('/home/lucky/memoryx/data/memoryx.db'))
+    repo = MemoryRepository(REPO_DIR / 'data/memoryx.db')
     await repo.open()
-    lance = LanceDBVectorStore(uri=Path('/home/lucky/memoryx/data/lancedb'))
+    lance = LanceDBVectorStore(uri=REPO_DIR / 'data/lancedb')
     await lance.open()
 
     stats = await collect_memory_stats(repo)

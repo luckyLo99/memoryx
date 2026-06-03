@@ -22,7 +22,7 @@ MemoryX 语义运行时完整性检查 — 将隐性假设变成启动时/运行
   python tools/memoryx_semantic_integrity_gate.py --db data/memoryx.db --include-conversations --check-systemd --semantic-smoke
 
   # 作为 systemd ExecStartPre
-  ExecStartPre=/home/lucky/memoryx/.venv/bin/python tools/memoryx_semantic_integrity_gate.py --db data/memoryx.db --include-conversations
+  ExecStartPre=REPO_DIR / '.venv' / 'bin' / 'python' tools/memoryx_semantic_integrity_gate.py --db data/memoryx.db --include-conversations
 """
 from __future__ import annotations
 
@@ -34,6 +34,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+REPO_DIR = Path(__file__).resolve().parent.parent
 
 REQUIRED_TABLES = {
     "memories",
@@ -48,7 +50,7 @@ REQUIRED_TABLES = {
 }
 
 # 生产模式要求的主库路径
-PRODUCTION_DB_PATH = "/home/lucky/memoryx/data/memoryx.db"
+PRODUCTION_DB_PATH = str(REPO_DIR / 'data' / 'memoryx.db')
 
 
 def fail(msg: str, detail: str = "") -> int:

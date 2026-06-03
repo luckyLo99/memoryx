@@ -31,6 +31,7 @@ BASE_BRANCH="${BASE_BRANCH:-memoryx-2-kernel}"
 GITHUB_REPO="${GITHUB_REPO:-luckyl214/memoryx}"
 PYTHON_BIN="${PYTHON_BIN:-python3.12}"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT_NAME="$(basename "$0")"
 
 log() {
@@ -130,7 +131,7 @@ scan_for_secrets() {
     | grep -Ev '\.(png|jpg|jpeg|gif|webp|pdf|gz|zip)$' \
     | while read -r f; do
         [[ -f "$f" ]] || continue
-        grep -InE '(/home/lucky|/Users/|C:\\|OPENAI_API_KEY|SILICONFLOW_API_KEY|api[_-]?key\s*=|secret\s*=|token\s*=|password\s*=)' "$f" || true
+        grep -InE '(/home/[^/]+/|/Users/|C:\\|OPENAI_API_KEY|SILICONFLOW_API_KEY|api[_-]?key\s*=|secret\s*=|token\s*=|password\s*=)' "$f" || true
       done > "$tmp"
 
   # Allow documented placeholders.
@@ -210,7 +211,7 @@ archive_check() {
 
   log "Checking archive content for private paths/secrets"
   local hits
-  hits="$(grep -RInE '(/home/lucky|/Users/|C:\\|OPENAI_API_KEY|SILICONFLOW_API_KEY|api[_-]?key\s*=|secret\s*=|token\s*=|password\s*=)' "$outdir/src" || true)"
+  hits="$(grep -RInE '(/home/[^/]+/|/Users/|C:\\|OPENAI_API_KEY|SILICONFLOW_API_KEY|api[_-]?key\s*=|secret\s*=|token\s*=|password\s*=)' "$outdir/src" || true)"
   hits="$(printf '%s\n' "$hits" | grep -Ev '(your_|placeholder|example|\.env\.example)' || true)"
 
   if [[ -n "$hits" ]]; then

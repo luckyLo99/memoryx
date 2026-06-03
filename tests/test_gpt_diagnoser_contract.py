@@ -19,7 +19,7 @@ VALID_PAYLOAD = {
     "root_cause": "cause",
     "reproduction_steps": ["step"],
     "allowed_files": ["memoryx/diagnostics/gpt_diagnoser.py"],
-    "forbidden_files": ["/home/lucky/runtime/memoryx-2.0.0"],
+    "forbidden_files": ["/tmp/memoryx_test/runtime/memoryx-2.0.0"],
     "recommended_tests": ["tests/test_gpt_diagnoser_contract.py"],
     "patch_plan": ["plan"],
     "release_impact": "none",

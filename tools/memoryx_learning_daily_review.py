@@ -7,8 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-DB = os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db")
-OUT_DIR = Path("/home/lucky/memoryx/study")
+REPO_DIR = Path(__file__).resolve().parent.parent
+DB = os.getenv("MEMORYX_DB_PATH", str(REPO_DIR / 'data' / 'memoryx.db'))
+OUT_DIR = REPO_DIR / "study"
 CST = ZoneInfo("Asia/Shanghai")
 
 

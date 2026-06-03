@@ -3,14 +3,16 @@
 import asyncio, os, sys
 from pathlib import Path
 
+REPO_DIR = Path(__file__).resolve().parent.parent
+
 # Load .env
-for line in open('/home/lucky/memoryx/.env'):
+for line in open(REPO_DIR / '.env'):
     line = line.strip()
     if line and not line.startswith('#') and '=' in line:
         k, v = line.split('=', 1)
         os.environ.setdefault(k.strip(), v.strip())
 
-sys.path.insert(0, '/home/lucky/memoryx')
+sys.path.insert(0, str(REPO_DIR))
 from memoryx.storage import MemoryRepository
 from memoryx.embeddings import LanceDBVectorStore
 import aiohttp
@@ -39,7 +41,7 @@ async def embed_one(s, text):
 
 
 async def main():
-    repo = MemoryRepository(Path('/home/lucky/memoryx/data/memoryx.db'))
+    repo = MemoryRepository(REPO_DIR / 'data/memoryx.db')
     await repo.open()
     mems = await repo.list_memories(limit=10000)
     need = [m for m in mems if not m.get('embedding')]
@@ -64,7 +66,7 @@ async def main():
     print(f'Embeddings done: {len(valid)}/{len(need)}')
 
     if valid:
-        lance = LanceDBVectorStore(uri=Path('/home/lucky/memoryx/data/lancedb'))
+        lance = LanceDBVectorStore(uri=REPO_DIR / 'data/lancedb')
         await lance.open()
         batch_data = []
         for m, emb in valid:
@@ -79,7 +81,7 @@ async def main():
 
     await repo.close()
 # 验证 LanceDB 可检索
-    lance2 = LanceDBVectorStore(uri=Path('/home/lucky/memoryx/data/lancedb'))
+    lance2 = LanceDBVectorStore(uri=REPO_DIR / 'data/lancedb')
     await lance2.open()
     import numpy as np
     test_vec = np.random.randn(4096).astype(np.float32).tolist()

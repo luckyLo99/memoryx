@@ -20,9 +20,11 @@ import json
 import os
 import sqlite3
 import sys
+from pathlib import Path
 
 
-QUEUE_DB = os.getenv("QUEUE_DB", "/home/lucky/memoryx/data/feishu_queue.db")
+REPO_DIR = Path(__file__).resolve().parent.parent
+QUEUE_DB = os.getenv("QUEUE_DB", str(REPO_DIR / 'data' / 'feishu_queue.db'))
 
 
 def fail(msg: str) -> None:

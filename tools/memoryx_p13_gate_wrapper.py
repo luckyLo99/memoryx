@@ -13,9 +13,11 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 
-MEMORYX_ROOT = os.getenv("MEMORYX_ROOT", "/home/lucky/memoryx")
+REPO_DIR = Path(__file__).resolve().parent.parent
+MEMORYX_ROOT = os.getenv("MEMORYX_ROOT", str(REPO_DIR))
 MEMORYX_DB_PATH = os.getenv("MEMORYX_DB_PATH", f"{MEMORYX_ROOT}/data/memoryx.db")
 P13_GATE = f"{MEMORYX_ROOT}/tools/memoryx_semantic_integrity_gate.py"
 PYTHON = f"{MEMORYX_ROOT}/.venv/bin/python"

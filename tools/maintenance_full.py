@@ -20,10 +20,12 @@ import os
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 
-DB_PATH = os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db")
+REPO_DIR = Path(__file__).resolve().parent.parent
+DB_PATH = os.getenv("MEMORYX_DB_PATH", str(REPO_DIR / 'data' / 'memoryx.db'))
 
 
 def now_utc() -> str:
