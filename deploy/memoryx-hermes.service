@@ -1,5 +1,5 @@
 [Unit]
-Description=Mnemosyne-X Memory REST Service
+Description=MemoryX Memory REST Service
 After=network.target
 
 [Service]

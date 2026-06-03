@@ -1,4 +1,4 @@
-# Contributing to Mnemosyne-X
+# Contributing to MemoryX
 
 我们欢迎任何形式的贡献。以下是参与指南。
 

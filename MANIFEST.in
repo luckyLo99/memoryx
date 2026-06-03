@@ -1,3 +1,4 @@
+prune memoryx-pure-release
 include README.md
 include LICENSE
 include CHANGELOG.md
@@ -12,3 +13,5 @@ include .env.example
 recursive-include db *.sql
 recursive-include tests *.py
 recursive-include memoryx/storage/sql *.sql
+
+exclude RELEASE_NOTES*.md

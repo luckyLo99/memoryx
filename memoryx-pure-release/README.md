@@ -1,3 +1,9 @@
+# ⚠️ ARCHIVED — Pre-2.0 Legacy Snapshot (v1.1.0-rc1)
+
+**This is not the current MemoryX runtime.** See the repository root for MemoryX 2.0.x.
+
+---
+
 # Mnemosyne-X — 认知记忆操作系统
 
 > **让 Agent 拥有真正的生产级认知记忆：不仅记住，还能理解、反思和自我优化。**

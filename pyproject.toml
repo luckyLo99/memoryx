@@ -55,7 +55,8 @@ Issues = "https://github.com/luckyl214/memoryx/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["memoryx*"]
+include = ["memoryx", "memoryx.*"]
+exclude = ["memoryx-pure-release*"]
 
 [tool.setuptools.package-data]
 memoryx = ["py.typed"]

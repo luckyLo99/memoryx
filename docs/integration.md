@@ -1,4 +1,4 @@
-# Hermes integration guide for MemoryX Phase 1
+# Hermes integration guide for MemoryX 
 
 ## Goal
 Attach MemoryX as a non-intrusive plugin using Hermes' existing plugin hook system.
