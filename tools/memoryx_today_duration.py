@@ -15,6 +15,8 @@ import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 
+REPO_DIR = Path(__file__).resolve().parent.parent
+
 
 def _fmt(seconds: int) -> str:
     h, m = divmod(seconds // 60, 60)
@@ -25,7 +27,7 @@ def _fmt(seconds: int) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Show learning duration from MemoryX")
-    parser.add_argument("--db", default="/home/lucky/memoryx/data/memoryx.db",
+    parser.add_argument("--db", default=str(REPO_DIR / 'data' / 'memoryx.db'),
                         help="MemoryX database path")
     parser.add_argument("--entity", default="",
                         help="Filter by entity (LIKE match, e.g. 'xhs' or 'xhs-learning')")

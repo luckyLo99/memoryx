@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_ROOT = Path("/home/lucky/memoryx")
+REPO_DIR = Path(__file__).resolve().parent.parent
+HERMES_HOME = Path.home() / '.hermes'
+DEFAULT_ROOT = REPO_DIR
 DEFAULT_MEMORYX_DB = DEFAULT_ROOT / "data" / "memoryx.db"
 DEFAULT_FEISHU_DB = DEFAULT_ROOT / "data" / "feishu_queue.db"
 DEFAULT_REST = "http://127.0.0.1:8080"
@@ -405,7 +407,7 @@ class SelfCheck:
                 self.add("ERROR", "gate_failed", f"{rel} FAIL", script=rel, output=output)
 
     def check_hermes_runtime(self) -> None:
-        hermes_home = Path(os.getenv("HERMES_HOME", "/home/lucky/.hermes"))
+        hermes_home = Path(os.getenv("HERMES_HOME", str(HERMES_HOME)))
         plugin_dir = hermes_home / "plugins" / "memoryx_runtime"
 
         if plugin_dir.exists():

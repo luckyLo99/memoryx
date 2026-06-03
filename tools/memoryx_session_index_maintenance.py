@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 from memoryx.search.session_index import SessionSearchIndexBuilder
 
+REPO_DIR = Path(__file__).resolve().parent.parent
 
 def main() -> int:
-    db = os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db")
+    db = os.getenv("MEMORYX_DB_PATH", str(REPO_DIR / 'data' / 'memoryx.db'))
     hours = int(os.getenv("MEMORYX_SESSION_INDEX_HOURS", "72"))
     limit = int(os.getenv("MEMORYX_SESSION_INDEX_LIMIT", "500"))
 

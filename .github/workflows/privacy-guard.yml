@@ -1,0 +1,77 @@
+name: Privacy Guard
+
+on:
+  pull_request:
+    branches: [memoryx-2-kernel, main]
+  push:
+    branches: [memoryx-2-kernel, main]
+
+jobs:
+  leak-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for hardcoded home paths
+        run: |
+          echo "=== Scanning for /home/<user>/ hardcoded paths ==="
+          HITS=$(git grep -InP '/home/[^/]+/' -- ':!.github' ':!*.md' ':!tests/' ':!__pycache__' 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ Found hardcoded /home/*/ paths:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "✅ No hardcoded home paths found"
+
+      - name: Check for tracked .env files
+        run: |
+          echo "=== Scanning for tracked .env files ==="
+          HITS=$(git ls-files | grep -iE '\.env$' | grep -v '\.env\.example' | grep -v '\.env\.template' || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ Found tracked .env files:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "✅ No .env files tracked"
+
+      - name: Check for API keys / tokens in source code
+        run: |
+          echo "=== Scanning for API keys in source ==="
+          # sk- API keys (OpenAI-style)
+          SK_HITS=$(git grep -InP '(?<![a-zA-Z])sk-[A-Za-z0-9]{20,}(?![a-zA-Z])' -- ':!.github' ':!*.md' ':!tests/' ':!__pycache__' 2>/dev/null || true)
+          # ghp_ GitHub tokens
+          GHP_HITS=$(git grep -InP 'ghp_[A-Za-z0-9]{36}' -- ':!.github' ':!*.md' ':!tests/' 2>/dev/null || true)
+          ERRORS=""
+          if [ -n "$SK_HITS" ]; then
+            ERRORS="$ERRORS\n❌ Found sk- API keys:\n$SK_HITS"
+          fi
+          if [ -n "$GHP_HITS" ]; then
+            ERRORS="$ERRORS\n❌ Found ghp_ tokens:\n$GHP_HITS"
+          fi
+          if [ -n "$ERRORS" ]; then
+            echo -e "$ERRORS"
+            exit 1
+          fi
+          echo "✅ No API keys or tokens found in source"
+
+      - name: Check git author identity
+        run: |
+          echo "=== Checking commit author identity ==="
+          COMMITS=$(git log --format="%H %ae %an" "${{ github.event.before }}".."${{ github.event.after }}" 2>/dev/null || git log --format="%H %ae %an" -5 2>/dev/null)
+          echo "$COMMITS"
+          BAD=$(echo "$COMMITS" | grep -v 'noreply.github.com\|@users.noreply.github.com\|@github.com' | grep -v 'dependabot' || true)
+          if [ -n "$BAD" ]; then
+            echo "⚠️  WARNING: Some commits use non-GitHub-noreply emails:"
+            echo "$BAD"
+            echo "Consider configuring git user.email to your GitHub noreply address."
+          else
+            echo "✅ All commit emails are GitHub noreply addresses"
+          fi
+
+      - name: Summary
+        run: |
+          echo "==================================="
+          echo "  ✅ Privacy Guard: All checks passed"
+          echo "==================================="

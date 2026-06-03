@@ -16,15 +16,16 @@ if env_path.exists():
             key, val = line.split("=", 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-sys.path.insert(0, '/home/lucky/memoryx')
+REPO_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_DIR))
 
 from memoryx.storage import MemoryRepository
 from memoryx.embeddings import LanceDBVectorStore
 import aiohttp
 
 # ── 配置 ──────────────────────────────────────────────────────────
-MEMORYX_DB = Path("/home/lucky/memoryx/data/memoryx.db")
-LANCEDB_URI = Path("/home/lucky/memoryx/data/lancedb")
+MEMORYX_DB = REPO_DIR / "data/memoryx.db"
+LANCEDB_URI = REPO_DIR / "data/lancedb"
 EMBEDDING_ENDPOINT = "https://api.siliconflow.cn/v1/embeddings"
 EMBEDDING_API_KEY = os.getenv("SILICONFLOW_API_KEY") or os.getenv("MEMORYX_EMBEDDING_API_KEY")
 EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-8B"

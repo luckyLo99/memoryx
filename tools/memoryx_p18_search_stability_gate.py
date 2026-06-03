@@ -5,9 +5,11 @@ import os
 import sqlite3
 import sys
 import time
+from pathlib import Path
 
 
-DB = os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db")
+REPO_DIR = Path(__file__).resolve().parent.parent
+DB = os.getenv("MEMORYX_DB_PATH", str(REPO_DIR / 'data' / 'memoryx.db'))
 
 
 def fail(msg: str) -> None:

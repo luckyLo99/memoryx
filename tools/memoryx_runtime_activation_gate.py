@@ -23,6 +23,9 @@ try:
 except ImportError:
     yaml = None
 
+REPO_DIR = Path(__file__).resolve().parent.parent
+HERMES_HOME = Path.home() / '.hermes'
+
 
 def ok(msg: str) -> None:
     print(f"  [PASS] {msg}")
@@ -43,9 +46,9 @@ def scalar(conn: sqlite3.Connection, sql: str, *params) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--db", default=os.getenv("MEMORYX_DB_PATH", "/home/lucky/memoryx/data/memoryx.db"))
-    parser.add_argument("--hermes-config", default="/home/lucky/.hermes/config.yaml")
-    parser.add_argument("--plugin-dir", default="/home/lucky/.hermes/plugins/memoryx_runtime")
+    parser.add_argument("--db", default=os.getenv("MEMORYX_DB_PATH", str(REPO_DIR / 'data' / 'memoryx.db')))
+    parser.add_argument("--hermes-config", default=str(HERMES_HOME / 'config.yaml'))
+    parser.add_argument("--plugin-dir", default=str(HERMES_HOME / 'plugins' / 'memoryx_runtime'))
     parser.add_argument("--gate-mode", action="store_true", help="Require ALL checks to pass (exit 1 on any failure)")
     parser.add_argument("--check-recent", action="store_true", help="Require memories from the last 24h")
     args = parser.parse_args()
