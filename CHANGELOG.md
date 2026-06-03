@@ -2,6 +2,15 @@
 
 All notable changes to MemoryX are documented in this file.
 
+## [2.1.1] - 2026-06-03
+
+### Phase 1 — Memory Kernel
+- Memory Kernel with evidence_events / claims / claim_versions / fts_memories schema.
+- MemoryKernel class: create_evidence / create_claim / revoke_claim / supersede_claim with version history.
+- Retriever class: FTS5 keyword search with configurable options.
+- 22 new tests for kernel and retriever (849 total, all passing).
+- Version bump: 2.1.0 → 2.1.1.
+
 ## [2.1.0] - 2026-06-03
 
 ### Phase 0 — Foundation
