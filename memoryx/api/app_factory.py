@@ -370,6 +370,8 @@ def create_app(
                 "alias_expansion_enabled": True,
                 "layer_boost_enabled": True,
                 "retrieval_dedup_enabled": True,
+                "batch_hydration_enabled": True,
+                "per_request_cache_enabled": True,
                 "trace_enabled": True,
                 "vector_store_available": vector_available,
             },

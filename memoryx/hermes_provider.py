@@ -569,6 +569,14 @@ class MemoryXHermesProvider:
             "approximate_content_chars": total_chars,
             "evidence_quality": await repo.evidence_quality_summary(),
             "layer_quality": await repo.layer_quality_summary(),
+            "retrieval_observability": {
+                "batch_hydration_enabled": True,
+                "per_request_cache_enabled": True,
+                "get_memory_count": "number of hydration IDs requested per query (24.6-B)",
+                "batch_hydration_count": "number of batch_get_memories calls per query (24.6-B)",
+                "cache_hit_count": "hydration_cache hits within request (24.7-B)",
+                "cache_miss_count": "hydration_cache misses within request (24.7-B)",
+            },
             "conflict_count": await repo.count_open_conflicts(),
             "limit_note": "Character count is approximate. DB path and secrets are not exposed.",
         }
