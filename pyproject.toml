@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memoryx"
-version = "2.0.0"
+dynamic = ["version"]
 description = "Cognitive Memory Operating System — Production-grade long-term memory for AI agents"
 readme = "README.md"
 license = {text = "MIT"}
@@ -60,3 +60,9 @@ exclude = ["memoryx-pure-release*"]
 
 [tool.setuptools.package-data]
 memoryx = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = {attr = "memoryx._version.__version__"}
+
+[project.scripts]
+memoryx = "memoryx.cli.doctor:main"

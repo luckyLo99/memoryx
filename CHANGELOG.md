@@ -2,7 +2,15 @@
 
 All notable changes to MemoryX are documented in this file.
 
-## [Unreleased]
+## [2.1.0] - 2026-06-03
+
+### Phase 0 — Foundation
+- Unified version to single source of truth (VERSION / _version.py / pyproject.toml).
+- Added `memoryx doctor` self-check command (lite/standard/dev profiles).
+- Added three installation profiles: lite, standard, dev with separate env examples.
+- Added `check_release_truth` release consistency script.
+- Updated README installation and configuration sections.
+- All 827 tests passing.
 
 ## [2.0.0] - 2026-05-29
 
