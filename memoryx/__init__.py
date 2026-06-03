@@ -12,7 +12,6 @@ from .compression import SemanticCompressionEngine
 from .config import MemoryXSettings
 from .consolidation import ConsolidationEngine
 from .conversation_log import ConversationLogStore
-from .core import MemoryCategory, MemoryLayer, MemorySource, MemoryType
 from .context import ContextAssemblyEngine, ContextBundle
 from .context_reasoning import ContextReasoningEngine
 from .embeddings import (
@@ -97,9 +96,6 @@ __all__ = [
     "ConsolidationEngine",
     "ContextAssemblyEngine",
     "ContextBundle",
-    "MemoryCategory",
-    "MemoryLayer",
-    "MemorySource",
     "ContextReasoningEngine",
     "ConversationLogStore",
     "DedupEngine",

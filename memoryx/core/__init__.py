@@ -1,3 +1,2 @@
-from .types import MemoryCategory, MemoryLayer, MemorySource, MemoryType
-
-__all__ = ["MemoryCategory", "MemoryLayer", "MemorySource", "MemoryType"]
+# MemoryX Core — Phase 1: Memory Kernel
+# evidence_events / claims / claim_versions / fts_memories
