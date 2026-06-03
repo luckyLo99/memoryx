@@ -2,7 +2,7 @@
 
 ## Status
 
-`memory_embeddings.vector_json` is **deprecated** as of MemoryX 1.1.0.
+`memory_embeddings.vector_json` is **deprecated** as of MemoryX 2.0.0.
 
 Production vector search must use **LanceDB** backend. The SQLite `vector_json` column exists
 for backward compatibility only and will be removed in a future major release.

@@ -4,8 +4,19 @@ All notable changes to MemoryX are documented in this file.
 
 ## [Unreleased]
 
-### Added
-- P11 cognitive guard: claim verification against MemoryX evidence
+## [2.0.0] - 2026-05-29
+
+### Stable release
+- Published MemoryX 2.0.0 stable.
+- Added release archive and checksum verification.
+- Completed production acceptance for Hermes integration.
+- Kept v2.0.0-rc.1 and v2.0.0-rc.2 as prerelease history.
+
+## [1.1.0-rc1] - 2026-05-23
+
+### Pre-release
+- MemoryX 1.1.0 release candidate.
+
 - LESSON policy enforcement: allow/warn/block/require_dry_run/require_tool_verification
 - Narrative reflection: synthesize task/opinion/lesson/claim into periodic reflections
 - Guarded generation: CognitiveGuard for answer + action verification

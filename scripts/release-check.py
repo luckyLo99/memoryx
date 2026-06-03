@@ -71,7 +71,7 @@ def rel(p: Path) -> str:
 
 # ── 检查 1: Git 状态 ──
 print("=" * 50)
-print("RELEASE CHECK — Mnemosyne-X")
+print("RELEASE CHECK — MemoryX")
 print("=" * 50)
 
 import subprocess

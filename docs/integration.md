@@ -1,7 +1,7 @@
-# Hermes integration guide for Mnemosyne-X Phase 1
+# Hermes integration guide for MemoryX Phase 1
 
 ## Goal
-Attach Mnemosyne-X as a non-intrusive plugin using Hermes' existing plugin hook system.
+Attach MemoryX as a non-intrusive plugin using Hermes' existing plugin hook system.
 
 ## Files to install
 Copy these into a Hermes plugin directory:
