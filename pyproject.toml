@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0.0"]
+requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -27,7 +27,7 @@ dependencies = [
     "pydantic>=2.0",
     "structlog>=23.0",
     "prometheus-client>=0.16.0",
-    "pydantic-settings>=2.0",
+    "pydantic-settings>=2.14.1",
 ]
 
 [project.optional-dependencies]
@@ -36,11 +36,11 @@ rest = [
     "httpx>=0.24.0",
 ]
 dev = [
-    "pytest>=7.0",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.21.0",
-    "black>=23.0",
+    "black>=26.5.1",
     "ruff>=0.1.0",
-    "mypy>=1.0",
+    "mypy>=2.1.0",
     "fastapi>=0.110.0",
     "httpx>=0.24.0",
 ]
