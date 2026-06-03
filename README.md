@@ -167,49 +167,15 @@ for r in results:
 
 ## Hermes Agent 集成
 
-### 方案 A：使用 hooks（推荐）
+For the verified Hermes authoritative integration, see [`docs/HERMES_MEMORYX_AUTHORITATIVE.md`](docs/HERMES_MEMORYX_AUTHORITATIVE.md).
 
-```bash
-# 1. 复制 hooks
-cp hooks/pre_response.sh ~/.hermes/hooks/
-cp hooks/post_response.sh ~/.hermes/hooks/
-chmod +x ~/.hermes/hooks/*.sh
+MemoryX supports Hermes through two separate pieces:
 
-# 2. 复制技能
-cp -r skills/memoryx ~/.hermes/skills/
+1. A Hermes MemoryX provider.
+2. An authoritative patch that routes native Hermes `memory()` writes into MemoryX.
 
-# 3. 添加到 PINNED_SKILLS
-# 编辑 ~/.hermes/skills/PINNED_SKILLS.json，添加 "memoryx"
+The runtime hook/plugin path is not a replacement for the Hermes native memory provider. For production Hermes usage, follow the authoritative integration document above.
 
-# 4. 重启 Gateway
-hermes gateway restart
-```
-
-### 方案 B：直接集成
-
-```python
-# 在 Hermes 插件中使用
-from memoryx.hermes_adapter import MemoryXHermesAdapter
-
-adapter = MemoryXHermesAdapter()
-
-# 对话前：注入相关记忆
-context = await adapter.get_context(user_query, session_id)
-
-# 对话后：存储重要信息
-await adapter.store_from_response(query, response)
-```
-
-### 自动存储触发关键词
-
-| 类别 | 关键词 |
-|------|--------|
-| 个人信息 | 我叫、我的名字、我是、我来自、我的生日 |
-| 偏好习惯 | 我喜欢、我不喜欢、我偏好、我每天、我每周 |
-| 观点态度 | 我认为、我觉得、我相信、我支持、我反对 |
-| 重要事件 | 我完成了、我学会了、我参加了、我获得了 |
-
----
 
 ## 架构设计
 
@@ -390,5 +356,5 @@ MIT License - 详见 [LICENSE](LICENSE) 文件。
 
 ## 联系
 
-- GitHub Issues: https://github.com/lucky99/memoryx/issues
-- 文档: https://github.com/lucky99/memoryx/tree/main/docs
+- GitHub Issues: https://github.com/luckyl214/memoryx/issues
+- 文档: https://github.com/luckyl214/memoryx/tree/main/docs
