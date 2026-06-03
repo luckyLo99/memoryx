@@ -19,6 +19,70 @@ MEMORY_TYPES = {
     "OPINION_SHIFT", "LESSON",
 }
 
+_QUERY_ALIASES: dict[str, list[str]] = {
+    "pytest": ["py test", "python test"],
+    "rust": ["rust programming", "rust language"],
+    "js": ["javascript"],
+    "ts": ["typescript"],
+    "sqlite": ["sqlite3", "fts5"],
+    "db": ["database"],
+    "deploy": ["release", "deployment"],
+    "build": ["compile"],
+}
+
+
+def tokenize_query_terms(query: str) -> list[str]:
+    """Deterministic query tokenizer for FTS5 searches (24.4-C).
+
+    Supports camelCase, snake_case, kebab-case, dot, slash, version numbers.
+    Original words are preserved alongside split forms.
+    """
+    if not query or not query.strip():
+        return []
+    raw = query.strip()
+    import re as _re
+    segments = _re.split(r"[-_.\\/]", raw)
+    tokens: list[str] = []
+    for seg in segments:
+        if not seg:
+            continue
+        # Split camelCase
+        parts = _re.sub(r"([a-z])([A-Z])", r"\1 \2", seg).lower().split()
+        for p in parts:
+            p = _re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", p)
+            if p and p not in tokens:
+                tokens.append(p)
+    # Preserve original raw query (for LIKE fallback, not FTS5 MATCH)
+    # raw_lower = raw.lower().strip()
+    # if raw_lower and raw_lower not in tokens:
+    #     tokens.insert(0, raw_lower)
+    return tokens
+
+
+def _build_fts_query(tokens: list[str], operator: str = "AND") -> str:
+    """Build a safe FTS5 MATCH query from tokens. Returns empty string if no safe tokens."""
+    safe = [t.replace('"', '""') for t in tokens if t]
+    if not safe:
+        return ""
+    if operator == "AND":
+        return " AND ".join(safe)
+    elif operator == "OR":
+        return " OR ".join(safe)
+    elif operator == "PHRASE":
+        return '"' + safe[0] + '"' if len(safe) == 1 else " NEAR/0 ".join(safe)
+    return " OR ".join(safe)
+
+
+def expand_with_aliases(tokens: list[str]) -> list[str]:
+    """Expand tokens using static alias map. Returns up to 16 unique tokens."""
+    expanded = list(tokens)
+    for t in tokens:
+        for alias in _QUERY_ALIASES.get(t, []):
+            for sub in alias.split():
+                if sub and sub not in expanded:
+                    expanded.append(sub)
+    return expanded[:16]
+
 
 @dataclass(init=False)
 class MemoryRecord:
@@ -266,10 +330,316 @@ class MemoryRepository:
         return [self._row_to_dict(r) for r in rows]
 
     async def search_full_text(self, query: str, limit: int=20) -> list[dict[str,Any]]:
+        """Full-text search with fallback plan: phrase → AND → OR → alias OR (24.4-C)."""
+        tokens = tokenize_query_terms(query)
+        if not tokens:
+            return []
+
+        plans = []
+        phrase_q = _build_fts_query(tokens, "PHRASE")
+        if phrase_q:
+            plans.append(phrase_q)
+        and_q = _build_fts_query(tokens, "AND")
+        if and_q and and_q != phrase_q:
+            plans.append(and_q)
+        or_q = _build_fts_query(tokens, "OR")
+        if or_q and or_q not in (phrase_q, and_q):
+            plans.append(or_q)
+        expanded = expand_with_aliases(tokens)
+        alias_or = _build_fts_query(expanded, "OR")
+        if alias_or and alias_or != or_q:
+            plans.append(alias_or)
+
+        for fts_q in plans:
+            try:
+                rows = await self.db.fetchall(
+                    "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+                    "WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",
+                    (fts_q, limit),
+                )
+                if rows:
+                    return [self._row_to_dict(r) for r in rows]
+            except Exception:
+                continue  # FTS syntax error → next plan
+        return []
+
+    async def search_full_text_with_trace(
+        self, query: str, limit: int = 20,
+    ) -> tuple[list[dict[str, Any]], dict]:
+        """Full-text search returning (results, trace).  Trace has:
+        query_plan_used, fallback_steps, raw_hit_count.
+        """
+        tokens = tokenize_query_terms(query)
+        if not tokens:
+            return [], {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": 0}
+
+        plan_defs = [
+            ("phrase", _build_fts_query(tokens, "PHRASE")),
+            ("and",    _build_fts_query(tokens, "AND")),
+            ("or",     _build_fts_query(tokens, "OR")),
+        ]
+        expanded = expand_with_aliases(tokens)
+        alias_q = _build_fts_query(expanded, "OR")
+        plan_defs.append(("alias", alias_q))
+
+        fallback_steps: list[str] = []
+        for plan_name, fts_q in plan_defs:
+            if not fts_q:
+                continue
+            try:
+                rows = await self.db.fetchall(
+                    "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+                    "WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",
+                    (fts_q, limit),
+                )
+                count = len(rows)
+                if count > 0:
+                    return [self._row_to_dict(r) for r in rows], {
+                        "query_plan_used": plan_name,
+                        "fallback_steps": fallback_steps,
+                        "raw_hit_count": count,
+                    }
+                fallback_steps.append(f"{plan_name}:0")
+            except Exception:
+                fallback_steps.append(f"{plan_name}:error")
+                continue
+        return [], {
+            "query_plan_used": None,
+            "fallback_steps": fallback_steps,
+            "raw_hit_count": 0,
+        }
+
+    async def search_memories_text(
+        self, query: str, limit: int = 20,
+        include_states: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search memories with optional active_state filter.
+
+        include_states: if set, only return memories whose active_state is in this set.
+        Default (None): only 'active' and 'archived' (excludes superseded/quarantined).
+        """
         q = self._normalize_search_query(query)
-        if not q: return []
-        rows = await self.db.fetchall("SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",(q,limit))
+        if not q:
+            return []
+        states = include_states if include_states is not None else {"active", "archived"}
+        placeholders = ",".join("?" for _ in states)
+        rows = await self.db.fetchall(
+            f"SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+            f"WHERE memories_fts MATCH ? AND m.active_state IN ({placeholders}) "
+            f"ORDER BY bm25(memories_fts) LIMIT ?;",
+            (q, *states, limit),
+        )
         return [self._row_to_dict(r) for r in rows]
+
+    async def list_memories_filtered(
+        self, limit: int = 20, memory_type: str | None = None,
+        scope: str | None = None, include_states: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """List memories with optional filtering.
+
+        include_states: if set, only return memories whose active_state is in this set.
+        Default (None): only 'active' and 'archived'.
+        """
+        conditions = []
+        params: list[Any] = []
+        states = include_states if include_states is not None else {"active", "archived"}
+        state_placeholders = ",".join("?" for _ in states)
+        conditions.append(f"active_state IN ({state_placeholders})")
+        params.extend(states)
+        if memory_type:
+            conditions.append("memory_type=?")
+            params.append(memory_type)
+        if scope:
+            conditions.append("scope=?")
+            params.append(scope)
+        where = " AND ".join(conditions)
+        rows = await self.db.fetchall(
+            f"SELECT * FROM memories WHERE {where} ORDER BY updated_at DESC LIMIT ?;",
+            (*params, limit),
+        )
+        return [self._row_to_dict(r) for r in rows]
+
+    async def count_memories_by_state(self) -> dict[str, int]:
+        """Return counts of memories grouped by active_state."""
+        rows = await self.db.fetchall(
+            "SELECT active_state, COUNT(*) AS cnt FROM memories GROUP BY active_state;"
+        )
+        return {r["active_state"]: r["cnt"] for r in rows}
+
+    async def count_memories_by_type_scope(self) -> dict[str, dict[str, int]]:
+        """Return counts grouped by memory_type -> scope."""
+        rows = await self.db.fetchall(
+            "SELECT memory_type, scope, COUNT(*) AS cnt FROM memories GROUP BY memory_type, scope ORDER BY memory_type;"
+        )
+        result: dict[str, dict[str, int]] = {}
+        for r in rows:
+            mt = r["memory_type"]
+            sc = r["scope"]
+            if mt not in result:
+                result[mt] = {}
+            result[mt][sc] = r["cnt"]
+        return result
+
+    async def count_memories_total(self) -> int:
+        """Return total number of memories."""
+        row = await self.db.fetchone("SELECT COUNT(*) AS cnt FROM memories;", ())
+        return int(row["cnt"]) if row else 0
+
+    async def count_memories_by_candidate_state(self) -> dict[str, int]:
+        """Return counts grouped by candidate_state from metadata_json.
+
+        Parses metadata_json for each memory.  Invalid/non-JSON metadata
+        is counted under 'unknown'.  This is a read-only scan.
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json FROM memories;", (),
+        )
+        counts: dict[str, int] = {}
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                meta = {}
+            cs = meta.get("candidate_state", "unknown")
+            counts[cs] = counts.get(cs, 0) + 1
+        return counts
+
+    async def count_memories_by_evidence_level(self) -> dict[str, int]:
+        """Return counts grouped by evidence_level from metadata_json.
+
+        Read-only scan.  Invalid metadata -> 'unknown'.
+        Missing evidence_level -> 'missing'.
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json FROM memories;", (),
+        )
+        counts: dict[str, int] = {}
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                counts["unknown"] = counts.get("unknown", 0) + 1
+                continue
+            el = meta.get("evidence_level", "missing")
+            counts[el] = counts.get(el, 0) + 1
+        return counts
+
+    async def count_low_quality_candidates(self) -> dict[str, int]:
+        """Return low-quality candidate statistics.
+
+        Low quality = candidate_state=='candidate' AND
+          evidence_level in {E0_MODEL_INFERENCE, missing, unknown}
+          OR confidence < 0.3
+
+        Returns dict with keys:
+          low_quality_candidate_count, e0_candidate_count,
+          missing_evidence_count, unknown_metadata_count
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json, confidence_score FROM memories;", (),
+        )
+        low_quality = 0
+        e0_candidate = 0
+        missing_evidence = 0
+        unknown_meta = 0
+
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                unknown_meta += 1
+                continue
+
+            cs = meta.get("candidate_state", "")
+            el = meta.get("evidence_level", "missing")
+            conf = meta.get("confidence", r["confidence_score"] if "confidence_score" in r.keys() else 0.0)
+            try:
+                conf = float(conf)
+            except (TypeError, ValueError):
+                conf = 0.0
+
+            if el == "missing":
+                missing_evidence += 1
+            if cs == "candidate" and el == "E0_MODEL_INFERENCE":
+                e0_candidate += 1
+            if cs == "candidate" and (
+                el in ("E0_MODEL_INFERENCE", "missing", "unknown") or conf < 0.3
+            ):
+                low_quality += 1
+
+        return {
+            "low_quality_candidate_count": low_quality,
+            "e0_candidate_count": e0_candidate,
+            "missing_evidence_count": missing_evidence,
+            "unknown_metadata_count": unknown_meta,
+        }
+
+    async def evidence_quality_summary(self) -> dict[str, Any]:
+        """Return combined evidence quality summary.
+
+        Combines evidence_level distribution, candidate_state distribution,
+        and low-quality candidate counts into a single report.
+        """
+        by_el = await self.count_memories_by_evidence_level()
+        by_cs = await self.count_memories_by_candidate_state()
+        lq = await self.count_low_quality_candidates()
+        return {
+            "by_evidence_level": by_el,
+            "by_candidate_state": by_cs,
+            **lq,
+        }
+
+    async def count_memories_by_layer(self) -> dict[str, int]:
+        """Return counts grouped by memory_layer from metadata_json.
+
+        Read-only scan.  Invalid metadata -> 'unknown'.
+        Missing memory_layer -> 'missing' (backward compat).
+        """
+        rows = await self.db.fetchall(
+            "SELECT id, metadata_json FROM memories;", (),
+        )
+        counts: dict[str, int] = {}
+        for r in rows:
+            raw = r["metadata_json"]
+            try:
+                meta = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, ValueError):
+                counts["unknown"] = counts.get("unknown", 0) + 1
+                continue
+            layer = meta.get("memory_layer", "missing")
+            counts[layer] = counts.get(layer, 0) + 1
+        return counts
+
+    async def layer_quality_summary(self) -> dict[str, Any]:
+        """Return combined layer quality summary.
+
+        Includes by_memory_layer, missing_layer_count, unknown_layer_count.
+        """
+        by_layer = await self.count_memories_by_layer()
+        missing = by_layer.pop("missing", 0)
+        unknown = by_layer.pop("unknown", 0)
+        return {
+            "by_memory_layer": by_layer,
+            "missing_layer_count": missing,
+            "unknown_layer_count": unknown,
+        }
+
+    async def count_open_conflicts(self) -> int:
+        """Return number of open (unresolved) conflicts."""
+        rows = await self.db.fetchall(
+            "SELECT COUNT(*) AS cnt FROM memory_conflicts WHERE resolved_state = 'open';", (),
+        )
+        return int(rows[0]["cnt"]) if rows else 0
+
+    async def count_conflicts_by_state(self) -> dict[str, int]:
+        """Return conflict counts grouped by resolved_state."""
+        rows = await self.db.fetchall(
+            "SELECT resolved_state, COUNT(*) AS cnt FROM memory_conflicts GROUP BY resolved_state;", (),
+        )
+        return {r["resolved_state"]: r["cnt"] for r in rows} if rows else {}
 
     async def record_access(self, memory_id: str) -> None:
         now = self._now_iso()
@@ -281,6 +651,52 @@ class MemoryRepository:
         now = self._now_iso()
         await self.db.execute("UPDATE memories SET active_state='superseded',superseded_by=?,valid_to=?,updated_at=? WHERE id=?;",(superseded_by,now,now,memory_id))
         await self.append_audit("memories",memory_id,"supersede_memory",after_json={"superseded_by":superseded_by})
+
+    async def update_memory_metadata(self, memory_id: str, metadata_patch: dict) -> bool:
+        """Update metadata_json by merging patch into existing metadata.
+
+        Reads existing metadata_json, parses it, merges the patch dict on
+        top (patch wins), and writes back.  Unknown fields in the existing
+        metadata are preserved.  If metadata_json is empty or invalid JSON
+        it is treated as {} with an internal repair warning.
+        """
+        row = await self.db.fetchone("SELECT metadata_json FROM memories WHERE id=?;", (memory_id,))
+        if row is None:
+            return False
+
+        raw = row["metadata_json"]
+        try:
+            existing = json.loads(raw) if raw else {}
+        except (json.JSONDecodeError, ValueError):
+            existing = {"_metadata_repair_warning": "metadata_json was not valid JSON, reset to {}"}
+
+        merged = dict(existing)
+        merged.update(metadata_patch)
+
+        new_meta = json.dumps(merged, ensure_ascii=False)
+        now = self._now_iso()
+        await self.db.execute(
+            "UPDATE memories SET metadata_json=?, updated_at=? WHERE id=?;",
+            (new_meta, now, memory_id),
+        )
+        return True
+
+    async def update_memory_active_state(self, memory_id: str, active_state: str) -> bool:
+        """Update active_state with validation — only existing legal values allowed.
+
+        Legal values: active, archived, superseded, quarantined.
+        Returns False if state is not legal or memory not found.
+        """
+        LEGAL = frozenset({"active", "archived", "superseded", "quarantined"})
+        if active_state not in LEGAL:
+            return False
+
+        now = self._now_iso()
+        n = await self.db.execute(
+            "UPDATE memories SET active_state=?, updated_at=? WHERE id=?;",
+            (active_state, now, memory_id),
+        )
+        return n > 0
 
     async def add_conflict(self, memory_id: str, conflicting_memory_id: str, reason: str) -> None:
         now = self._now_iso()

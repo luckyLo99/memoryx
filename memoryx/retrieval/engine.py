@@ -1,10 +1,129 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
-from .models import RetrievalIntent, RetrievalResult
+from .models import RetrievalIntent, RetrievalResult, RetrievalTrace
+
+logger = logging.getLogger(__name__)
+
+
+def _is_visible_memory_for_retrieval(
+    record: dict[str, Any],
+    include_candidates: bool = False,
+) -> bool:
+    """Determine if a memory record should be visible in retrieval results.
+
+    Rules:
+    - metadata_json has no candidate_state: legacy committed, visible
+    - candidate_state in [committed, verified]: visible
+    - candidate_state == "candidate": only if include_candidates=True
+    - candidate_state in [rejected, superseded, stale]: never visible
+    - metadata_json invalid: conservatively visible (avoid killing old data)
+    """
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        return True  # conservative: don't kill old data on parse failure
+
+    cs = meta.get("candidate_state")
+    if cs is None:
+        return True  # legacy committed, always visible
+
+    if cs in ("committed", "verified"):
+        return True
+    if cs == "candidate":
+        return include_candidates
+    # rejected, superseded, stale — never visible
+    return False
+
+
+def _is_session_scoped_memory(record: dict[str, Any]) -> bool:
+    """Check if a memory is session-scoped (scope=session or memory_layer=session).
+
+    Returns True if the memory belongs to a specific session.
+    Does NOT check if it matches the current session_id.
+    """
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    return record.get("scope") == "session" or meta.get("memory_layer") == "session"
+
+
+def _session_matches(record: dict[str, Any], session_id: str | None) -> bool:
+    """Check if a memory's session_id matches the given session_id.
+
+    Returns False if either side is None.
+    """
+    if not session_id:
+        return False
+    mem_session = record.get("session_id")
+    return bool(mem_session) and mem_session == session_id
+
+
+def _is_lesson_memory(record: dict[str, Any]) -> bool:
+    """Check if a memory record is a LESSON.
+
+    Primary criterion: memory_type == "LESSON".
+    Fallback: metadata.memory_class == "lesson".
+    """
+    if record.get("memory_type") == "LESSON":
+        return True
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    return meta.get("memory_class") == "lesson"
+
+
+def _layer_score_boost(record: dict[str, Any]) -> float:
+    """Return a deterministic layer-based score boost (24.4-B).
+
+    Only applies to memories that have already passed eligibility.
+    policy/guard get highest boost, project moderate, session slight.
+    long_term and legacy get no boost.
+    """
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    layer = meta.get("memory_layer", "")
+    if layer in ("policy", "guard"):
+        return 0.30
+    if layer == "project":
+        return 0.15
+    if layer == "session":
+        return 0.10
+    return 0.0
+
+
+def _retrieval_dedup_key(record: dict[str, Any], memory_type: str = "") -> str:
+    """Return a deduplication key for a memory record.
+
+    Based on content + memory_type + layer. Not a cryptographic hash,
+    just a deterministic grouping key.
+    """
+    content = (record.get("content") or "").strip().lower()
+    mt = memory_type or record.get("memory_type", "")
+    raw_meta = record.get("metadata_json", "{}")
+    try:
+        meta = json.loads(raw_meta) if raw_meta else {}
+    except (json.JSONDecodeError, ValueError):
+        meta = {}
+    layer = meta.get("memory_layer", "")
+    return hashlib.sha256(f"{mt}|{layer}|{content}".encode("utf-8")).hexdigest()
+
+
+MIN_FINAL_SCORE = 0.05
 
 
 class HybridRetrievalEngine:
@@ -23,6 +142,8 @@ class HybridRetrievalEngine:
         session_id: str | None = None,
         include_global: bool = True,
         include_lessons: bool = True,
+        include_candidates: bool = False,
+        session_only: bool = False,
         explain_scores: bool = False,
         tag_filter: list[str] | None = None,
         tag_mode: str = "any",
@@ -33,20 +154,46 @@ class HybridRetrievalEngine:
             session_id=session_id,
             scope_filter=scope_filter,
             include_global=include_global,
+            session_only=session_only,
         )
 
-        vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+        vector_hits: list[dict] = []
+        vector_available = False
+        if self.vector_store is not None:
+            try:
+                vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+                vector_available = True
+            except Exception:
+                vector_hits = []  # degraded: vector unavailable
         vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
 
-        keyword_hits = await self.repository.search_full_text(query, limit=max(limit * 3, 10))
+        # 24.4-B: fetch_limit optimization — base 2x, fallback 3x if needed
+        base_fetch = max(limit * 2, 30)
+        fallback_fetch = max(limit * 3, 30)
+        if explain_scores:
+            keyword_hits, fts_trace = await self.repository.search_full_text_with_trace(query, limit=base_fetch)
+        else:
+            keyword_hits = await self.repository.search_full_text(query, limit=base_fetch)
+            fts_trace = {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": len(keyword_hits)}
         keyword_map = {item["memory_id"]: item for item in keyword_hits}
 
         candidate_ids = list(dict.fromkeys([*vector_scores.keys(), *keyword_map.keys()]))
+        raw_hit_count = len(candidate_ids)
         memories: list[dict[str, Any]] = []
+        seen_dedup: dict[str, float] = {}  # dedup_key -> best_score (24.4-B)
+        hidden_candidates = 0
+        hidden_session = 0
+        hidden_lessons = 0
+        hidden_state = 0
+        dedup_dropped = 0
+        hydrated_count = 0
+        get_memory_count = 0
         for memory_id in candidate_ids:
+            get_memory_count += 1
             memory = await self.repository.get_memory(memory_id)
             if memory is None:
                 continue
+            hydrated_count += 1
 
             # Session isolation: filter by session_id and scope
             mem_scope = str(memory.get("scope", "global"))
@@ -65,19 +212,56 @@ class HybridRetrievalEngine:
                 elif include_global and mem_scope == "global":
                     pass
                 else:
+                    hidden_session += 1
                     continue  # different session, exclude
             elif not include_global:
                 if mem_scope == "global":
+                    hidden_state += 1
                     continue
+
+            # Session scope hardening (24.3C)
+            if _is_session_scoped_memory(memory):
+                if not _session_matches(memory, session_id):
+                    hidden_session += 1
+                    continue  # foreign session-scoped memory never visible
+            if session_only:
+                if not _is_session_scoped_memory(memory):
+                    hidden_session += 1
+                    continue  # session_only excludes global/user/project
+                if not _session_matches(memory, session_id):
+                    hidden_session += 1
+                    continue  # must also match session_id
 
             if tag_filter and not self._match_tags(memory.get("tags_json", "[]"), tag_filter, tag_mode):
                 continue
+
+            # Candidate visibility filter: exclude candidate/rejected/superseded/stale
+            if not _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates):
+                hidden_candidates += 1
+                continue
+
+            # Lesson inclusion filter: exclude LESSON when include_lessons=False
+            if not include_lessons and _is_lesson_memory(memory):
+                hidden_lessons += 1
+                continue
+
+            # 24.4-B: retrieval-level dedup
+            dk = _retrieval_dedup_key(memory)
+            est_score = vector_scores.get(memory_id, 0.0)
+            if dk in seen_dedup:
+                if est_score <= seen_dedup[dk]:
+                    dedup_dropped += 1
+                    continue  # lower or equal score, skip
+            seen_dedup[dk] = est_score
+
             memories.append(memory)
 
         weights = self._intent_weights(intent)
         results: list[RetrievalResult] = []
         now = datetime.now(timezone.utc)
         query_tokens = self._tokens(query)
+        layer_boost_applied = 0
+        fallback_used = False
 
         for memory in memories:
             memory_id = str(memory.get("id") or memory.get("memory_id"))
@@ -98,6 +282,12 @@ class HybridRetrievalEngine:
                 + episodic_score * weights["episodic"]
             )
 
+            # 24.4-B: layer-aware score boost
+            layer_boost = _layer_score_boost(memory)
+            final_score += layer_boost
+            if layer_boost:
+                layer_boost_applied += 1
+
             explanation = self._build_explanation(
                 semantic_score=semantic_score,
                 keyword_score=keyword_score,
@@ -107,6 +297,9 @@ class HybridRetrievalEngine:
                 episodic_score=episodic_score,
                 intent=intent,
             )
+            if layer_boost:
+                explanation += f", layer_boost={layer_boost:.2f}"
+
             results.append(
                 RetrievalResult(
                     memory_id=memory_id,
@@ -126,6 +319,57 @@ class HybridRetrievalEngine:
 
         results.sort(key=lambda item: item.final_score, reverse=True)
 
+        # 24.4-B: fallback fetch if results < limit and base_fetch was fully utilized
+        if len(results) < limit and len(keyword_hits) >= base_fetch:
+            fallback_used = True
+            more_hits = await self.repository.search_full_text(query, limit=fallback_fetch)
+            new_ids = {m["memory_id"] for m in more_hits} - {r.memory_id for r in results}
+            for memory_id in new_ids:
+                get_memory_count += 1
+                memory = await self.repository.get_memory(memory_id)
+                if memory is None:
+                    continue
+                hydrated_count += 1
+                if _is_visible_memory_for_retrieval(memory, include_candidates=include_candidates) is False:
+                    continue
+                if not include_lessons and _is_lesson_memory(memory):
+                    continue
+                dk = _retrieval_dedup_key(memory)
+                vs = vector_scores.get(memory_id, 0.0)
+                if dk in seen_dedup and vs <= seen_dedup[dk]:
+                    continue
+                seen_dedup[dk] = vs
+
+                content = str(memory["content"])
+                keyword_score = self._keyword_overlap(self._tokens(query), self._tokens(content))
+                importance_score = float(memory.get("importance_score", 0.0))
+                final_score = (
+                    vs * weights["semantic"]
+                    + keyword_score * weights["keyword"]
+                    + self._temporal_score(str(memory.get("valid_from") or memory.get("updated_at") or ""), now) * weights["temporal"]
+                    + self._entity_overlap(self._tokens(query), memory.get("entities_json", "[]")) * weights["entity"]
+                    + importance_score * weights["importance"]
+                    + (0.15 if str(memory.get("memory_type", "")) == "EPISODIC" else 0.0) * weights["episodic"]
+                )
+                final_score += _layer_score_boost(memory)
+                results.append(RetrievalResult(
+                    memory_id=memory_id, content=content,
+                    memory_type=str(memory.get("memory_type", "")),
+                    scope=str(memory.get("scope", "global")),
+                    semantic_score=vs, keyword_score=keyword_score,
+                    temporal_score=0.0, entity_score=0.0,
+                    importance_score=importance_score, episodic_score=0.0,
+                    final_score=final_score, explanation="fallback_fetch",
+                ))
+
+        results.sort(key=lambda item: item.final_score, reverse=True)
+
+        # 24.4-B: min score threshold trimming (only when results > limit)
+        if len(results) > limit:
+            results = [r for r in results if r.final_score >= MIN_FINAL_SCORE]
+            if not results:
+                results = []  # empty is safe
+
         # LESSON fusion: boost matching lesson memories
         if include_lessons:
             results = await self._merge_lesson_candidates(
@@ -138,7 +382,30 @@ class HybridRetrievalEngine:
                 limit=limit,
             )
 
-        return results[:limit]
+        results = results[:limit]
+
+        if explain_scores:
+            trace = RetrievalTrace(
+                query_plan_used=fts_trace.get("query_plan_used"),
+                fallback_steps=fts_trace.get("fallback_steps", []),
+                fallback_used=fallback_used,
+                vector_available=vector_available,
+                raw_hits=raw_hit_count,
+                visible_hits=len(results),
+                dedup_dropped=dedup_dropped,
+                hidden_candidates=hidden_candidates,
+                hidden_session=hidden_session,
+                hidden_lessons=hidden_lessons,
+                hidden_state=hidden_state,
+                layer_boost_applied=layer_boost_applied,
+                fetch_limit=base_fetch,
+                fallback_fetch_limit=fallback_fetch if fallback_used else None,
+                hydrated_count=hydrated_count,
+                get_memory_count=get_memory_count,
+            )
+            return results, trace.to_dict()
+
+        return results
 
     @staticmethod
     def _build_visibility_filter(
@@ -146,12 +413,25 @@ class HybridRetrievalEngine:
         session_id: str | None,
         scope_filter: str | None,
         include_global: bool = True,
+        session_only: bool = False,
     ) -> tuple[str, list[Any]]:
         """Build WHERE clause for session/scope visibility filtering."""
         clauses = ["active_state = 'active'"]
         params: list[Any] = []
 
         visible: list[str] = []
+
+        if session_only:
+            # Broad SQL pass — don't filter on scope here. The final eligibility
+            # is enforced in the memory loop via _is_session_scoped_memory().
+            # This avoids false negatives for scope='global' + memory_layer='session'.
+            if session_id:
+                visible.append("session_id = ?")
+                params.append(session_id)
+            elif visible:
+                visible.append("1=0")
+            clauses.append("(" + " OR ".join(visible) + ")")
+            return " AND ".join(clauses), params
 
         if session_id:
             visible.append("session_id = ?")

@@ -49,6 +49,7 @@ class HermesMemoryBridge:
         query_api=None,
         retrieval_engine=None,
         lesson_policy=None,
+        working_memory_engine=None,
         max_context_items: int = 6,
     ) -> None:
         self.repository = repository
@@ -62,6 +63,7 @@ class HermesMemoryBridge:
             else None
         )
         self.narrative = NarrativeReflectionEngine(repository=repository) if NarrativeReflectionEngine is not None else None
+        self.working_memory_engine = working_memory_engine
         self.max_context_items = max_context_items
 
     async def on_user_message(self, *, session_id: str, content: str, **extra: Any) -> HermesBridgeResult:
@@ -84,6 +86,35 @@ class HermesMemoryBridge:
                 memories = []
 
         context_block = self.render_context_block(memories=memories, safety_block=self.llm_firewall.render_policy_block(safety))
+
+        # Inject working memory context (L0), if available
+        working_lines: list[str] = []
+        if self.working_memory_engine is not None:
+            try:
+                snap = await self.working_memory_engine.snapshot(session_id)
+                if snap and snap.get("has_state"):
+                    working_lines = snap["lines"]
+            except Exception:
+                pass  # degraded, not crash
+        if working_lines:
+            working_block = "<working_context>\n" + "\n".join(working_lines) + "\n</working_context>"
+            context_block = working_block + "\n\n" + context_block
+
+        # Inject open conflict warning (24.3D-D)
+        conflict_warning: str | None = None
+        if hasattr(self.repository, "count_open_conflicts"):
+            try:
+                oc = await self.repository.count_open_conflicts()
+                if oc > 0:
+                    conflict_warning = (
+                        "<conflict_warning>\n"
+                        f"- {oc} open memory conflict(s) require review.\n"
+                        "</conflict_warning>"
+                    )
+            except Exception:
+                pass  # degraded
+        if conflict_warning:
+            context_block = conflict_warning + "\n\n" + context_block
         return HermesBridgeResult(
             event="on_user_message",
             session_id=session_id,

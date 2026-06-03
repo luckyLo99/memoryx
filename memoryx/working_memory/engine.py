@@ -68,6 +68,27 @@ class WorkingMemoryEngine:
                 self._states.pop(session_id, None)
             return len(stale_ids)
 
+    async def snapshot(self, session_id: str) -> dict | None:
+        """Return a read-only snapshot of working memory state.
+
+        Does NOT persist to DB.  Returns None if session not found or expired.
+        This is a read-only view for context injection (L0 layer).
+        """
+        state = await self.get_state(session_id)
+        if state is None:
+            return None
+        parts = []
+        if state.current_task:
+            parts.append(f"Current task: {state.current_task}")
+        if state.reasoning_chain:
+            parts.append("Reasoning: " + " -> ".join(state.reasoning_chain[-3:]))
+        if state.active_todos:
+            parts.append("Active todos: " + ", ".join(state.active_todos))
+        if state.workflow_state:
+            wf_keys = list(state.workflow_state.keys())[:5]
+            parts.append("Workflow: " + ", ".join(wf_keys))
+        return {"session_id": session_id, "lines": parts, "has_state": bool(parts)}
+
     async def compress_state(self, session_id: str, *, max_reasoning_items: int = 3, max_todos: int = 3) -> str:
         async with self._lock:
             state = self._states.get(session_id)

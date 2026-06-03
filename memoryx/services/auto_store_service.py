@@ -105,6 +105,9 @@ class AutoStoreService:
             "source": source,
             "tool_name": tool_name,
             "source_type": "tool_verified",
+            "promotion_source": "tool_verified",
+            "promotion_trusted": True,
+            "promotion_policy_version": "24.3D-C",
         }
 
         from memoryx.storage import MemoryRecord

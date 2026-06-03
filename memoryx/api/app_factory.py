@@ -73,7 +73,18 @@ class MemoryXAppState:
 
 
 def _default_db_path() -> Path:
-    return Path(os.getenv("MEMORYX_DB_PATH", "./data/memoryx.db"))
+    """Determine REST DB path with priority:
+    1. MEMORYX_DB_PATH env var (explicit)
+    2. MEMORYX_HOME/memoryx.db (Hermes profile home)
+    3. ./data/memoryx.db (fallback)
+    """
+    explicit = os.environ.get("MEMORYX_DB_PATH")
+    if explicit:
+        return Path(explicit)
+    mhome = os.environ.get("MEMORYX_HOME")
+    if mhome:
+        return Path(mhome) / "memoryx.db"
+    return Path("./data/memoryx.db")
 
 
 def _default_lancedb_path() -> Path:
@@ -83,18 +94,30 @@ def _default_lancedb_path() -> Path:
 async def _build_default_state() -> MemoryXAppState:
     from memoryx.api import MemoryQueryAPI
     from memoryx.storage import MemoryRepository
-    from memoryx.embeddings import LanceDBVectorStore
 
     db_path = _default_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    repo = MemoryRepository(db_path)
-    await repo.open()
+    try:
+        repo = MemoryRepository(db_path)
+        await repo.open()
+    except Exception:
+        repo = None
+        return MemoryXAppState(
+            repository=None, query_api=None, owns_repository=False, owns_query_api=False,
+        )
 
-    # P0: 启用 LanceDB 向量存储
-    lancedb_path = _default_lancedb_path()
-    lancedb_path.parent.mkdir(parents=True, exist_ok=True)
-    lance_store = LanceDBVectorStore(uri=lancedb_path)
-    await lance_store.open()
+    # P0: Optional LanceDB vector store — fallback if not installed
+    lance_store = None
+    try:
+        from memoryx.embeddings import LanceDBVectorStore
+        lancedb_path = _default_lancedb_path()
+        lancedb_path.parent.mkdir(parents=True, exist_ok=True)
+        lance_store = LanceDBVectorStore(uri=lancedb_path)
+        await lance_store.open()
+    except ImportError:
+        pass
+    except Exception:
+        pass
 
     api = MemoryQueryAPI(repository=repo, vector_store=lance_store)
     return MemoryXAppState(
@@ -243,7 +266,26 @@ def create_app(
 
     @app.get("/ready")
     async def ready(_key: str | None = Depends(verify_api_key)) -> dict:
-        repo = await ensure_repo()
+        """Enhanced readiness endpoint with DB path and memory statistics.
+
+        This enables operators to confirm REST is connected to the same
+        database as the Hermes runtime.  Returns degraded status when DB
+        is unreachable rather than crashing.
+        """
+        import os as _os
+
+        repo: Any = None
+        try:
+            repo = await ensure_repo()
+        except HTTPException:
+            return {
+                "status": "degraded", "ready": False,
+                "source": "rest",
+                "warning": "repository not configured",
+                "db": {"path": str(_default_db_path()), "exists": _default_db_path().exists()},
+                "env": {"cwd": _os.getcwd(), "memoryx_home": _os.environ.get("MEMORYX_HOME", "")},
+            }
+
         checks: dict[str, bool] = {}
         try:
             row = await repo.db.fetchone("SELECT 1 AS ok;", ())
@@ -261,9 +303,78 @@ def create_app(
         except Exception:
             checks["memories"] = checks["memory_versions"] = checks["memories_fts"] = checks["conversation_logs"] = False
 
+        db_path = getattr(repo.db, "db_path", str(_default_db_path()))
+        db_path_obj = Path(str(db_path))
+
+        # Statistics (best-effort, degraded on failure)
+        db_stats: dict[str, Any] = {
+            "path": str(db_path_obj),
+            "exists": db_path_obj.exists(),
+        }
+        try:
+            db_stats["memory_count"] = await repo.count_memories_total()
+            by_state = await repo.count_memories_by_state()
+            db_stats["active_memory_count"] = by_state.get("active", 0)
+            by_cs = await repo.count_memories_by_candidate_state()
+            db_stats["candidate_count"] = by_cs.get("candidate", 0)
+            db_stats["committed_count"] = by_cs.get("committed", 0)
+            db_stats["stale_count"] = by_cs.get("stale", 0)
+            ev_quality = await repo.evidence_quality_summary()
+            db_stats["evidence_quality"] = {
+                "low_quality_candidate_count": ev_quality.get("low_quality_candidate_count", 0),
+                "e0_candidate_count": ev_quality.get("e0_candidate_count", 0),
+                "missing_evidence_count": ev_quality.get("missing_evidence_count", 0),
+                "unknown_metadata_count": ev_quality.get("unknown_metadata_count", 0),
+            }
+            lq = await repo.layer_quality_summary()
+            db_stats["layer_quality"] = lq
+            db_stats["open_conflict_count"] = await repo.count_open_conflicts()
+        except Exception:
+            db_stats["memory_count"] = -1
+            db_stats["active_memory_count"] = -1
+            db_stats["candidate_count"] = -1
+            db_stats["committed_count"] = -1
+            db_stats["stale_count"] = -1
+            db_stats["evidence_quality"] = {
+                "low_quality_candidate_count": -1,
+                "e0_candidate_count": -1,
+                "missing_evidence_count": -1,
+                "unknown_metadata_count": -1,
+            }
+            db_stats["layer_quality"] = {
+                "by_memory_layer": {},
+                "missing_layer_count": -1,
+                "unknown_layer_count": -1,
+            }
+
         if not all(checks.values()):
-            raise HTTPException(503, {"ready": False, "checks": checks})
-        return {"status": "ok", "ready": True, "checks": checks}
+            return {
+                "status": "degraded", "ready": False,
+                "source": "rest",
+                "warning": "some tables missing",
+                "checks": checks, "db": db_stats,
+                "env": {"cwd": _os.getcwd(), "memoryx_home": _os.environ.get("MEMORYX_HOME", "")},
+            }
+
+        vector_store = state().lance_store
+        vector_available = vector_store is not None
+
+        return {
+            "status": "ready", "ready": True,
+            "source": "rest",
+            "checks": checks,
+            "db": db_stats,
+            "retrieval_capabilities": {
+                "fts_fallback_enabled": True,
+                "query_tokenizer_enabled": True,
+                "alias_expansion_enabled": True,
+                "layer_boost_enabled": True,
+                "retrieval_dedup_enabled": True,
+                "trace_enabled": True,
+                "vector_store_available": vector_available,
+            },
+            "env": {"cwd": _os.getcwd(), "memoryx_home": _os.environ.get("MEMORYX_HOME", "")},
+        }
 
     @app.get("/health")
     async def health() -> dict:
