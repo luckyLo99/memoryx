@@ -24,7 +24,7 @@ async def check_update(*, timeout: float = 10.0) -> dict[str, Any]:
 
     Returns:
         {
-            "current_version": "2.0.0",
+            "current_version": "2.1.0",
             "latest_version": "1.2.0",
             "up_to_date": False,
             "release_url": "https://github.com/...",

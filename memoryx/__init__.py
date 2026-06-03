@@ -1,4 +1,10 @@
-__version__ = "2.0.0"
+from pathlib import Path
+
+def _get_version() -> str:
+    version_path = Path(__file__).parent.parent / "VERSION"
+    return version_path.read_text().strip()
+
+__version__ = _get_version()
 
 from .api import MemoryQueryAPI
 from .bank import MemoryBank

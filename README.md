@@ -101,14 +101,21 @@ git clone https://github.com/luckyl214/memoryx.git
 cd memoryx
 
 # 切换到 stable 版本
-git checkout v2.1.0
+git checkout v2.0.0
 
 # 创建虚拟环境
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 安装依赖
-pip install -e ".[dev]"
+# 安装依赖（选择其一）
+# Lite (no embedding / can run without vector dependencies)
+# pip install -e .
+#
+# Standard (with embedding support)
+# pip install -e ".[embedding]"
+#
+# Development (includes test dependencies)
+# pip install -e ".[dev]"
 ```
 
 ### 2. 配置
@@ -118,7 +125,11 @@ pip install -e ".[dev]"
 cp .env.example .env
 
 # 编辑配置（至少需要 Embedding API）
-# .env:
+# .env (choose one of the profile templates from .env.example):
+#   # Example for standard profile:
+#   MEMORYX_PROFILE=standard
+#   MEMORYX_VECTOR_ENABLED=true
+#   MEMORYX_EMBEDDING_ENABLED=true
 #   MEMORYX_EMBEDDING_ENDPOINT=https://api.openai.com/v1/embeddings
 #   MEMORYX_EMBEDDING_API_KEY=your_api_key_here
 #   MEMORYX_EMBEDDING_MODEL=text-embedding-3-small
@@ -134,31 +145,33 @@ python3 scripts/verify_memoryx.py
 ### 4. 基本使用
 
 ```python
-from memoryx.storage import MemoryRepository, MemoryRecord
-from memoryx.retrieval import HybridRetrievalEngine
+from pathlib import Path
+import asyncio
+from memoryx.storage.repository import MemoryRepository, MemoryRecord
 
-# 初始化仓库（自动创建数据库）
-repo = MemoryRepository.open()
+async def main():
+    # 初始化仓库（自动创建数据库）
+    repo = MemoryRepository(db_path=Path("./memoryx_lite.db"))
+    await repo.open()
 
-# 存储记忆
-record = MemoryRecord(
-    memory_id="user_preference_001",
-    content="用户偏好简洁回答",
-    memory_type="FACT",
-    importance_score=0.8
-)
-await repo.store_memory(record)
+    # 存储记忆
+    record = MemoryRecord(
+        memory_id="user_preference_001",
+        content="用户偏好简洁回答",
+        memory_type="FACT",
+        importance_score=0.8
+    )
+    mid = await repo.store_memory(record)
+    print(f"Stored: {mid}")
 
-# 混合检索
-engine = HybridRetrievalEngine(repository=repo)
-results = await engine.retrieve(
-    query="用户偏好",
-    limit=5,
-    explain_scores=True
-)
+    # FTS 全文检索
+    results = await repo.search_full_text("简洁")
+    for r in results:
+        print(f"[{r.get('memory_type', '?')}] {r.get('content', '')}")
 
-for r in results:
-    print(f"[{r.memory_type}] {r.content} (score: {r.final_score})")
+    await repo.close()
+
+asyncio.run(main())
 ```
 
 ---

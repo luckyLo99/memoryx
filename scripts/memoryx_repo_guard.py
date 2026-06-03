@@ -145,14 +145,14 @@ def check_version(root: Path) -> None:
     init_py = root / "memoryx" / "__init__.py"
     version_file = root / "VERSION"
 
-    expected = "2.0.0"
+    expected = "2.1.0"
     text = pyproject.read_text(encoding="utf-8")
-    if 'version = "2.0.0"' not in text:
-        warn('pyproject.toml does not contain version = "2.0.0"')
+    if 'version = "2.1.0"' not in text:
+        warn('pyproject.toml does not contain version = "2.1.0"')
 
     if init_py.exists():
         init_text = init_py.read_text(encoding="utf-8")
-        if '__version__ = "2.0.0"' not in init_text and "__version__='2.0.0'" not in init_text:
+        if '__version__ = "2.1.0"' not in init_text and "__version__='2.0.0'" not in init_text:
             warn("memoryx/__init__.py may not expose __version__ = 2.0.0")
 
     if version_file.exists() and version_file.read_text(encoding="utf-8").strip() != expected:
