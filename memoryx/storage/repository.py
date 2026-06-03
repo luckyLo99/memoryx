@@ -19,6 +19,17 @@ MEMORY_TYPES = {
     "OPINION_SHIFT", "LESSON",
 }
 
+# === 24.6-B: chunking helper for batch IN queries =============================
+# SQLite host parameter limit: 32766 (≥3.32.0) or 999 (older).
+# Using batch_size=500 leaves headroom for other params.
+_BATCH_HYDRATION_CHUNK_SIZE = 500
+
+
+def _chunked(items: list[str], size: int) -> list[list[str]]:
+    """Yield items in chunks of `size`."""
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
 _QUERY_ALIASES: dict[str, list[str]] = {
     "pytest": ["py test", "python test"],
     "rust": ["rust programming", "rust language"],
@@ -320,6 +331,36 @@ class MemoryRepository:
     async def get_memory(self, memory_id: str) -> dict[str,Any]|None:
         row = await self.db.fetchone("SELECT * FROM memories WHERE id=?;",(memory_id,))
         return self._row_to_dict(row) if row else None
+
+    async def batch_get_memories(
+        self,
+        memory_ids: list[str],
+        *,
+        batch_size: int = _BATCH_HYDRATION_CHUNK_SIZE,
+    ) -> dict[str, dict[str, Any]]:
+        """Return dict[id, memory] for a batch of memory IDs (24.6-B).
+
+        Uses parameterised IN queries with chunking to respect SQLite
+        host parameter limits.  Empty / duplicate input are handled safely.
+        """
+        if not memory_ids:
+            return {}
+        # Deduplicate while preserving first-occurrence order
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for mid in memory_ids:
+            if mid not in seen:
+                seen.add(mid)
+                ordered.append(mid)
+        result: dict[str, dict[str, Any]] = {}
+        for chunk in _chunked(ordered, batch_size):
+            placeholders = ",".join(["?"] * len(chunk))
+            sql = f"SELECT * FROM memories WHERE id IN ({placeholders})"
+            rows = await self.db.fetchall(sql, tuple(chunk))
+            for row in rows:
+                d = self._row_to_dict(row)
+                result[d["memory_id"]] = d
+        return result
 
     async def list_memories(self, limit: int=1000) -> list[dict[str,Any]]:
         rows = await self.db.fetchall("SELECT * FROM memories ORDER BY updated_at DESC LIMIT ?;",(limit,))
