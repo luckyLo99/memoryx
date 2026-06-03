@@ -15,7 +15,7 @@ def test_replay_case_round_trip_to_dict_json_from_dict():
         replay_id="replay-1",
         source_trace_ids=["trace-1"],
         session_id_hash="hash-1",
-        memoryx_version="2.0.0",
+        memoryx_version="2.1.0",
         hermes_version="h1",
         scenario="scenario",
         steps=[ReplayStep(step_id="1", phase="on_user_message", input_preview="hello")],

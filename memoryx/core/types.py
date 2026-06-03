@@ -1,41 +1,61 @@
-from __future__ import annotations
+"""Data types for the Memory Kernel."""
 
-from enum import StrEnum
+from dataclasses import dataclass, field
+from typing import Any
 
-
-class MemoryType(StrEnum):
-    FACT = "FACT"
-    EXPERIENCE = "EXPERIENCE"
-    OBSERVATION = "OBSERVATION"
-    OPINION = "OPINION"
-    PREFERENCE = "PREFERENCE"
-    PROJECT = "PROJECT"
-    TASK = "TASK"
-    RELATION = "RELATION"
-    EPISODIC = "EPISODIC"
-    ENT_RELATION = "ENT_RELATION"
-    PERSONA = "PERSONA"
+Status = str  # "active" | "superseded" | "revoked"
 
 
-class MemoryCategory(StrEnum):
-    """记忆类别 — 参考 Mem0 多类别设计"""
-    USER = "user"
-    SESSION = "session"
-    AGENT = "agent"
+@dataclass
+class Claim:
+    """A claim — current active memory node."""
+
+    claim_id: str
+    claim_type: str
+    content: str
+    status: Status = "active"
+    confidence: float = 0.5
+    importance: float = 0.5
+    valid_from: str | None = None
+    valid_to: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
-class MemoryLayer(StrEnum):
-    """记忆层级 — 参考 Letta 分层记忆设计"""
-    WORKING = "working"
-    SHORT_TERM = "short_term"
-    LONG_TERM = "long_term"
-    ARCHIVE = "archive"
-    SELF_EDIT = "self_edit"
+@dataclass
+class Evidence:
+    """An evidence event — immutable raw input."""
+
+    evidence_id: str
+    source_type: str
+    content: str
+    content_hash: str
+    session_id: str | None = None
+    agent_id: str | None = None
+    user_id: str | None = None
+    metadata_json: str | None = None
+    created_at: str | None = None
 
 
-class MemorySource(StrEnum):
-    """记忆来源"""
-    DIALOGUE = "dialogue"
-    TOOL_RESULT = "tool_result"
-    MANUAL = "manual"
-    SYSTEM = "system"
+@dataclass
+class ClaimVersion:
+    """A version entry tracking every state change on a claim."""
+
+    version_id: str
+    claim_id: str
+    evidence_ids: list[str] = field(default_factory=list)
+    operation: str = "create"
+    before_json: dict | None = None
+    after_json: dict | None = None
+    reason: str | None = None
+    created_at: str | None = None
+
+
+@dataclass
+class RetrievalResult:
+    """Result of a FTS retrieval query."""
+
+    claim_id: str
+    content: str
+    score: float
+    explanation: dict[str, Any]

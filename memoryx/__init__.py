@@ -1,4 +1,10 @@
-__version__ = "2.0.0"
+from pathlib import Path
+
+def _get_version() -> str:
+    version_path = Path(__file__).parent.parent / "VERSION"
+    return version_path.read_text().strip()
+
+__version__ = _get_version()
 
 from .api import MemoryQueryAPI
 from .bank import MemoryBank
@@ -6,7 +12,6 @@ from .compression import SemanticCompressionEngine
 from .config import MemoryXSettings
 from .consolidation import ConsolidationEngine
 from .conversation_log import ConversationLogStore
-from .core import MemoryCategory, MemoryLayer, MemorySource, MemoryType
 from .context import ContextAssemblyEngine, ContextBundle
 from .context_reasoning import ContextReasoningEngine
 from .embeddings import (
@@ -91,9 +96,6 @@ __all__ = [
     "ConsolidationEngine",
     "ContextAssemblyEngine",
     "ContextBundle",
-    "MemoryCategory",
-    "MemoryLayer",
-    "MemorySource",
     "ContextReasoningEngine",
     "ConversationLogStore",
     "DedupEngine",
