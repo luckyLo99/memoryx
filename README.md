@@ -7,7 +7,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-179%20passed-brightgreen)](https://github.com)
+[![Tests](https://img.shields.io/badge/tests-827%20passed-brightgreen)](https://github.com/luckyl214/memoryx/actions)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 ---
@@ -101,7 +101,7 @@ git clone https://github.com/luckyl214/memoryx.git
 cd memoryx
 
 # 切换到 stable 版本
-git checkout v2.0.0
+git checkout v2.1.0
 
 # 创建虚拟环境
 python3 -m venv .venv
@@ -124,39 +124,37 @@ cp .env.example .env
 #   MEMORYX_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-### 3. 初始化数据库
+### 3. 验证安装
 
-```python
-# 数据库由 MemoryRepository.open() 自动创建
-from memoryx.storage import MemoryRepository
-repo = MemoryRepository.open()
-
-# 验证
-from memoryx.tools import verify_memoryx
-verify_memoryx()
+```bash
+# 运行验证脚本（检查检索、记忆、对话日志等核心功能）
+python3 scripts/verify_memoryx.py
 ```
 
 ### 4. 基本使用
 
 ```python
-from memoryx.storage import MemoryRepository
+from memoryx.storage import MemoryRepository, MemoryRecord
 from memoryx.retrieval import HybridRetrievalEngine
 
+# 初始化仓库（自动创建数据库）
+repo = MemoryRepository.open()
+
 # 存储记忆
-repo = MemoryRepository()
-await repo.store_memory(
+record = MemoryRecord(
     memory_id="user_preference_001",
     content="用户偏好简洁回答",
     memory_type="FACT",
     importance_score=0.8
 )
+await repo.store_memory(record)
 
-# 检索记忆
-engine = HybridRetrievalEngine(repo)
-results = await engine.search(
+# 混合检索
+engine = HybridRetrievalEngine(repository=repo)
+results = await engine.retrieve(
     query="用户偏好",
     limit=5,
-    min_score=0.5
+    explain_scores=True
 )
 
 for r in results:
@@ -219,54 +217,57 @@ The runtime hook/plugin path is not a replacement for the Hermes native memory p
 ### MemoryRepository
 
 ```python
-# 存储记忆
-await repo.store_memory(record: MemoryRecord) -> str
+# 打开仓库（自动创建数据库）
+repo = MemoryRepository.open()
 
-# 检索记忆
-await repo.search(query: str, limit: int = 10) -> List[MemoryRecord]
-
-# 按类型检索
-await repo.list_memories(memory_type: str, limit: int = 10) -> List[MemoryRecord]
-
-# 更新记忆
-await repo.update_memory(memory_id: str, **kwargs)
-
-# 删除记忆
-await repo.delete_memory(memory_id: str)
+def store_memory(record: MemoryRecord) -> str: ...
+def search_full_text(query: str, limit: int = 20) -> list[dict]: ...
+def search_memories_text(
+    query: str,
+    limit: int = 20,
+    include_states: set[str] | None = None,
+) -> list[dict]: ...
+def list_memories(limit: int = 1000) -> list[dict]: ...
+def update_memory_metadata(memory_id: str, metadata_patch: dict) -> bool: ...
+def supersede_memory(memory_id: str, superseded_by: str) -> None: ...
 ```
 
 ### HybridRetrievalEngine
 
 ```python
-engine = HybridRetrievalEngine(repo)
+from memoryx.retrieval import HybridRetrievalEngine
 
-# 混合检索
-results = await engine.search(
-    query="用户偏好简洁回答",
-    limit=5,
-    min_score=0.5,
-    tag_filter=["preference"],
-    progressive=False  # 是否逐层揭示
-)
+engine = HybridRetrievalEngine(repository=repo)
+
+async def retrieve(
+    *,
+    query: str,
+    limit: int = 10,
+    tag_filter: list[str] | None = None,
+    scope_filter: str | None = None,
+    session_id: str | None = None,
+    explain_scores: bool = False,
+    fusion_method: str = "weighted",
+) -> list[RetrievalResult]: ...
 
 # 获取可解释评分
 for r in results:
-    print(f"语义: {r.semantic_score}, 关键词: {r.keyword_score}, 最终: {r.final_score}")
+    print(f"语义: {r.semantic_score}, 关键词: {r.keyword_score}, "
+          f"实体: {r.entity_score}, 时序: {r.temporal_score}, "
+          f"重要性: {r.importance_score}, 情节: {r.episodic_score}, "
+          f"最终: {r.final_score}")
 ```
 
 ### ConversationLogStore
 
 ```python
+from memoryx.conversation_log import ConversationLogStore
+
 log_store = ConversationLogStore(repo)
 
-# 记录对话
-await log_store.log(session_id, role, content)
-
-# 检索对话历史
-logs = await log_store.session_history(session_id, limit=20)
-
-# 搜索对话
-logs = await log_store.search("user birthday", limit=10)
+async def log(session_id: str, role: str, content: str) -> str: ...
+async def session_history(session_id: str, *, limit: int = 50) -> list[dict]: ...
+async def search(query: str, *, session_id: str | None = None, limit: int = 20) -> list[dict]: ...
 ```
 
 ---
@@ -318,27 +319,36 @@ A: 现代 AI Agent 需要在多次对话中保持上下文一致性。记忆系�
 
 ### Q: 支持哪些数据库？
 
-A: 当前支持 SQLite（生产推荐）。计划支持：
+A: 当前支持 SQLite（生产推荐，WAL + FTS5）和 LanceDB（向量存储）。计划支持：
 - PostgreSQL（大规模）
-- LanceDB（向量优化）
 - Redis（缓存层）
 
 ### Q: 如何迁移现有记忆？
 
-A: 使用 `migrate.py` 脚本：
+A: 使用迁移脚本：
 
 ```bash
-python3 scripts/migrate.py --from tencentdb --to memoryx
+# 从 LanceDB 格式导入
+python3 scripts/migrate_to_lancedb.py
 ```
-
-支持迁移：TencentDB, Mem0, Letta, Zep, Cognee 等。
 
 ### Q: 性能如何？
 
-A: 基准测试（2C4G VPS）：
-- 检索延迟：< 50ms（1000 条记忆）
-- 存储吞吐：> 100 ops/s
-- 内存占用：< 200MB
+A: 内部基准（2C4G VPS，1000 条记忆）：
+- 检索延迟：约 50ms
+- 存储吞吐：约 100 ops/s
+- 内存占用：约 200MB
+（实际性能因 Embedding 模型和存储介质而异）
+
+### Q: 如何验证安装是否正常？
+
+A: 运行验证脚本：
+
+```bash
+python3 scripts/verify_memoryx.py
+```
+
+该脚本会测试存储、全文检索、混合检索、对话日志等核心功能是否正常。
 
 ---
 
