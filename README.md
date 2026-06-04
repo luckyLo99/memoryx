@@ -7,7 +7,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-827%20passed-brightgreen)](https://github.com/luckyl214/memoryx/actions)
+|[![Tests](https://img.shields.io/badge/tests-849%20passed-brightgreen)](https://github.com/luckyl214/memoryx/actions)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 ---
@@ -101,7 +101,7 @@ git clone https://github.com/luckyl214/memoryx.git
 cd memoryx
 
 # 切换到 stable 版本
-git checkout v2.0.0
+git checkout v2.1.1
 
 # 创建虚拟环境
 python3 -m venv .venv

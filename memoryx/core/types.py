@@ -1,61 +1,92 @@
-"""Data types for the Memory Kernel."""
+from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
-Status = str  # "active" | "superseded" | "revoked"
+ClaimStatus = Literal[
+    "candidate",
+    "active",
+    "superseded",
+    "revoked",
+    "conflicted",
+    "quarantined",
+    "expired",
+]
 
+ClaimOperation = Literal[
+    "create",
+    "update",
+    "supersede",
+    "revoke",
+    "conflict",
+    "resolve_conflict",
+    "reinforce",
+    "expire",
+]
 
-@dataclass
-class Claim:
-    """A claim — current active memory node."""
+ConfidenceLabel = Literal["high", "medium", "low", "rejected"]
+RetrieverMode = Literal["lite", "hybrid", "vector", "auto"]
 
-    claim_id: str
-    claim_type: str
-    content: str
-    status: Status = "active"
-    confidence: float = 0.5
-    importance: float = 0.5
-    valid_from: str | None = None
-    valid_to: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
-
-
-@dataclass
+@dataclass(frozen=True)
 class Evidence:
-    """An evidence event — immutable raw input."""
-
     evidence_id: str
     source_type: str
     content: str
     content_hash: str
-    session_id: str | None = None
-    agent_id: str | None = None
-    user_id: str | None = None
-    metadata_json: str | None = None
-    created_at: str | None = None
+    created_at: str
+    metadata_json: str = "{}"
 
+@dataclass(frozen=True)
+class Claim:
+    claim_id: str
+    claim_type: str
+    content: str
+    status: ClaimStatus
+    confidence: float
+    importance: float
+    created_at: str
+    updated_at: str
 
-@dataclass
+@dataclass(frozen=True)
 class ClaimVersion:
-    """A version entry tracking every state change on a claim."""
-
     version_id: str
     claim_id: str
-    evidence_ids: list[str] = field(default_factory=list)
-    operation: str = "create"
-    before_json: dict | None = None
-    after_json: dict | None = None
+    operation: ClaimOperation
+    before_json: str
+    after_json: str
+    created_at: str
     reason: str | None = None
-    created_at: str | None = None
 
+@dataclass(frozen=True)
+class ScoreBreakdown:
+    bm25_score: float | None = None
+    lexical_score: float = 0.0
+    vector_score: float | None = None
+    recency_score: float = 0.0
+    importance_score: float = 0.0
+    confidence_score: float = 0.0
+    decay_multiplier: float = 1.0
+    access_boost: float = 0.0
+    status_penalty: float = 0.0
+    rrf_score: float | None = None
+    final_score: float = 0.0
 
-@dataclass
+@dataclass(frozen=True)
 class RetrievalResult:
-    """Result of a FTS retrieval query."""
-
     claim_id: str
     content: str
-    score: float
-    explanation: dict[str, Any]
+    claim_type: str
+    status: ClaimStatus
+    final_score: float
+    confidence_label: ConfidenceLabel
+    explanation: dict[str, Any] = field(default_factory=dict)
+
+@dataclass(frozen=True)
+class SearchOptions:
+    limit: int = 10
+    mode: RetrieverMode = "auto"
+    include_inactive: bool = False
+    min_score: float = 0.15
+    reject_low_confidence: bool = True
+    record_access: bool = True
+    explain: bool = True

@@ -1,212 +1,140 @@
-"""MemoryKernel — write / version / state management for claims + evidence."""
+from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
+from .conflict import new_conflict_group_id
 from .schema import apply_schema
 
+def utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+def content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 class MemoryKernel:
-    """Core memory kernel — evidence ingestion, claim creation, version history."""
-
-    def __init__(self, db: str) -> None:
+    def __init__(self, db: str):
         self.db = db
         self.conn = sqlite3.connect(db)
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA foreign_keys=ON")
+        self.conn.row_factory = sqlite3.Row
         apply_schema(self.conn)
-
-    # ------------------------------------------------------------------
-    # Evidence
-    # ------------------------------------------------------------------
-
-    def create_evidence(
-        self,
-        source_type: str,
-        content: str,
-        metadata: dict[str, Any] | None = None,
-        session_id: str | None = None,
-        agent_id: str | None = None,
-        user_id: str | None = None,
-    ) -> str:
-        """Append an evidence event. Returns the generated evidence_id."""
-        ev_id = str(uuid.uuid4())
-        content_hash = str(uuid.uuid5(uuid.NAMESPACE_DNS, content))
-        self.conn.execute(
-            """INSERT INTO evidence_events
-               (evidence_id, source_type, session_id, agent_id, user_id,
-                content, content_hash, metadata_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ev_id, source_type, session_id, agent_id, user_id,
-             content, content_hash, json.dumps(metadata or {})),
-        )
-        self.conn.commit()
-        return ev_id
-
-    # ------------------------------------------------------------------
-    # Claims
-    # ------------------------------------------------------------------
-
-    def create_claim(
-        self,
-        claim_type: str,
-        content: str,
-        evidence_ids: list[str] | None = None,
-        confidence: float = 0.5,
-        importance: float = 0.5,
-    ) -> str:
-        """Create a new active claim and its FTS entry. Returns claim_id."""
-        claim_id = str(uuid.uuid4())
-        now = self._now()
-
-        self.conn.execute(
-            """INSERT INTO claims
-               (claim_id, claim_type, content, status,
-                confidence, importance,
-                created_at, updated_at)
-               VALUES (?, ?, ?, 'active', ?, ?, ?, ?)""",
-            (claim_id, claim_type, content,
-             confidence, importance,
-             now, now),
-        )
-
-        self.conn.execute(
-            "INSERT INTO fts_memories (claim_id, content) VALUES (?, ?)",
-            (claim_id, content),
-        )
-
-        self._write_version(claim_id, evidence_ids or [], "create", None, {
-            "claim_type": claim_type,
-            "content": content,
-            "confidence": confidence,
-            "importance": importance,
-        })
-
-        self.conn.commit()
-        return claim_id
-
-    def revoke_claim(self, claim_id: str, reason: str = "") -> None:
-        """Revoke an active claim (status → revoked)."""
-        row = self.conn.execute(
-            "SELECT content, claim_type FROM claims WHERE claim_id = ?",
-            (claim_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError(f"Claim {claim_id} not found")
-        before = {"content": row[0], "claim_type": row[1]}
-
-        self.conn.execute(
-            "UPDATE claims SET status = 'revoked', updated_at = ? WHERE claim_id = ?",
-            (self._now(), claim_id),
-        )
-        self._write_version(claim_id, [], "revoke", before, {
-            "status": "revoked",
-            "reason": reason,
-        }, reason=reason)
-        self.conn.commit()
-
-    def supersede_claim(
-        self,
-        old_claim_id: str,
-        new_claim_id: str,
-        reason: str = "",
-    ) -> None:
-        """Mark old_claim_id as superseded in favour of new_claim_id."""
-        row = self.conn.execute(
-            "SELECT content FROM claims WHERE claim_id = ?",
-            (old_claim_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError(f"Claim {old_claim_id} not found")
-
-        self.conn.execute(
-            "UPDATE claims SET status = 'superseded', updated_at = ? WHERE claim_id = ?",
-            (self._now(), old_claim_id),
-        )
-        self._write_version(old_claim_id, [], "supersede",
-                           {"content": row[0]},
-                           {"superseded_by": new_claim_id, "reason": reason})
-        self.conn.commit()
-
-    def get_claim(self, claim_id: str) -> dict | None:
-        """Fetch a claim by ID. Returns None if not found."""
-        row = self.conn.execute(
-            """SELECT claim_id, claim_type, content, status,
-                      confidence, importance,
-                      valid_from, valid_to, created_at, updated_at
-               FROM claims WHERE claim_id = ?""",
-            (claim_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        return {
-            "claim_id": row[0],
-            "claim_type": row[1],
-            "content": row[2],
-            "status": row[3],
-            "confidence": row[4],
-            "importance": row[5],
-            "valid_from": row[6],
-            "valid_to": row[7],
-            "created_at": row[8],
-            "updated_at": row[9],
-        }
-
-    def list_versions(self, claim_id: str) -> list[dict]:
-        """Return the version history for a given claim."""
-        rows = self.conn.execute(
-            """SELECT version_id, claim_id, evidence_ids, operation,
-                      before_json, after_json, reason, created_at
-               FROM claim_versions
-               WHERE claim_id = ?
-               ORDER BY created_at ASC""",
-            (claim_id,),
-        ).fetchall()
-        return [
-            {
-                "version_id": r[0],
-                "claim_id": r[1],
-                "evidence_ids": r[2].split(",") if r[2] else [],
-                "operation": r[3],
-                "before": json.loads(r[4]) if r[4] else None,
-                "after": json.loads(r[5]) if r[5] else None,
-                "reason": r[6],
-                "created_at": r[7],
-            }
-            for r in rows
-        ]
 
     def close(self) -> None:
         self.conn.close()
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    def create_evidence(self, source_type: str, content: str, session_id: str | None = None, agent_id: str | None = None, user_id: str | None = None, metadata: dict[str, Any] | None = None) -> str:
+        evidence_id = str(uuid.uuid4())
+        self.conn.execute("INSERT INTO evidence_events(evidence_id, source_type, session_id, agent_id, user_id, content, content_hash, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (evidence_id, source_type, session_id, agent_id, user_id, content, content_hash(content), json.dumps(metadata or {}, ensure_ascii=False)))
+        self.conn.commit()
+        return evidence_id
 
-    def _write_version(
-        self,
-        claim_id: str,
-        evidence_ids: list[str],
-        operation: str,
-        before: Any,
-        after: Any,
-        reason: str | None = None,
-    ) -> None:
-        self.conn.execute(
-            """INSERT INTO claim_versions
-               (version_id, claim_id, evidence_ids, operation, before_json, after_json, reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), claim_id,
-             ",".join(evidence_ids),
-             operation,
-             json.dumps(before) if before else None,
-             json.dumps(after) if after else None,
-             reason),
-        )
+    def get_evidence(self, evidence_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM evidence_events WHERE evidence_id = ?", (evidence_id,)).fetchone()
+        return dict(row) if row else None
 
-    @staticmethod
-    def _now() -> str:
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc).isoformat()
+    def create_claim(self, claim_type: str, content: str, evidence_ids: list[str], confidence: float = 0.5, importance: float = 0.5) -> str:
+        claim_id = str(uuid.uuid4())
+        now = utc_iso()
+        eids_str = ",".join(evidence_ids)
+        self.conn.execute("INSERT INTO claims(claim_id, claim_type, content, status, confidence, importance, created_at, updated_at, source_evidence_ids) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)",
+            (claim_id, claim_type, content, confidence, importance, now, now, eids_str))
+        self.conn.execute("INSERT INTO fts_memories(claim_id, content) VALUES (?, ?)", (claim_id, content))
+        self._write_version(claim_id, evidence_ids, "create", None, self.get_claim(claim_id), "create")
+        self.conn.commit()
+        return claim_id
+
+    def get_claim(self, claim_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM claims WHERE claim_id = ?", (claim_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_claims(self, status: str | None = None) -> list[dict[str, Any]]:
+        if status:
+            rows = self.conn.execute("SELECT * FROM claims WHERE status = ? ORDER BY created_at ASC", (status,)).fetchall()
+        else:
+            rows = self.conn.execute("SELECT * FROM claims ORDER BY created_at ASC").fetchall()
+        return [dict(r) for r in rows]
+
+    def update_claim(self, claim_id: str, content: str | None = None, confidence: float | None = None, importance: float | None = None, evidence_ids: list[str] | None = None, reason: str = "update") -> None:
+        before = self.get_claim(claim_id)
+        if not before:
+            raise ValueError(f"claim not found: {claim_id}")
+        next_c = content if content is not None else before["content"]
+        next_conf = confidence if confidence is not None else before["confidence"]
+        next_imp = importance if importance is not None else before["importance"]
+        self.conn.execute("UPDATE claims SET content = ?, confidence = ?, importance = ?, updated_at = ? WHERE claim_id = ?", (next_c, next_conf, next_imp, utc_iso(), claim_id))
+        if content is not None and content != before["content"]:
+            self.conn.execute("DELETE FROM fts_memories WHERE claim_id = ?", (claim_id,))
+            self.conn.execute("INSERT INTO fts_memories(claim_id, content) VALUES (?, ?)", (claim_id, content))
+        self._write_version(claim_id, evidence_ids or [], "update", before, self.get_claim(claim_id), reason)
+        self.conn.commit()
+
+    def revoke_claim(self, claim_id: str, reason: str = "revoke") -> None:
+        before = self.get_claim(claim_id)
+        if not before:
+            raise ValueError(f"claim not found: {claim_id}")
+        self.conn.execute("UPDATE claims SET status = 'revoked', updated_at = ? WHERE claim_id = ?", (utc_iso(), claim_id))
+        self._write_version(claim_id, [], "revoke", before, self.get_claim(claim_id), reason)
+        self.conn.commit()
+
+    def supersede_claim(self, old_claim_id: str, new_claim_type: str, new_content: str, evidence_ids: list[str], reason: str = "supersede", confidence: float = 0.7, importance: float = 0.5) -> str:
+        before = self.get_claim(old_claim_id)
+        if not before:
+            raise ValueError(f"claim not found: {old_claim_id}")
+        new_id = self.create_claim(claim_type=new_claim_type, content=new_content, evidence_ids=evidence_ids, confidence=confidence, importance=importance)
+        self.conn.execute("UPDATE claims SET status = 'superseded', superseded_by = ?, updated_at = ? WHERE claim_id = ?", (new_id, utc_iso(), old_claim_id))
+        self.add_claim_edge(new_id, old_claim_id, "supersedes", reason=reason)
+        self._write_version(old_claim_id, evidence_ids, "supersede", before, self.get_claim(old_claim_id), reason)
+        self.conn.commit()
+        return new_id
+
+    def reinforce_claim(self, claim_id: str, evidence_ids: list[str] | None = None, reason: str = "reinforce", confidence_delta: float = 0.03, importance_delta: float = 0.01) -> None:
+        before = self.get_claim(claim_id)
+        if not before:
+            raise ValueError(f"claim not found: {claim_id}")
+        self.conn.execute("UPDATE claims SET confidence = MIN(1.0, confidence + ?), importance = MIN(1.0, importance + ?), updated_at = ? WHERE claim_id = ?", (confidence_delta, importance_delta, utc_iso(), claim_id))
+        self._write_version(claim_id, evidence_ids or [], "reinforce", before, self.get_claim(claim_id), reason)
+        self.conn.commit()
+
+    def mark_conflict(self, claim_a_id: str, claim_b_id: str, reason: str = "conflict") -> str:
+        group_id = new_conflict_group_id()
+        ba = self.get_claim(claim_a_id)
+        bb = self.get_claim(claim_b_id)
+        if not ba or not bb:
+            raise ValueError("both claims must exist")
+        for cid in (claim_a_id, claim_b_id):
+            self.conn.execute("UPDATE claims SET status = 'conflicted', contradiction_group_id = ?, updated_at = ? WHERE claim_id = ?", (group_id, utc_iso(), cid))
+        self.add_claim_edge(claim_a_id, claim_b_id, "conflicts_with", reason=reason)
+        self._write_version(claim_a_id, [], "conflict", ba, self.get_claim(claim_a_id), reason)
+        self._write_version(claim_b_id, [], "conflict", bb, self.get_claim(claim_b_id), reason)
+        self.conn.commit()
+        return group_id
+
+    def resolve_conflict(self, conflict_group_id: str, winning_claim_id: str, reason: str = "resolve_conflict") -> None:
+        rows = self.conn.execute("SELECT claim_id FROM claims WHERE contradiction_group_id = ?", (conflict_group_id,)).fetchall()
+        if not rows:
+            raise ValueError(f"conflict group not found: {conflict_group_id}")
+        for row in rows:
+            cid = row["claim_id"]
+            before = self.get_claim(cid)
+            new_status = "active" if cid == winning_claim_id else "superseded"
+            self.conn.execute("UPDATE claims SET status = ?, updated_at = ? WHERE claim_id = ?", (new_status, utc_iso(), cid))
+            self._write_version(cid, [], "resolve_conflict", before, self.get_claim(cid), reason)
+        self.conn.commit()
+
+    def add_claim_edge(self, from_claim_id: str, to_claim_id: str, edge_type: str, reason: str | None = None) -> str:
+        edge_id = str(uuid.uuid4())
+        self.conn.execute("INSERT INTO claim_edges(edge_id, from_claim_id, to_claim_id, edge_type, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)", (edge_id, from_claim_id, to_claim_id, edge_type, reason, utc_iso()))
+        return edge_id
+
+    def get_claim_versions(self, claim_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT * FROM claim_versions WHERE claim_id = ? ORDER BY created_at ASC", (claim_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def _write_version(self, claim_id: str, evidence_ids: list[str], operation: str, before: dict[str, Any] | None, after: dict[str, Any] | None, reason: str | None = None) -> None:
+        self.conn.execute("INSERT INTO claim_versions(version_id, claim_id, evidence_ids, operation, before_json, after_json, reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), claim_id, ",".join(evidence_ids), operation, json.dumps(before or {}, ensure_ascii=False), json.dumps(after or {}, ensure_ascii=False), reason))

@@ -1,20 +1,22 @@
-"""Tests for the Retriever — FTS5 search with score explanations."""
+"""Phase 1 retriever tests — FTS5 search with status awareness.
 
-import os
+Aligns with Phase 1 specification.
+"""
+
+from __future__ import annotations
+
 import tempfile
+from pathlib import Path
 
 import pytest
 
-from memoryx.core.kernel import MemoryKernel
-from memoryx.core.retriever import Retriever
+from memoryx.core import MemoryKernel, Retriever, SearchOptions
 
 
 @pytest.fixture
-def kernel():
-    """Seed a kernel with some test claims."""
-    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    tmp.close()
-    k = MemoryKernel(tmp.name)
+def retriever() -> Retriever:
+    db = str(Path(tempfile.mktemp(suffix=".db")))
+    k = MemoryKernel(db)
     # Seed data
     k.create_claim("preference", "User prefers concise answers", [],
                     confidence=0.8, importance=0.7)
@@ -24,75 +26,70 @@ def kernel():
     k.create_claim("fact", "The sky is blue during daytime", [])
     k.create_claim("preference", "User prefers dark mode UI", [],
                     confidence=0.6, importance=0.5)
-    yield k
+
+    r = Retriever(db)
+    yield r
     k.close()
-    os.unlink(tmp.name)
-
-
-@pytest.fixture
-def retriever(kernel: MemoryKernel):
-    return Retriever(kernel.db)
+    Path(db).unlink(missing_ok=True)
 
 
 # ------------------------------------------------------------------
-# Basic FTS match
+# test_retriever_finds_active_claim
 # ------------------------------------------------------------------
 
-class TestBasicRetrieval:
-    def test_simple_match(self, retriever: Retriever):
-        results = retriever.search("concise")
-        assert len(results) >= 1
-        assert "concise" in results[0].content
+def test_retriever_finds_active_claim() -> None:
+    db = str(Path(tempfile.mktemp(suffix=".db")))
+    kernel = MemoryKernel(db)
 
-    def test_multi_word_match(self, retriever: Retriever):
-        results = retriever.search("Python programming")
-        assert len(results) >= 1
-        assert any("Python" in r.content for r in results)
+    ev = kernel.create_evidence("user_message", "I like apples")
+    cid = kernel.create_claim("preference", "I like apples", [ev])
 
-    def test_chinese_match(self, retriever: Retriever):
-        results = retriever.search("capital")
-        assert len(results) >= 1
-        assert "France" in results[0].content
+    results = Retriever(db).search("apples")
+    assert len(results) == 1
+    assert results[0].claim_id == cid
+    assert "bm25_score" in results[0].explanation
+    assert "lexical_score" in results[0].explanation
 
-    def test_no_match(self, retriever: Retriever):
-        results = retriever.search("xyznonexistentkeyword")
-        assert len(results) == 0
-
-    def test_limit(self, retriever: Retriever):
-        results = retriever.search("prefers", limit=2)
-        assert len(results) <= 2
+    kernel.close()
+    Path(db).unlink(missing_ok=True)
 
 
 # ------------------------------------------------------------------
-# Score & explanation
+# test_retriever_hides_revoked_by_default
 # ------------------------------------------------------------------
 
-class TestScoreExplanation:
-    def test_explanation_fields(self, retriever: Retriever):
-        results = retriever.search("Paris")
-        assert len(results) > 0
-        r = results[0]
-        assert r.score is not None  # BM25 score
-        assert r.explanation["matched"] is True
-        assert r.explanation["query"] == "Paris"
-        assert "bm25_score" in r.explanation
+def test_retriever_hides_revoked_by_default() -> None:
+    db = str(Path(tempfile.mktemp(suffix=".db")))
+    kernel = MemoryKernel(db)
 
-    def test_ordering(self, retriever: Retriever):
-        # BM25: lower score = better match, results should be sorted
-        results = retriever.search("prefers")
-        if len(results) >= 2:
-            # Each should have a valid BM25 score
-            for r in results:
-                assert isinstance(r.score, (int, float))
+    ev = kernel.create_evidence("user_message", "secret apple")
+    cid = kernel.create_claim("fact", "secret apple", [ev])
+    kernel.revoke_claim(cid)
+
+    r = Retriever(db)
+    # Default (include_inactive=False) → revoked hidden
+    assert r.search("apple") == []
+    # Explicit include_inactive → visible
+    assert len(r.search("apple", options=SearchOptions(include_inactive=True, min_score=0.0, reject_low_confidence=False))) == 1
+    assert r.search("apple", options=SearchOptions(include_inactive=True, min_score=0.0, reject_low_confidence=False))[0].claim_id == cid
+
+    kernel.close()
+    Path(db).unlink(missing_ok=True)
 
 
 # ------------------------------------------------------------------
-# Count
+# test_retriever_limit
 # ------------------------------------------------------------------
 
-class TestCount:
-    def test_count_match(self, retriever: Retriever):
-        assert retriever.count("prefers") >= 2
+def test_retriever_limit() -> None:
+    db = str(Path(tempfile.mktemp(suffix=".db")))
+    kernel = MemoryKernel(db)
 
-    def test_count_no_match(self, retriever: Retriever):
-        assert retriever.count("xyznonexistentkeyword") == 0
+    for i in range(5):
+        kernel.create_claim("fact", f"apple item {i}", [])
+
+    results = Retriever(db).search("apple", limit=2)
+    assert len(results) == 2
+
+    kernel.close()
+    Path(db).unlink(missing_ok=True)

@@ -1,2 +1,15 @@
-# MemoryX Core — Phase 1: Memory Kernel
-# evidence_events / claims / claim_versions / fts_memories
+from __future__ import annotations
+
+from .schema import apply_schema
+from .kernel import MemoryKernel
+from .retriever import Retriever
+from .hybrid_retriever import HybridRetriever
+from .types import Claim, ClaimVersion, Evidence, RetrievalResult, ScoreBreakdown, SearchOptions
+from .vector import NullVectorProvider, VectorHit, VectorProvider
+
+__all__ = [
+    "apply_schema", "MemoryKernel", "Retriever", "HybridRetriever",
+    "Claim", "ClaimVersion", "Evidence", "RetrievalResult",
+    "ScoreBreakdown", "SearchOptions",
+    "NullVectorProvider", "VectorHit", "VectorProvider",
+]
