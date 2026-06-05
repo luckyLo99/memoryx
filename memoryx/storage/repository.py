@@ -791,7 +791,7 @@ class MemoryRepository:
             # Ensure parent row exists for FK constraint
             await self.db.execute(
                 "INSERT OR IGNORE INTO memories(id,memory_type,content,content_hash,checksum,active_state) VALUES (?,?,?,?,?,?);",
-                (memory_id, "EPISODE", content, ch, ch, "active"))
+                (memory_id, "EPISODIC", content, ch, ch, "active"))
         await self.db.execute("INSERT INTO episodic_memories(id,memory_id,session_id,content,summary,importance_score,valid_from,active_state,checksum,created_at,metadata_json) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
             (eid,memory_id,session_id,content,summary,importance_score,now,"active",ch,now,"{}"))
         return eid

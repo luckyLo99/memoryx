@@ -22,7 +22,7 @@ class GenericLLMExtractionClient:
         session_factory: Callable[[], Any] | None = None,
     ) -> None:
         self.base_url = base_url
-        self.api_key = "your_api_key_here"
+        self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.retry_attempts = retry_attempts

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import logging
 from collections import Counter
 from datetime import datetime, timezone
@@ -123,7 +124,7 @@ def _retrieval_dedup_key(record: dict[str, Any], memory_type: str = "") -> str:
     return hashlib.sha256(f"{mt}|{layer}|{content}".encode("utf-8")).hexdigest()
 
 
-MIN_FINAL_SCORE = 0.05
+MIN_FINAL_SCORE = float(os.environ.get("MEMORYX_MIN_RETRIEVAL_SCORE", "0.12"))
 
 
 class HybridRetrievalEngine:
