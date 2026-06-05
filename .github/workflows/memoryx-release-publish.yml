@@ -1,0 +1,78 @@
+name: MemoryX Release Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Publish target"
+        type: choice
+        required: true
+        options:
+          - testpypi
+          - pypi
+      tag:
+        description: "Expected release tag, e.g. v2.2.0"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m pip install -e .
+
+      - name: Release candidate checks
+        run: |
+          python scripts/verify_phase15_release_candidate.py
+          python -m memoryx.dev.check_release_truth
+          memoryx doctor --profile lite
+          pytest -q
+
+      - name: Build distributions
+        run: |
+          python -m build
+          python -m twine check dist/*
+
+      - name: Generate manifests
+        run: |
+          python -m memoryx.release.cli manifest
+          python - <<'PY'
+          from memoryx.release import ReleaseManifestBuilder
+          ReleaseManifestBuilder(".").dist_manifest("dist_manifest.json")
+          PY
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: memoryx-release-artifacts
+          path: |
+            dist/*
+            release_manifest.json
+            dist_manifest.json
+
+      - name: Publish to TestPyPI
+        if: ${{ github.event.inputs.target == 'testpypi' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        if: ${{ github.event.inputs.target == 'pypi' && startsWith(github.event.inputs.tag, 'v') }}
+        uses: pypa/gh-action-pypi-publish@release/v1
