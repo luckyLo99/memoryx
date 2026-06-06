@@ -45,3 +45,11 @@ def clear_observability_context(tokens: tuple[contextvars.Token, contextvars.Tok
     trace_token, session_token = tokens
     _trace_id_var.reset(trace_token)
     _session_id_var.reset(session_token)
+
+
+def current_context() -> dict[str, str | None]:
+    """Return current observability context as a dict."""
+    return {
+        "trace_id": _trace_id_var.get(),
+        "session_id": _session_id_var.get(),
+    }

@@ -117,6 +117,19 @@ def observe_rest_request(*, route: str, method: str, seconds: float) -> None:
     rest_request_seconds.labels(route=str(route), method=str(method).upper()).observe(float(seconds))
 
 
+class _DefaultMetrics:
+    """Simple default metrics collector for e2e testing."""
+
+    def reset(self) -> None:
+        pass
+
+    def snapshot(self) -> dict[str, int]:
+        return {}
+
+
+default_metrics = _DefaultMetrics()
+
+
 def record_llm_safety_event(*, surface: str, decision: str, severity: str) -> None:
     llm_safety_events_total.labels(surface=surface, decision=decision, severity=severity).inc()
 
