@@ -1,18 +1,66 @@
-## Description
-<!-- Describe the changes in this PR -->
+## MemoryX Change Gate
 
-## Type of change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
+### Batch
 
-## Checklist
-- [ ] My code follows the project's style guidelines
-- [ ] I have added tests that prove my fix/feature works
-- [ ] All existing tests pass (`pytest -q`)
-- [ ] I have run `python scripts/release-check.py` and confirmed no leaks
-- [ ] I have updated documentation (if applicable)
+- [ ] hotfix
+- [ ] patch
+- [ ] docs-only
+- [ ] hygiene-only
+- [ ] feature / minor
+- [ ] other:
 
-## Related issue
-<!-- Link to the related issue if applicable -->
+### Problem
+
+Describe the exact failure or need.
+
+### Root cause
+
+Describe the verified root cause. Do not guess.
+
+### Scope
+
+Allowed files:
+
+-
+
+Forbidden files:
+
+-
+
+### Change summary
+
+-
+
+### Tests
+
+Paste exact results:
+
+```text
+python -m pytest --collect-only -q
+python -m pytest -q
+python scripts/run_memoryx_release_gate.py
+```
+
+### Archive hygiene
+
+Required if packaging/release/docs/runtime paths changed.
+
+```text
+archive hygiene:
+secret scan:
+private path scan:
+```
+
+### Risk
+
+*
+
+### Rollback
+
+*
+
+### Release impact
+
+* [ ] no release needed
+* [ ] patch v2.0.x candidate
+* [ ] minor v2.1.0-rc.1 candidate
