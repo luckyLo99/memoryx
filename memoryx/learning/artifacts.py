@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from datetime import datetime
@@ -26,7 +27,8 @@ class StudyArtifactBuilder:
         reusable_methods: list[str],
         next_actions: list[str],
     ) -> Path:
-        path = self.study_dir / f"{project_id}-session-review.md"
+        safe_pid = re.sub(r"[^\w\-.]", "_", project_id)
+        path = self.study_dir / f"{safe_pid}-session-review.md"
         now = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S CST")
 
         block = [
@@ -66,7 +68,8 @@ class StudyArtifactBuilder:
         weak_points: list[str],
         next_tasks: list[str],
     ) -> Path:
-        path = self.study_dir / f"{project_id}-mastery-check.md"
+        safe_pid = re.sub(r"[^\w\-.]", "_", project_id)
+        path = self.study_dir / f"{safe_pid}-mastery-check.md"
         now = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S CST")
 
         block = [

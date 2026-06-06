@@ -236,7 +236,8 @@ class MemoryXSkillDistiller:
                 raise RuntimeError(f"draft status is not draft: {row['status']}")
 
             skill_key = row["skill_key"]
-            out_dir = hermes_skill_dir / skill_key
+            safe_key = re.sub(r"[^\w\-.]", "_", skill_key)
+            out_dir = hermes_skill_dir / safe_key
             out_dir.mkdir(parents=True, exist_ok=True)
 
             skill_path = out_dir / "SKILL.md"

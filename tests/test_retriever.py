@@ -5,6 +5,7 @@ Aligns with Phase 1 specification.
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from memoryx.core import MemoryKernel, Retriever, SearchOptions
 
 @pytest.fixture
 def retriever() -> Retriever:
-    db = str(Path(tempfile.mktemp(suffix=".db")))
+    fd, db = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     k = MemoryKernel(db)
     # Seed data
     k.create_claim("preference", "User prefers concise answers", [],
@@ -38,7 +40,8 @@ def retriever() -> Retriever:
 # ------------------------------------------------------------------
 
 def test_retriever_finds_active_claim() -> None:
-    db = str(Path(tempfile.mktemp(suffix=".db")))
+    fd, db = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     kernel = MemoryKernel(db)
 
     ev = kernel.create_evidence("user_message", "I like apples")
@@ -59,7 +62,8 @@ def test_retriever_finds_active_claim() -> None:
 # ------------------------------------------------------------------
 
 def test_retriever_hides_revoked_by_default() -> None:
-    db = str(Path(tempfile.mktemp(suffix=".db")))
+    fd, db = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     kernel = MemoryKernel(db)
 
     ev = kernel.create_evidence("user_message", "secret apple")
@@ -82,7 +86,8 @@ def test_retriever_hides_revoked_by_default() -> None:
 # ------------------------------------------------------------------
 
 def test_retriever_limit() -> None:
-    db = str(Path(tempfile.mktemp(suffix=".db")))
+    fd, db = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     kernel = MemoryKernel(db)
 
     for i in range(5):

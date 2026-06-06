@@ -5,6 +5,7 @@ Aligns with Phase 1 specification.
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from memoryx.core import MemoryKernel
 
 @pytest.fixture
 def kernel() -> MemoryKernel:
-    db = str(Path(tempfile.mktemp(suffix=".db")))
+    fd, db = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     k = MemoryKernel(db)
     yield k
     k.close()

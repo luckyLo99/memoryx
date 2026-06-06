@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -9,6 +10,8 @@ from pydantic import BaseModel
 from memoryx.cognitive.guarded_generation import CognitiveGuard
 from memoryx.cognitive.narrative_reflection import NarrativeReflectionEngine
 from memoryx.cognitive.trust import MemoryTrustScorer
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -647,7 +650,8 @@ def create_p11_router(
             raw.commit()
             raw.close()
         except Exception as exc:
-            return {"error": str(exc), "traceback": traceback.format_exc()}
+            logger.error("task_start error: %s", traceback.format_exc())
+            return {"error": str(exc)}
 
         return {"task_id": task_id, "session_id": body.session_id, "status": "running", "started_at": now_iso}
 
@@ -712,7 +716,8 @@ def create_p11_router(
             raw.commit()
             raw.close()
         except Exception as exc:
-            return {"error": str(exc), "traceback": traceback.format_exc()}
+            logger.error("task_start error: %s", traceback.format_exc())
+            return {"error": str(exc)}
 
         return {
             "task_id": task_id,

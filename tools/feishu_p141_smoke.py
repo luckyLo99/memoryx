@@ -19,6 +19,7 @@ P14.1 Feishu Production Hardening Smoke Test
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import tempfile
@@ -54,7 +55,9 @@ def _job(**kwargs):
 
 def test_1_event_dedupe():
     """场景 1: 事件去重"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     dedupe = FeishuEventDedupe(db_path)
 
     # 第一次：新事件
@@ -71,7 +74,9 @@ def test_1_event_dedupe():
 
 def test_2_dlq_auto():
     """场景 2: DLQ 自动移入"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     queue = FeishuSQLiteQueue(db_path)
 
     job = _job()
@@ -98,7 +103,9 @@ def test_2_dlq_auto():
 
 def test_3_max_attempts():
     """场景 3: max_attempts 限制"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     queue = FeishuSQLiteQueue(db_path)
 
     job = _job()
@@ -121,7 +128,9 @@ def test_3_max_attempts():
 
 def test_4_queue_attachments():
     """场景 4: 队列双写 attachments"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     queue = FeishuSQLiteQueue(db_path)
 
     job = _job(
@@ -145,7 +154,9 @@ def test_4_queue_attachments():
 
 def test_5_attachment_status():
     """场景 5: 附件状态跟踪"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     queue = FeishuSQLiteQueue(db_path)
 
     job = _job(
@@ -174,7 +185,9 @@ def test_5_attachment_status():
 
 def test_6_dlq_stats():
     """场景 6: DLQ 统计"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     queue = FeishuSQLiteQueue(db_path)
 
     # 创建 2 个 job 并让它们失败
@@ -216,7 +229,9 @@ def test_7_state_transitions():
 
 def test_8_queue_ops():
     """场景 8: 队列基本操作"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(tmp_path)
     queue = FeishuSQLiteQueue(db_path)
 
     job = _job()
