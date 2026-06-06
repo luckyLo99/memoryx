@@ -31,7 +31,7 @@ EMBEDDING_CACHE_PATH = DATA_DIR / "embedding_cache.json"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Embedding 配置（从 .env 读取）
-EMBEDDING_ENDPOINT = https://api.openai.com/v1/embeddings
+EMBEDDING_ENDPOINT = "https://api.openai.com/v1/embeddings"
 EMBEDDING_API_KEY = os.getenv("MEMORYX_EMBEDDING_API_KEY")
 EMBEDDING_MODEL = os.getenv("MEMORYX_EMBEDDING_MODEL", "text-embedding-3-small")
 EMBEDDING_DIMENSION = int(os.getenv("MEMORYX_EMBEDDING_DIMENSION", "4096"))
