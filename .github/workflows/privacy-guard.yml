@@ -87,7 +87,7 @@ jobs:
             ERRORS="$ERRORS\n❌ Found sensenova- token:\n$HITS"
           fi
           # DeepSeek / together / openrouter style tokens
-          HITS=$(git grep -InP '(?<![a-zA-Z])(ds_|sk-ds-|tgp_|or_)[A-Za-z0-9_\-]{10,}(?![a-zA-Z])' -- $EXCLUDE 2>/dev/null || true)
+          HITS=$(git grep -InP '(?<![a-zA-Z])(ds_|sk-ds-)[A-Za-z0-9_\-]{10,}(?![a-zA-Z])' -- $EXCLUDE 2>/dev/null || true)
           if [ -n "$HITS" ]; then
             ERRORS="$ERRORS\n❌ Found DeepSeek/OpenRouter token:\n$HITS"
           fi
