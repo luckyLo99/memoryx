@@ -10,7 +10,7 @@ version: "3.0.0"
 date-released: "2026-06-07"
 license: MIT
 repository-code: "https://github.com/luckyl214/memoryx"
-abstract: "A production-grade cognitive memory operating system for AI agents, featuring Ebbinghaus forgetting curves, Baddeley working memory model, dual-process retrieval, semantic conflict detection, MCP server, and native Hermes Agent integration."
+abstract: "A cognitive memory operating system for AI agents, featuring Ebbinghaus forgetting curves, Baddeley working memory model, dual-process retrieval, semantic conflict detection, MCP server, and native Hermes Agent integration."
 keywords:
   - "cognitive architecture"
   - "agent memory"
