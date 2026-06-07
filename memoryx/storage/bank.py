@@ -1,4 +1,5 @@
 from __future__ import annotations
+import uuid
 
 import re
 from typing import Any
@@ -30,7 +31,7 @@ class MemoryBank:
     async def store(self, memory_type: str, content: str, **kwargs: Any) -> str:
         """存入一条带 bank 标记的记忆。"""
         record = MemoryRecord(
-            memory_id=kwargs.pop("memory_id", __import__("uuid").uuid4().hex),
+            memory_id=kwargs.pop("memory_id", uuid.uuid4().hex),
             memory_type=memory_type,
             content=content,
             scope=self.bank_id,

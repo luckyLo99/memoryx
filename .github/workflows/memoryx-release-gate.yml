@@ -39,17 +39,23 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Show system info
+        run: |
+          python --version
+          pip list 2>/dev/null | grep -iE 'aiohttp|pydantic|structlog|mcp|lancedb'
+
       - name: Install package
         run: |
           python -m pip install --upgrade pip setuptools
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,mcp]"
 
       - name: Collect tests
         run: |
           python -m pytest --collect-only -q \
             --ignore=memoryx-pure-release \
             --ignore=tools \
-            --ignore=scripts/test_siliconflow_embedding.py
+            --ignore=scripts/test_siliconflow_embedding.py \
+            2>&1 | tail -200
 
       - name: Run tests
         run: |

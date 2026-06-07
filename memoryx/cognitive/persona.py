@@ -1,4 +1,5 @@
 from __future__ import annotations
+import uuid
 
 import hashlib
 from datetime import datetime, timezone
@@ -81,7 +82,7 @@ class PersonaEngine:
             await self.repository.db.execute(
                 "INSERT INTO reflection_summaries(id, summary, content_hash, checksum, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
-                (__import__("uuid").uuid4().hex, markdown, content_hash, content_hash),
+                (uuid.uuid4().hex, markdown, content_hash, content_hash),
             )
 
         return result

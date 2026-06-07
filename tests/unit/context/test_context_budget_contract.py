@@ -416,6 +416,6 @@ def test_compression_does_not_change_section_order() -> None:
 def test_no_semantic_compression_engine_imported() -> None:
     """Context engine must NOT import or call SemanticCompressionEngine."""
     engine_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "context" / "engine.py"
-    text = engine_path.read_text()
+    text = engine_path.read_text(encoding='utf-8')
     assert "SemanticCompressionEngine" not in text, \
         "engine.py must not import or reference SemanticCompressionEngine"

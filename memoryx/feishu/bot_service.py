@@ -103,7 +103,8 @@ class FeishuHermesBotService:
             job.card_message_id = result["message_id"]
 
             # 卡片所有权断言
-            assert job.card_message_id, "send_interactive_card returned empty message_id"
+            if not job.card_message_id:
+                raise RuntimeError("send_interactive_card returned empty message_id")
 
             # 记录卡片发送到 feishu_card_messages 表
             self.queue.record_card_message(

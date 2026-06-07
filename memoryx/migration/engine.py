@@ -1,4 +1,5 @@
 from __future__ import annotations
+from memoryx.storage import MemoryRecord
 
 import asyncio
 import json
@@ -82,7 +83,7 @@ class MigrationEngine:
                 report.imported += 1
                 continue
             try:
-                memory = __import__("memoryx").storage.MemoryRecord(
+                memory = MemoryRecord(
                     memory_id=normalized["memory_id"],
                     memory_type=normalized["memory_type"],
                     content=normalized["content"],

@@ -31,7 +31,7 @@ VECTOR_STORE_PATH = DATA_DIR / "vectors.json"
 EMBEDDING_CACHE_PATH = DATA_DIR / "embedding_cache.json"
 
 # Embedding API 配置（从 .env 读取）
-EMBEDDING_ENDPOINT = 'https://api.openai.com/v1/embeddings'
+EMBEDDING_ENDPOINT = os.getenv('EMBEDDING_ENDPOINT_URL', 'https://api.openai.com/v1/embeddings')
 EMBEDDING_API_KEY = os.getenv("MEMORYX_EMBEDDING_API_KEY")
 EMBEDDING_MODEL = os.getenv("MEMORYX_EMBEDDING_MODEL", "text-embedding-3-small")
 
@@ -127,8 +127,8 @@ async def test_embedding_api():
         return vectors
     except Exception as e:
         print(f"   ❌ Embedding API 失败: {e}")
-        print(f"   提示: 请确认 openai_compatible 是否提供 embedding 端点")
-        print(f"   当前配置: {openai_compatible_EMBEDDING_ENDPOINT}")
+        print(f"   Tip: Confirm the embedding endpoint is available")
+        print(f"   当前配置: {EMBEDDING_ENDPOINT}")
         return None
 
 async def verify_hybrid_retrieval(vectors: list | None):

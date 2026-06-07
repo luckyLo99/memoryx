@@ -4,15 +4,15 @@
   "python": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",
   "git": {
-    "commit": "d1e61fac015ed29b1f05f49245fa5776575fe958",
+    "commit": "eaeaa61859f58efcf444fe5fee0758633434ef24",
     "branch": "memoryx-2-kernel",
-    "status_short": "M CITATION.cff\n M SECURITY_THREAT_MODEL.md\n M memoryx/extraction/client.py\n M release_manifest.json\n M tests/unit/misc/test_project_state_engine.py\n?? _fix_remaining.py"
+    "status_short": "A  .env.example.lite\nM  .github/workflows/memoryx-release-gate.yml\nM  .gitignore\nM  memoryx/cognitive/persona.py\nA  memoryx/dev/__init__.py\nA  memoryx/dev/check_release_truth.py\nM  memoryx/feishu/bot_service.py\nM  memoryx/migration/engine.py\nA  memoryx/runtime/__init__.py\nA  memoryx/runtime/__pycache__/__init__.cpython-314.pyc\nA  memoryx/runtime/__pycache__/event_bus.cpython-314.pyc\nA  memoryx/runtime/__pycache__/events.cpython-314.pyc\nA  memoryx/runtime/__pycache__/orchestrator.cpython-314.pyc\nA  memoryx/runtime/event_bus.py\nA  memoryx/runtime/events.py\nA  memoryx/runtime/orchestrator.py\nM  memoryx/storage/bank.py\nM  memoryx/storage/seed.py\nM  pyproject.toml\nM  release_manifest.json\nM  scripts/verify_memoryx.py\nM  tests/unit/context/test_context_budget_contract.py\nA  tests/unit/runtime/__init__.py\nA  tests/unit/runtime/test_app_factory_lifespan.py\nA  tests/unit/runtime/test_conversation_log_contract.py\nA  tests/unit/runtime/test_hermes_bridge_contract.py\nA  tests/unit/runtime/test_hook.py\nA  tests/unit/runtime/test_hook_contract_hardening.py\nA  tests/unit/runtime/test_lifecycle_contract.py\nA  tests/unit/runtime/test_llm_firewall.py\nA  tests/unit/runtime/test_metrics_contract.py\nA  tests/unit/runtime/test_migration_quality.py\nA  tests/unit/runtime/test_orchestrator.py\nA  tests/unit/runtime/test_p11_routes_lazy_dependencies.py\nA  tests/unit/runtime/test_run_guard.py\nA  tests/unit/runtime/test_runtime_command_runner.py\nA  tests/unit/runtime/test_runtime_context_truncate.py\nA  tests/unit/runtime/test_runtime_prompt_assembler.py\nA  tests/unit/runtime/test_runtime_replay_contract.py\nA  tests/unit/runtime/test_runtime_task_guard.py\nA  tests/unit/runtime/test_runtime_transcript_store.py"
   },
   "files": {
     "pyproject.toml": {
       "path": "pyproject.toml",
-      "bytes": 2463,
-      "sha256": "5d3ca38be375a5b58dc4c2c9e2d058a44f746a9aa801b80b793204c39b5c3e8b"
+      "bytes": 2434,
+      "sha256": "4e78a1121d8da92882fb672e5b37985ee0248ee384fd46a4d537dbd3277ff067"
     },
     "README.md": {
       "path": "README.md",
@@ -28,13 +28,33 @@
       "path": "VERSION",
       "bytes": 5,
       "sha256": "c9163ff21f1f2b0390dc48bdda47179718f772f507a7cebceca59ce1a7129029"
+    },
+    ".env.example.lite": {
+      "path": ".env.example.lite",
+      "bytes": 392,
+      "sha256": "6ee0f31d71b1495ac7c612b4f9c8ec657ca750355e1c99d3bc6d8bb7d9da47b5"
+    },
+    "memoryx/dev/__init__.py": {
+      "path": "memoryx/dev/__init__.py",
+      "bytes": 39,
+      "sha256": "f6432c3222fc4acea2b99cc0b4612700018fce8b382853e19e7a338c153b7f46"
+    },
+    "memoryx/dev/check_release_truth.py": {
+      "path": "memoryx/dev/check_release_truth.py",
+      "bytes": 1542,
+      "sha256": "8529e2ce89532d2fab82a60e05c48f531a27c6a52e7ad5c8f589b82a2537bec0"
+    },
+    "memoryx/runtime/__init__.py": {
+      "path": "memoryx/runtime/__init__.py",
+      "bytes": 444,
+      "sha256": "a15262d27357801cc8047ed48b2bedb80f3c03697a4424ea46c3588b03c07fa1"
     }
   },
   "dist": [
     {
       "path": "dist\\memoryx-3.0.0.zip",
-      "bytes": 888561,
-      "sha256": "4b43f6ff7a85cf68bdddc4a4d03adeb392d25d0cb420b087c159c18a55c51f59"
+      "bytes": 883239,
+      "sha256": "84e8190f6845066537173fbbba9ad814caefce4ca08f588e8640e48eff801730"
     }
   ]
 }

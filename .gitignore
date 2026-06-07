@@ -92,7 +92,7 @@ memoryx-pure-release/
 # local private config
 .env
 .env.*
-!.env.example
+!.env.example*
 
 # local runtime data
 db/
@@ -101,7 +101,7 @@ cache/
 archive/
 exports/
 markdown/
-runtime/
+/runtime/
 tmp/
 temp/
 

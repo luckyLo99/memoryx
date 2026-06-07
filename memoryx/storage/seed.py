@@ -1,4 +1,5 @@
 from __future__ import annotations
+import uuid
 
 import json
 from pathlib import Path
@@ -60,7 +61,7 @@ class ConversationSeed:
                 if not content:
                     continue
                 record = MemoryRecord(
-                    memory_id=__import__("uuid").uuid4().hex,
+                    memory_id=uuid.uuid4().hex,
                     memory_type="EXPERIENCE",
                     content=content,
                     scope="imported",
