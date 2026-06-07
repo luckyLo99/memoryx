@@ -1,20 +1,6 @@
+"""DEPRECATED — imports now available directly from memoryx.hooks."""
 from __future__ import annotations
-
-from .hooks import MemoryHookManager, SessionEventListener
-from .hooks.dead_letter_queue import DeadLetterQueue
-from .hooks.dispatcher import EventDispatcher
-from .hooks.health_monitor import HealthMonitor
-from .hooks.queue_manager import QueueManager
-from .hooks.retry_manager import RetryManager
-from .hooks.subscriber_manager import SubscriberManager
-
-__all__ = [
-    "DeadLetterQueue",
-    "EventDispatcher",
-    "HealthMonitor",
-    "MemoryHookManager",
-    "QueueManager",
-    "RetryManager",
-    "SessionEventListener",
-    "SubscriberManager",
-]
+import warnings as _w
+_w.warn("memoryx.manager is deprecated; import directly from memoryx.hooks", DeprecationWarning, stacklevel=2)
+from memoryx.hooks import DeadLetterQueue, EventDispatcher, HealthMonitor, MemoryHookManager, QueueManager, RetryManager, SessionEventListener, SubscriberManager
+__all__ = ["DeadLetterQueue", "EventDispatcher", "HealthMonitor", "MemoryHookManager", "QueueManager", "RetryManager", "SessionEventListener", "SubscriberManager"]

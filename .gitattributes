@@ -1,17 +1,31 @@
-# Exclude from git archive / source distribution
-reports/ export-ignore
-artifacts/ export-ignore
-traces/ export-ignore
-lancedb/ export-ignore
-study/ export-ignore
-memoryx-pure-release/ export-ignore
-scripts/test_siliconflow_embedding.py export-ignore
-tools/test_siliconflow_embedding.py export-ignore
-memoryx-pure-core-code.txt export-ignore
-production_selfcheck_report.* export-ignore
-P14.*_PLAN.md export-ignore
-verify_p*.py export-ignore
-tools/ export-ignore
-deploy/ export-ignore
-tests/e2e/test_benchmark_gate.py export-ignore
-tests/production/test_memoryx_production_contracts.py export-ignore
+# Auto detect text files and normalize line endings
+* text=auto
+
+# Python source
+*.py text diff=python
+
+# Markdown
+*.md text
+
+# YAML/JSON
+*.yml text
+*.yaml text
+*.json text
+
+# Shell scripts
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+# Batch files
+*.bat text eol=crlf
+
+# Git files
+.gitattributes text
+.gitignore text
+
+# Binary files - don't touch
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary
+*.sqlite3 binary

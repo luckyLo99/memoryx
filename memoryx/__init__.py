@@ -7,11 +7,11 @@ def _get_version() -> str:
 __version__ = _get_version()
 
 from .api import MemoryQueryAPI
-from .bank import MemoryBank
+from .storage.bank import MemoryBank
 from .compression import SemanticCompressionEngine
 from .config import MemoryXSettings
 from .consolidation import ConsolidationEngine
-from .conversation_log import ConversationLogStore
+from .storage.conversation_log import ConversationLogStore
 from .context import ContextAssemblyEngine, ContextBundle
 from .context_reasoning import ContextReasoningEngine
 from .embeddings import (
@@ -22,6 +22,9 @@ from .embeddings import (
     EmbeddingResult,
     GenericEmbeddingClient,
     VectorStore,
+    VectorProvider,
+    VectorHit,
+    NullVectorProvider,
 )
 from .episodic import EpisodicMemoryEngine
 from .evaluation import MemoryEvaluationEngine
@@ -33,7 +36,7 @@ from .extraction import (
     GenericLLMExtractionClient,
     MemoryExtractionEngine,
 )
-from .events import EventPriority, MemoryEventType
+from .runtime.events import EventPriority, MemoryEventType
 from .hermes_adapter import HermesCompatibilityAdapter  # noqa: F401 — backward-compat alias
 from .graph import EntityGraphEngine
 from .hierarchy import HierarchicalMemoryManager, MemoryMigrationReport, MemoryTier
@@ -51,29 +54,45 @@ from .hooks import (
 from .injection import InjectedPrompt, PromptInjectionEngine
 from .integration import HermesIntegrationRuntime
 from .knowledge_distillation import DistilledKnowledgeArtifact, KnowledgeDistillationEngine
-from .mcp_server import MCPServer
+from .mcp.server import MCPServer
 from .meta_cognition import MetaCognitiveProfile, MetaCognitiveReflectionEngine
 from .migration import MigrationEngine, MigrationReport
 from .observability import MemoryObservabilityEngine
-from .orchestrator import ModuleRegistry, ModuleStatus, SystemOrchestrator
+from .runtime.orchestrator import ModuleRegistry, ModuleStatus, SystemOrchestrator
 from .palace import PalaceDrawer, PalaceEngine, PalaceNavigator, PalaceRoom, PalaceWing
-from .persona import PersonaEngine
+from .cognitive.persona import PersonaEngine
 from .project_state import ProjectState, ProjectStateEngine
 from .recall import ActiveRecallEngine
-from .reflect import ReflectEngine
+from .reflection.reflect import ReflectEngine
 from .reflection import ReflectionEngine
 from .reinforcement import ImportanceReinforcementEngine
 from .governance import ResourceGovernanceDecision, ResourceGovernanceEngine, ResourceLimits, RuntimeResourceSnapshot
-from .retrieval import HybridRetrievalEngine, RetrievalIntent, RetrievalResult
+from .retrieval import (
+    HybridRetrievalEngine,
+    RetrievalIntent,
+    RetrievalResult,
+    ScoreBreakdown,
+    ConfidenceLabel,
+    compute_final_score,
+    normalize_bm25,
+    recency,
+    decay_multiplier,
+    access_boost,
+    status_penalty,
+    label_from_score,
+    reciprocal_rank_fusion,
+    make_ranked_candidates,
+    RankedCandidate,
+)
 from .routing import MemoryRouter, RoutePlan, RoutingIntent
 from .cognition import RuntimeCognitiveState, RuntimeCognitiveStateEngine
 from .safety import MemorySafetyEngine
-from .scene import Scene, SceneEngine
-from .seed import ConversationSeed
-from .self_editor import SelfEditor
+from .episodic.scene import Scene, SceneEngine
+from .storage.seed import ConversationSeed
+from .validation.self_editor import SelfEditor
 from .self_healing import SelfHealingEngine, SelfHealingReport
 from .storage import MemoryRecord, MemoryRepository
-from .symbolic import SymbolicIndex
+from .graph.symbolic import SymbolicIndex
 from .temporal import TemporalMemoryEngine, TemporalState
 from .tool_memory import ToolInteractionMemory, ToolInteractionRecord
 from .validation import (
@@ -193,4 +212,22 @@ __all__ = [
     "VectorStore",
     "WorkingMemoryEngine",
     "WorkingMemoryState",
+    # — retrieval scoring / fusion —
+    "ScoreBreakdown",
+    "ConfidenceLabel",
+    "compute_final_score",
+    "normalize_bm25",
+    "recency",
+    "decay_multiplier",
+    "access_boost",
+    "status_penalty",
+    "label_from_score",
+    "reciprocal_rank_fusion",
+    "make_ranked_candidates",
+    "RankedCandidate",
+    # — vector abstraction —
+    "VectorProvider",
+    "VectorHit",
+    "NullVectorProvider",
 ]
+

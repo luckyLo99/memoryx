@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import sqlite3
 
-from .fusion import make_ranked_candidates, reciprocal_rank_fusion
+from memoryx.retrieval.fusion import make_ranked_candidates, reciprocal_rank_fusion
 from .retriever import Retriever
-from .scoring import compute_final_score, confidence_label, score_to_explanation
+from memoryx.retrieval.scorer import compute_final_score, confidence_label, score_to_explanation
 from .types import RetrievalResult, SearchOptions
-from .vector import NullVectorProvider, VectorProvider
+from memoryx.embeddings.vector_store import NullVectorProvider, VectorProvider
 
 class HybridRetriever:
     def __init__(self, db_path: str, vector_provider: VectorProvider | None = None):

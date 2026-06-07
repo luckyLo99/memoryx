@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
@@ -8,6 +9,56 @@ from uuid import uuid4
 
 NEGATIONS = ["不", "不是", "没有", "never", "not", "no", "dislike", "hate"]
 PREFERENCE_WORDS = ["喜欢", "不喜欢", "偏好", "讨厌", "prefer", "like", "dislike"]
+
+
+# ---------------------------------------------------------------------------
+# Utility functions (ported from legacy core/conflict.py)
+# ---------------------------------------------------------------------------
+
+
+def new_conflict_group_id() -> str:
+    """Generate a unique conflict group identifier."""
+    return f"cg_{uuid.uuid4().hex}"
+
+
+def _norm(value: object) -> str:
+    """Normalise a value for conflict comparison."""
+    return str(value or "").strip().lower()
+
+
+def same_slot(existing: dict, incoming: dict) -> bool:
+    """Check if two memories/claims refer to the same semantic slot.
+
+    Two items are considered same-slot when they share claim_type,
+    subject, and predicate (if available).
+    """
+    if existing.get("subject") or incoming.get("subject"):
+        return (
+            existing.get("claim_type") == incoming.get("claim_type")
+            and _norm(existing.get("subject")) == _norm(incoming.get("subject"))
+            and _norm(existing.get("predicate")) == _norm(incoming.get("predicate"))
+        )
+    return existing.get("claim_type") == incoming.get("claim_type")
+
+
+def should_reinforce(existing: dict, incoming: dict) -> bool:
+    """Check if incoming content reinforces an existing memory (same content)."""
+    return _norm(existing.get("content")) == _norm(incoming.get("content"))
+
+
+def should_supersede(existing: dict, incoming: dict) -> bool:
+    """Check if incoming content supersedes existing (same slot, different content).
+
+    Returns False when items are not in the same slot.
+    """
+    if not same_slot(existing, incoming):
+        return False
+    return _norm(existing.get("content")) != _norm(incoming.get("content"))
+
+
+# ---------------------------------------------------------------------------
+# Conflict detection (ported from legacy core/conflict.py — MemoryConflictDetector)
+# ---------------------------------------------------------------------------
 
 
 @dataclass(slots=True)

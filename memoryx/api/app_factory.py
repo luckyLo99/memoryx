@@ -28,8 +28,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from memoryx.api.auth import verify_api_key
 from memoryx.api.errors import http_exception_handler, unhandled_exception_handler, validation_exception_handler
-from memoryx.api.p11_routes import create_p11_router
-from memoryx.api.p8_bootstrap import install_p8_observability
+from memoryx.api.memories import create_p11_router
+from memoryx.api.bootstrap import install_p8_observability
 from memoryx.api.routes.learning import router as learning_router
 from memoryx.api.routes.learning import distill_router
 from memoryx.api.rate_limit import EmbeddingConcurrencyGate, SlidingWindowRateLimiter

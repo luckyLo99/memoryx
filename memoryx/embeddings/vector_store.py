@@ -1,13 +1,76 @@
+"""Vector storage abstraction.
+
+Provides:
+- VectorStore: concrete JSON-file-backed async store (new path).
+- VectorHit, VectorProvider, NullVectorProvider: protocol interfaces
+  (ported from legacy core/vector.py).
+"""
+
 from __future__ import annotations
 
 import asyncio
 import json
 import math
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+
+# ---------------------------------------------------------------------------
+# VectorProvider protocol (ported from legacy core/vector.py)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VectorHit:
+    """A single vector search result."""
+
+    claim_id: str
+    score: float
+
+
+class VectorProvider(Protocol):
+    """Protocol for pluggable vector search backends."""
+
+    @property
+    def available(self) -> bool: ...
+
+    def search(self, query: str, limit: int = 20) -> list[VectorHit]: ...
+
+    def upsert(self, claim_id: str, content: str) -> None: ...
+
+    def delete(self, claim_id: str) -> None: ...
+
+
+class NullVectorProvider:
+    """Fallback provider used when no vector backend is configured."""
+
+    @property
+    def available(self) -> bool:
+        return False
+
+    def search(self, query: str, limit: int = 20) -> list[VectorHit]:
+        return []
+
+    def upsert(self, claim_id: str, content: str) -> None:
+        return None
+
+    def delete(self, claim_id: str) -> None:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Concrete VectorStore (JSON-file-backed, async)
+# ---------------------------------------------------------------------------
 
 
 class VectorStore:
+    """Lightweight JSON-file-backed vector store.
+
+    Handles upsert, delete, and cosine-similarity search.
+    Not intended for production-scale use; use LanceDB for scale.
+    """
+
     def __init__(self, path: Path) -> None:
         self.path = path
         self._lock = asyncio.Lock()

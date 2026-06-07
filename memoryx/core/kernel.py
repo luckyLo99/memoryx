@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from .conflict import new_conflict_group_id
+from memoryx.cognitive.conflict import new_conflict_group_id
 from .schema import apply_schema
 
 def utc_iso() -> str:
@@ -22,6 +22,13 @@ class MemoryKernel:
         self.conn = sqlite3.connect(db)
         self.conn.row_factory = sqlite3.Row
         apply_schema(self.conn)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     def close(self) -> None:
         self.conn.close()

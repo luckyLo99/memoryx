@@ -8,6 +8,7 @@ from memoryx.hooks.compatibility_adapter import CompatibilityAdapter
 from memoryx.hooks.dead_letter_queue import DeadLetterQueue
 from memoryx.hooks.queue_manager import QueueManager
 from memoryx.hooks.hermes_adapter import HermesCompatibilityAdapter
+from memoryx.runtime.events import MemoryEventType
 
 __all__ = [
     "MemoryHookManager",
@@ -20,4 +21,13 @@ __all__ = [
     "DeadLetterQueue",
     "QueueManager",
     "HermesCompatibilityAdapter",
+]
+
+# Standard Hermes hook event types
+HOOK_EVENTS = [
+    MemoryEventType.ON_USER_MESSAGE,
+    MemoryEventType.ON_ASSISTANT_RESPONSE,
+    MemoryEventType.ON_TOOL_CALL,
+    MemoryEventType.ON_TOOL_RESULT,
+    MemoryEventType.ON_SESSION_END,
 ]

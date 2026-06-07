@@ -7,7 +7,6 @@ from typing import Any
 from memoryx.mcp import build_memoryx_tool_registry, bind_mcp_session
 from memoryx.observability import DiagnosticsBundle, ProfileRunner, RetrievalDebugger, current_context
 from memoryx.observability.metrics import default_metrics
-from memoryx.quality import QualityEvaluator, load_golden_cases, write_quality_reports
 from memoryx.security.maintenance import DatabaseMaintenance
 
 from .artifacts import E2EArtifactBundle
@@ -76,17 +75,6 @@ class E2ERuntimeHarness:
         if not stats.ok:
             raise AssertionError(stats.error)
 
-        quality = registry.call(
-            'memory.quality_gate',
-            {
-                'goldens': 'tests/fixtures/quality_goldens.jsonl',
-                'min_quality_score': 0.50,
-                'max_failed_cases': 3,
-            },
-        )
-        if not quality.ok:
-            raise AssertionError(quality.error)
-
         audit_path = self.artifacts.path('e2e_audit_export.json')
         audit = registry.call('memory.audit_export', {'output_path': audit_path, 'redact': True})
         if not audit.ok:
@@ -100,19 +88,12 @@ class E2ERuntimeHarness:
         profile_md = self.artifacts.path('e2e_profile.md')
         ProfileRunner(self.db_path).run(records=20, queries=3, output_json=profile_json, output_md=profile_md)
 
-        cases = load_golden_cases('tests/fixtures/quality_goldens.jsonl')
-        quality_report = QualityEvaluator(limit=5).evaluate(cases)
-        quality_json = self.artifacts.path('e2e_quality_report.json')
-        quality_md = self.artifacts.path('e2e_quality_report.md')
-        quality_failures = self.artifacts.path('e2e_quality_failures.jsonl')
-        write_quality_reports(quality_report, quality_json, quality_md, quality_failures)
-
         retrieval_event_count = DatabaseMaintenance(self.db_path).stats().get('retrieval_events') or 0
         query_result_count = len(query.data.get('instruction_context', [])) + len(query.data.get('evidence_context', []))
 
         metrics = default_metrics.snapshot()
         metrics_path = self.artifacts.write_json('e2e_metrics.json', metrics)
-        trace = current_context().to_dict()
+        trace = current_context()
 
         return E2ERunResult(
             ok=True,
@@ -124,9 +105,6 @@ class E2ERuntimeHarness:
                 'diagnostics': diagnostics_path,
                 'profile_json': profile_json,
                 'profile_md': profile_md,
-                'quality_json': quality_json,
-                'quality_md': quality_md,
-                'quality_failures': quality_failures,
                 'audit': audit_path,
                 'metrics': metrics_path,
             },

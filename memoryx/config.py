@@ -100,3 +100,10 @@ class MemoryXSettings(BaseSettings):
 
 def get_settings() -> MemoryXSettings:
     return MemoryXSettings(_env_file=os.getenv("MEMORYX_ENV_FILE", ".env"))
+
+# ── Path constants (moved from legacy memoryx.db) ──────────────────────
+from pathlib import Path as _Path
+_REPO_ROOT = _Path(__file__).resolve().parents[1]
+REPO_ROOT = _REPO_ROOT
+SCHEMA_PATH = _REPO_ROOT / "memoryx" / "storage" / "sql" / "schema.sql"
+MIGRATIONS_DIR = _REPO_ROOT / "db" / "migrations"

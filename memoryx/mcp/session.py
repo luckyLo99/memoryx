@@ -17,10 +17,10 @@ class MCPRuntimeSession:
 _session_var: ContextVar[MCPRuntimeSession] = ContextVar("memoryx_mcp_session", default=MCPRuntimeSession())
 
 def bind_mcp_session(*, session_id=None, agent_id=None, user_id=None, run_id=None, request_id=None):
-    from memoryx.observability import bind_context
+    from memoryx.observability.context import bind_observability_context
     session = MCPRuntimeSession(session_id=session_id, agent_id=agent_id, user_id=user_id, run_id=run_id, request_id=request_id)
     token = _session_var.set(session)
-    trace_token = bind_context(session_id=session_id, agent_id=agent_id, user_id=user_id, run_id=run_id, request_id=request_id)
+    trace_token = bind_observability_context(session_id=session_id)
     return token, trace_token
 
 def current_mcp_session() -> MCPRuntimeSession:

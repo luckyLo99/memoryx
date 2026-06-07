@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..db import MIGRATIONS_DIR, SCHEMA_PATH
+from memoryx.config import MIGRATIONS_DIR, SCHEMA_PATH
 from .sqlite_async import AsyncSQLite
 
 

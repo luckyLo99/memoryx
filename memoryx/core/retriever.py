@@ -5,7 +5,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
-from .scoring import compute_final_score, confidence_label, score_to_explanation
+from memoryx.retrieval.scorer import compute_final_score, confidence_label, score_to_explanation
 from .types import RetrievalResult, SearchOptions
 
 def utc_iso() -> str:

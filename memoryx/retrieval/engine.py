@@ -39,7 +39,7 @@ def _is_visible_memory_for_retrieval(
         return True
     if cs == "candidate":
         return include_candidates
-    # rejected, superseded, stale — never visible
+    # rejected, superseded, stale 鈥?never visible
     return False
 
 
@@ -167,7 +167,7 @@ class HybridRetrievalEngine:
                 vector_hits = []  # degraded: vector unavailable
         vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
 
-        # 24.4-B: fetch_limit optimization — base 2x, fallback 3x if needed
+        # 24.4-B: fetch_limit optimization 鈥?base 2x, fallback 3x if needed
         base_fetch = max(limit * 2, 30)
         fallback_fetch = max(limit * 3, 30)
         if explain_scores:
@@ -191,7 +191,7 @@ class HybridRetrievalEngine:
         batch_hydration_count = 0
         cache_hit_count = 0
         cache_miss_count = 0
-        # 24.7-B: per-request hydration_cache — avoids same-request re-hydration
+        # 24.7-B: per-request hydration_cache 鈥?avoids same-request re-hydration
         hydration_cache: dict[str, dict[str, Any]] = {}
         memory_map = await self.repository.batch_get_memories(candidate_ids)
         batch_hydration_count += 1
@@ -451,7 +451,7 @@ class HybridRetrievalEngine:
         visible: list[str] = []
 
         if session_only:
-            # Broad SQL pass — don't filter on scope here. The final eligibility
+            # Broad SQL pass 鈥?don't filter on scope here. The final eligibility
             # is enforced in the memory loop via _is_session_scoped_memory().
             # This avoids false negatives for scope='global' + memory_layer='session'.
             if session_id:
@@ -470,7 +470,7 @@ class HybridRetrievalEngine:
             visible.append("scope = ?")
             params.append(scope_filter)
         elif not session_id:
-            # No session isolation — unfiltered
+            # No session isolation 鈥?unfiltered
             if not scope_filter:
                 return " AND ".join(clauses), params
 
@@ -575,7 +575,7 @@ class HybridRetrievalEngine:
             parts.append(f"intent={intent.value}")
         return ", ".join(parts)
 
-    # ── LESSON retrieval boost ──
+    # 鈹€鈹€ LESSON retrieval boost 鈹€鈹€
 
     async def _merge_lesson_candidates(
         self,
@@ -588,7 +588,7 @@ class HybridRetrievalEngine:
         include_global: bool,
         limit: int,
     ) -> list[RetrievalResult]:
-        from memoryx.cognitive.lessons import LessonPolicyEngine
+        from memoryx.cognitive.lesson_policy import LessonPolicyEngine
         engine = LessonPolicyEngine(repository=self.repository)
         lessons = await engine.match(
             query=query,
@@ -641,3 +641,4 @@ class HybridRetrievalEngine:
             verification_status=str(lesson.get("verification_status", "verified")),
             trust_score=float(lesson.get("trust_score", 0.9)),
         )
+

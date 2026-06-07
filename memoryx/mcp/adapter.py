@@ -7,7 +7,7 @@ from memoryx.context_budget import BudgetedContextAssembler
 from memoryx.core import HermesAdapter, MemoryKernel
 from memoryx.core.hybrid_retriever import HybridRetriever
 from memoryx.core.types import SearchOptions
-from memoryx.core.vector import NullVectorProvider
+from memoryx.embeddings.vector_store import NullVectorProvider
 from .session import current_mcp_session
 
 
@@ -82,8 +82,15 @@ class MemoryXMCPAdapter:
     def stats(self, args: dict[str, Any] | None = None) -> dict[str, Any]:
         with MemoryKernel(self.db_path) as k:
             conn = k.conn
-            tables = ["evidence_events", "claims", "claim_versions", "retrieval_events", "claim_edges", "memory_edges"]
-            return {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables}
+            all_tables = ["evidence_events","claims","claim_versions","retrieval_events","claim_edges","memory_edges"]
+            existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            row_counts = {}
+            for t in all_tables:
+                try:
+                    row_counts[t] = conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] if t in existing else -1
+                except Exception:
+                    row_counts[t] = -1
+            return {'row_counts': row_counts, 'tables': all_tables}
 
     def quality_gate(self, args: dict[str, Any]) -> dict[str, Any]:
         return {"passed": True, "note": "quality gate stub"}

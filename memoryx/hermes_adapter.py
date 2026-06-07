@@ -1,5 +1,6 @@
+"""DEPRECATED - use memoryx.hooks.HermesCompatibilityAdapter directly."""
 from __future__ import annotations
-
-from .hooks import HermesCompatibilityAdapter
-
+import warnings as _w
+_w.warn("memoryx.hermes_adapter is deprecated; use memoryx.hooks.HermesCompatibilityAdapter", DeprecationWarning, stacklevel=2)
+from memoryx.hooks import HermesCompatibilityAdapter
 __all__ = ["HermesCompatibilityAdapter"]

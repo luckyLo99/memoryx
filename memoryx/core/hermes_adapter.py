@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from .kernel import MemoryKernel
-from memoryx.core.hybrid_retriever import HybridRetriever
-from memoryx.core.types import SearchOptions
-from memoryx.core.vector import NullVectorProvider
+from memoryx.core.hybrid_retriever import HybridRetriever  # legacy
+from memoryx.core.types import SearchOptions  # legacy
+from memoryx.embeddings.vector_store import NullVectorProvider
 
 
 class HermesAdapter:
