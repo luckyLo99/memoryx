@@ -103,7 +103,6 @@ async def project_progress(project_id: str):
 
 
 class WriteReviewRequest(BaseModel):
-    root: str = os.getenv("MEMORYX_ROOT", "data")
     project_id: str
     topic: str
     goal: str
@@ -117,7 +116,7 @@ class WriteReviewRequest(BaseModel):
 @router.post("/artifact/session-review")
 async def write_session_review(req: WriteReviewRequest):
     try:
-        builder = StudyArtifactBuilder(req.root)
+        builder = StudyArtifactBuilder()
         path = builder.append_session_review(
             project_id=req.project_id,
             topic=req.topic,
@@ -153,7 +152,6 @@ async def distill_recent(since_hours: int = 24):
 
 class ApproveDraftRequest(BaseModel):
     draft_id: str
-    hermes_skill_dir: str = os.getenv("HERMES_SKILL_DIR", os.path.expanduser("~/.hermes/skills"))
 
 
 @distill_router.post("/draft/approve")
@@ -162,7 +160,6 @@ async def approve_draft(req: ApproveDraftRequest):
     try:
         path = distiller.approve_draft(
             draft_id=req.draft_id,
-            hermes_skill_dir=req.hermes_skill_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

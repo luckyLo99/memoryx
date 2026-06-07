@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from memoryx.context_budget import TokenEstimator
-from memoryx.learning.artifacts import StudyArtifactBuilder
+from memoryx.learning.artifacts import StudyArtifactBuilder, _safe_artifact_root
 from memoryx.skills.distiller import _safe_skill_install_root, _safe_skill_key
 
 
@@ -21,11 +21,12 @@ def test_study_artifact_root_must_stay_inside_configured_root(tmp_path, monkeypa
     outside = tmp_path / "outside"
     monkeypatch.setenv("MEMORYX_ROOT", str(allowed))
 
-    builder = StudyArtifactBuilder(allowed)
+    assert _safe_artifact_root(allowed) == allowed
 
+    builder = StudyArtifactBuilder()
     assert builder.study_dir == allowed / "study"
     with pytest.raises(ValueError, match="artifact root"):
-        StudyArtifactBuilder(outside)
+        _safe_artifact_root(outside)
 
 
 def test_skill_install_root_must_stay_inside_configured_root(tmp_path, monkeypatch) -> None:
@@ -40,6 +41,6 @@ def test_skill_install_root_must_stay_inside_configured_root(tmp_path, monkeypat
 
 
 def test_skill_key_sanitization_rejects_empty_keys() -> None:
-    assert _safe_skill_key("memoryx/hermes operator") == "memoryx_hermes_operator"
+    assert _safe_skill_key("memoryx-hermes-operator") == "memoryx-hermes-operator"
     with pytest.raises(ValueError, match="skill key"):
-        _safe_skill_key("...")
+        _safe_skill_key("memoryx/hermes operator")

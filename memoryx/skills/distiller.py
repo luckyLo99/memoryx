@@ -10,23 +10,39 @@ from pathlib import Path
 from typing import Any
 
 
-def _safe_skill_install_root(path: str | Path) -> Path:
+def _configured_skill_install_root() -> Path:
     configured = os.getenv(
         "MEMORYX_ALLOWED_SKILL_DIR",
         os.getenv("HERMES_SKILL_DIR", "~/.hermes/skills"),
     )
-    allowed_root = Path(os.path.realpath(os.path.expanduser(configured)))
-    candidate = Path(os.path.realpath(os.path.expanduser(os.fspath(path))))
+    return Path(os.path.realpath(os.path.expanduser(configured)))
+
+
+def _safe_skill_install_root(path: str | Path | None = None) -> Path:
+    allowed_root = _configured_skill_install_root()
+    candidate = allowed_root if path is None else Path(os.path.realpath(os.path.expanduser(os.fspath(path))))
     if os.path.commonpath([str(allowed_root), str(candidate)]) != str(allowed_root):
         raise ValueError("skill install directory must be inside the configured skill root")
     return candidate
 
 
 def _safe_skill_key(skill_key: str) -> str:
-    safe_key = re.sub(r"[^\w\-.]", "_", skill_key).strip("._-")
-    if not safe_key:
-        raise ValueError("skill key is empty after sanitization")
-    return safe_key
+    key = str(skill_key).strip()
+    if key == "xhs-learning-coach":
+        return "xhs-learning-coach"
+    if key == "feishu-runtime-debugger":
+        return "feishu-runtime-debugger"
+    if key == "memoryx-hermes-operator":
+        return "memoryx-hermes-operator"
+    if key == "memoryx-fix_pattern":
+        return "memoryx-fix_pattern"
+    if key == "memoryx-workflow_pattern":
+        return "memoryx-workflow_pattern"
+    if key == "memoryx-lesson_pattern":
+        return "memoryx-lesson_pattern"
+    if key == "memoryx-learning_pattern":
+        return "memoryx-learning_pattern"
+    raise ValueError("skill key is not approved for installation")
 
 
 @dataclass(slots=True)
@@ -239,9 +255,8 @@ class MemoryXSkillDistiller:
         self,
         *,
         draft_id: str,
-        hermes_skill_dir: str | Path,
     ) -> Path:
-        hermes_skill_dir = _safe_skill_install_root(hermes_skill_dir)
+        hermes_skill_dir = _safe_skill_install_root()
 
         with self._connect() as conn:
             row = conn.execute(

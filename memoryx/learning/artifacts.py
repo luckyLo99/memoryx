@@ -10,19 +10,21 @@ from datetime import datetime
 CST = ZoneInfo("Asia/Shanghai")
 
 
-def _safe_artifact_root(root: str | Path) -> Path:
-    allowed_root = Path(
-        os.path.realpath(os.getenv("MEMORYX_ARTIFACT_ROOT", os.getenv("MEMORYX_ROOT", "data")))
-    )
-    candidate = Path(os.path.realpath(os.fspath(root)))
+def _configured_artifact_root() -> Path:
+    return Path(os.path.realpath(os.getenv("MEMORYX_ARTIFACT_ROOT", os.getenv("MEMORYX_ROOT", "data"))))
+
+
+def _safe_artifact_root(root: str | Path | None = None) -> Path:
+    allowed_root = _configured_artifact_root()
+    candidate = allowed_root if root is None else Path(os.path.realpath(os.fspath(root)))
     if os.path.commonpath([str(allowed_root), str(candidate)]) != str(allowed_root):
         raise ValueError("artifact root must be inside the configured MemoryX artifact root")
     return candidate
 
 
 class StudyArtifactBuilder:
-    def __init__(self, root: str | Path) -> None:
-        self.root = _safe_artifact_root(root)
+    def __init__(self) -> None:
+        self.root = _safe_artifact_root()
         self.study_dir = self.root / "study"
         self.study_dir.mkdir(parents=True, exist_ok=True)
 
