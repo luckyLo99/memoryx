@@ -226,7 +226,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-*Built with ❤️ for the AI agent community. Part of the [Codex for OSS](https://openai.com/zh-Hans-CN/form/codex-for-oss/) program.*
 
 ⭐ Star us on GitHub — it helps other developers find MemoryX!
 

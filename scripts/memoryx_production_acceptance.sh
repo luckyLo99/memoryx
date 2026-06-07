@@ -33,7 +33,7 @@
 # Optional env:
 #   MEMORYX_REPO_SLUG=luckyl214/memoryx
 #   MEMORYX_REPO_URL=https://github.com/luckyl214/memoryx.git
-#   MEMORYX_TAG=v2.0.0
+#   MEMORYX_TAG=v3.0.0
 #   MEMORYX_EXPECTED_VERSION=2.0.0
 #   MEMORYX_EXPECTED_COMMIT=5207785
 #   PYTHON_BIN=python3.12
@@ -47,7 +47,7 @@ SCRIPT_NAME="$(basename "$0")"
 
 MEMORYX_REPO_SLUG="${MEMORYX_REPO_SLUG:-luckyl214/memoryx}"
 MEMORYX_REPO_URL="${MEMORYX_REPO_URL:-https://github.com/luckyl214/memoryx.git}"
-MEMORYX_TAG="${MEMORYX_TAG:-v2.0.0}"
+MEMORYX_TAG="${MEMORYX_TAG:-v3.0.0}"
 MEMORYX_EXPECTED_VERSION="${MEMORYX_EXPECTED_VERSION:-2.0.0}"
 MEMORYX_EXPECTED_COMMIT="${MEMORYX_EXPECTED_COMMIT:-5207785}"
 PYTHON_BIN="${PYTHON_BIN:-python3.12}"
@@ -593,9 +593,9 @@ check_local_repo_guardrails() {
   fi
 
   if [[ -f "constraints-memoryx-stable.txt" ]]; then
-    grep -q "@v2.0.0" constraints-memoryx-stable.txt \
-      && pass "constraints-memoryx-stable.txt pins v2.0.0" \
-      || fatal "constraints file does not pin v2.0.0"
+    grep -q "@v3.0.0" constraints-memoryx-stable.txt \
+      && pass "constraints-memoryx-stable.txt pins v3.0.0" \
+      || fatal "constraints file does not pin v3.0.0"
   else
     fatal "constraints-memoryx-stable.txt missing"
   fi
@@ -704,7 +704,7 @@ Rules:
 
 * Hermes must load MemoryX through the stable runtime/preflight path.
 * Runtime data must remain under MEMORYX_HOME.
-* v2.0.0 tag and release assets are immutable.
+* v3.0.0 tag and release assets are immutable.
 * Future fixes must use v2.0.1+ patch releases or v2.1.0-rc.1+ feature releases.
 \`\`\`
 EOF

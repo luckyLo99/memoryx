@@ -13,7 +13,7 @@ class ContextBudgetPolicy:
     evidence_annotation / source_annotation / layer_annotation: toggle annotation.
     summarize_line_limit / summarize_token_limit_per_line: truncation params.
     """
-    max_tokens: int = 1200
+    max_tokens: int = 100_000
 
     hard_reserve_working: int = 120
     hard_reserve_warnings: int = 120
@@ -38,7 +38,7 @@ class ContextBudgetPolicy:
     @classmethod
     def from_max_token_budget(cls, max_token_budget: int) -> "ContextBudgetPolicy":
         """Build a policy scaled from a legacy max_token_budget value."""
-        ratio = max_token_budget / 1200
+        ratio = max_token_budget / 100000
         return cls(
             max_tokens=max_token_budget,
             hard_reserve_working=max(60, int(120 * ratio)),

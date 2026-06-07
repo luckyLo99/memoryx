@@ -138,3 +138,5 @@ htmlcov/
 *.pfx
 token*
 secret*
+
+pytest-of-lucky/

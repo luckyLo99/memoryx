@@ -13,7 +13,7 @@ ALLOWED_DECISIONS = {
     "unknown",
 }
 ALLOWED_SEVERITIES = {"P0", "P1", "P2", "P3"}
-ALLOWED_RELEASE_IMPACTS = {"none", "v2.0.1", "v2.1.0-rc.1"}
+ALLOWED_RELEASE_IMPACTS = {"none", "v2.0.1", "v3.0.0-rc.1"}
 REQUIRED_FIELDS = [
     "phase",
     "decision",

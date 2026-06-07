@@ -22,7 +22,7 @@
 set -Eeuo pipefail
 
 MEMORYX_REPO_URL="${MEMORYX_REPO_URL:-https://github.com/luckyl214/memoryx.git}"
-MEMORYX_STABLE_TAG="${MEMORYX_STABLE_TAG:-v2.0.0}"
+MEMORYX_STABLE_TAG="${MEMORYX_STABLE_TAG:-v3.0.0}"
 MEMORYX_EXPECTED_VERSION="${MEMORYX_EXPECTED_VERSION:-2.0.0}"
 
 MEMORYX_RUNTIME_ROOT="${MEMORYX_RUNTIME_ROOT:-$HOME/runtime}"
@@ -369,16 +369,16 @@ write_agent_rules() {
   cat > "$root/AGENT_RULES.md" <<'EOF'
 # MemoryX Agent Rules
 
-MemoryX v2.0.0 stable is frozen.
+MemoryX v3.0.0 stable is frozen.
 
 ## Absolute prohibitions
 
 Agents must not:
 
 - move, delete, recreate, or overwrite these tags:
-  - v2.0.0
-  - v2.0.0-rc.1
-  - v2.0.0-rc.2
+  - v3.0.0
+  - v3.0.0-rc.1
+  - v3.0.0-rc.2
 - edit GitHub release assets
 - edit runtime data:
   - .env
@@ -417,7 +417,7 @@ Agents must not:
 
 ## Stable release rule
 
-v2.0.0 is immutable. Any fix must become:
+v3.0.0 is immutable. Any fix must become:
 
 - v2.0.1 for patch/hotfix
 - v2.1.0-rc.1 for feature/minor work
@@ -537,7 +537,7 @@ write_constraints() {
 #
 # Do not change this to a branch name or local path.
 
-memoryx @ git+https://github.com/luckyl214/memoryx.git@v2.0.0
+memoryx @ git+https://github.com/luckyl214/memoryx.git@v3.0.0
 EOF
 }
 
@@ -570,7 +570,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROTECTED_TAGS = ["v2.0.0", "v2.0.0-rc.1", "v2.0.0-rc.2"]
+PROTECTED_TAGS = ["v3.0.0", "v3.0.0-rc.1", "v3.0.0-rc.2"]
 FORBIDDEN_PATH_PATTERNS = [
     re.compile(r"(^|/)\.env($|/)"),
     re.compile(r"(^|/)reports($|/)"),

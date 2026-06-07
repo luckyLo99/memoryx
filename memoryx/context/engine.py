@@ -98,7 +98,7 @@ def _is_result_lesson(result: RetrievalResult) -> bool:
 
 
 class ContextAssemblyEngine:
-    def __init__(self, max_token_budget: int = 1200, policy: ContextBudgetPolicy | None = None) -> None:
+    def __init__(self, max_token_budget: int = 100_000, policy: ContextBudgetPolicy | None = None) -> None:
         self.max_token_budget = max_token_budget
         self.policy = policy or ContextBudgetPolicy.from_max_token_budget(max_token_budget)
 

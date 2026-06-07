@@ -5,9 +5,9 @@ import os
 @dataclass(frozen=True)
 class ContextBudgetPolicy:
     enabled: bool = True
-    model_context_window_tokens: int = 256_000
-    max_context_tokens: int = 8_192
-    max_context_ratio: float = 0.04
+    model_context_window_tokens: int = 1_000_000
+    max_context_tokens: int = 100_000
+    max_context_ratio: float = 0.10
     max_memory_items: int = 24
     max_session_items: int = 8
     max_item_tokens: int = 512
@@ -18,9 +18,9 @@ class ContextBudgetPolicy:
 
     @classmethod
     def from_env(cls) -> "ContextBudgetPolicy":
-        model_window = int(os.getenv("MEMORYX_MODEL_CONTEXT_TOKENS", "256000"))
-        max_context = int(os.getenv("MEMORYX_CONTEXT_MAX_TOKENS", "8192"))
-        ratio = float(os.getenv("MEMORYX_CONTEXT_MAX_RATIO", "0.04"))
+        model_window = int(os.getenv("MEMORYX_MODEL_CONTEXT_TOKENS", "1000000"))
+        max_context = int(os.getenv("MEMORYX_CONTEXT_MAX_TOKENS", "100000"))
+        ratio = float(os.getenv("MEMORYX_CONTEXT_MAX_RATIO", "0.10"))
         computed_cap = int(model_window * ratio)
         effective_max = min(max_context, computed_cap) if computed_cap > 0 else max_context
         return cls(

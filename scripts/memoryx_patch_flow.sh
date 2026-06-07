@@ -77,7 +77,7 @@ assert_dirty_only_allowed_for_commit() {
 }
 
 assert_no_protected_tag_change() {
-  local protected=("v2.0.0" "v2.0.0-rc.1" "v2.0.0-rc.2")
+  local protected=("v3.0.0" "v3.0.0-rc.1" "v3.0.0-rc.2")
   for tag in "${protected[@]}"; do
     if git tag -l "$tag" | grep -qx "$tag"; then
       local typ
@@ -291,7 +291,7 @@ cmd_status() {
   git status --short
   git branch --show-current
   git log --oneline -5
-  git tag -l 'v2.0.0*'
+  git tag -l 'v3.0.0*'
   assert_no_protected_tag_change
 }
 
@@ -391,7 +391,7 @@ cmd_tag() {
   assert_no_protected_tag_change
 
   case "$tag" in
-    v2.0.0|v2.0.0-rc.1|v2.0.0-rc.2)
+    v3.0.0|v3.0.0-rc.1|v3.0.0-rc.2)
       die "Protected historical tag cannot be created/modified by this script: $tag"
       ;;
     v2.0.*|v2.1.0-rc.*|v2.1.*)

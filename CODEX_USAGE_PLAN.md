@@ -1,56 +1,49 @@
-# Codex Usage Plan — MemoryX 2.0
+# AI-Assisted Development Governance
 
-> Last updated: 2026-05-31
-> Program: [OpenAI Codex for Open Source](https://developers.openai.com/community/codex-for-oss)
+> Last updated: 2026-06-07
 > Repository: `luckyl214/memoryx`
 
 ## Purpose
 
-This document describes how OpenAI Codex (and associated GPT models via API credits) will be used for **OSS maintainer automation** in the MemoryX project. Codex/GPT is **not integrated into MemoryX runtime** and does not serve as a default retrieval, memory, or context engine path.
-
-See also: `docs/MAINTAINER_WORKFLOW.md`, `docs/ISSUE_TRIAGE_GUIDE.md`, `docs/PR_REVIEW_GUIDE.md`, `RELEASE_CHECKLIST.md`.
+This document defines how AI-assisted development tools are used for MemoryX maintainer automation.
+AI tools are never integrated into the MemoryX runtime and do not serve as a default retrieval,
+memory, or context engine path.
 
 ## Approved Use Cases
 
 ### 1. Pull Request Review
-- **What**: Codex reviews incoming PRs for code quality, contract regression, forbidden patterns (e.g. schema changes, FK violations, runtime path edits)
 - **Scope**: Python source files, contract tests, CI workflows
-- **Guard**: Review output is advisory only; merge requires human maintainer approval + ReleaseGate pass
+- **Guard**: Review output is advisory; merge requires human maintainer approval
 
 ### 2. Issue Triage
-- **What**: Codex classifies new issues (bug / feature / security / question) and suggests labels
 - **Scope**: GitHub Issues
-- **Guard**: Classification is advisory only; security-sensitive issues are escalated to private advisory
+- **Guard**: Classification is advisory; security issues escalated to private advisory
 
 ### 3. Regression Test Generation
-- **What**: Codex generates contract tests for new batch scopes based on batch instructions and audit findings
 - **Scope**: `tests/test_*_contract.py` files
-- **Guard**: Generated tests must pass the full test suite before commit; never skip or xfail
+- **Guard**: Generated tests must pass full test suite before commit
 
 ### 4. Release Validation
-- **What**: Codex runs pre-release audit (repo_guard, ReleaseGate, diff analysis) and produces a structured readiness report
-- **Scope**: `scripts/run_memoryx_release_gate.py`, `scripts/memoryx_repo_guard.py`
+- **Scope**: Pre-release audit, diff analysis, readiness report
 - **Guard**: Release decision requires human maintainer approval
 
-### 5. Documentation / Changelog Alignment
-- **What**: Codex validates that PR descriptions, CHANGELOG entries, and docs match the actual code changes
+### 5. Documentation Alignment
 - **Scope**: `CHANGELOG.md`, `docs/`, `README.md`
-- **Guard**: Content changes are advisory; human review required before merge
+- **Guard**: Content changes are advisory; human review required
 
-### 6. Security-Sensitive Review
-- **What**: Codex auditor reviews `SECURITY_THREAT_MODEL.md`, dependency changes, and auth boundary modifications
-- **Scope**: Security-critical files (`SECURITY.md`, `SECURITY_THREAT_MODEL.md`, `pyproject.toml`, `memoryx/api/`)
-- **Guard**: Findings are advisory; must be reviewed by a human maintainer
+### 6. Security Review
+- **Scope**: `SECURITY.md`, `SECURITY_THREAT_MODEL.md`, `pyproject.toml`, auth boundaries
+- **Guard**: Findings must be reviewed by a human maintainer
 
-## Hard Boundaries
+## Boundaries
 
 | Boundary | Rule |
 |----------|------|
-| **No runtime integration** | Codex/GPT is never called from MemoryX runtime (retrieval, context assembly, memory ingestion, REST endpoints) |
-| **No default model path** | MemoryX does not ship with a Codex/GPT provider as a default |
-| **No API key storage** | API keys for Codex/OAI are stored in environment variables or Hermes config; never in the MemoryX repo |
-| **Human-in-the-loop** | All maintainer automation output is advisory; final decisions require human maintainer approval |
-| **No silent execution** | Codex-assisted workflows are always triggered explicitly (via Hermes agent or manual invocation), never as background automation |
+| No runtime integration | AI tools are never called from MemoryX runtime |
+| No default model path | MemoryX does not ship with any AI provider as default |
+| No API key storage | Keys stored in environment variables only; never in repo |
+| Human-in-the-loop | All outputs are advisory; human required for decisions |
+| No silent execution | All AI-assisted workflows are explicitly triggered |
 
 ## API Credits Usage
 
@@ -58,14 +51,5 @@ See also: `docs/MAINTAINER_WORKFLOW.md`, `docs/ISSUE_TRIAGE_GUIDE.md`, `docs/PR_
 |----------|----------------|-----------|
 | PR review | Medium (code analysis) | Per PR |
 | Issue triage | Low (classification) | Per issue |
-| Test generation | Medium-High (code synthesis) | Per batch |
-| Release validation | Low (audit report) | Per release |
-| Docs/changelog | Low (text validation) | Per PR |
-
-API credits are provided through the OpenAI Codex for Open Source program and are used exclusively for the approved use cases above.
-
-## Review & Update Policy
-
-- This plan is reviewed with each major release cycle.
-- Codex Security review scope may include taint flow analysis, auth boundary review, and dependency risk assessment.
-- Updates to this plan require human maintainer approval.
+| Test generation | Medium (code generation) | Per batch |
+| Release validation | High (full audit) | Per release |

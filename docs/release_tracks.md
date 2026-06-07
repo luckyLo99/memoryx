@@ -1,8 +1,8 @@
 # MemoryX Release Tracks
 
-## Track A: v2.0.0 Stable First Release
+## Track A: v3.0.0 Stable First Release
 
-`v2.0.0-rc1` is the frozen release-candidate line for the first stable open-source release.
+`v3.0.0-rc1` is the frozen release-candidate line for the first stable open-source release.
 
 **Scope:**
 - P0 schema recovery
@@ -12,7 +12,7 @@
 - Performance/data model hardening (benchmarks, SQLite retry, vector deprecation)
 - Release engineering (wheel, sdist, SBOM, checksums)
 
-**Released:** [v2.0.0-rc1 on GitHub](https://github.com/luckyl214/memoryx/releases/tag/v2.0.0-rc1)
+**Released:** [v3.0.0-rc1 on GitHub](https://github.com/luckyl214/memoryx/releases/tag/v3.0.0-rc1)
 
 **During RC soak, ONLY allowed:**
 - Installation fixes
@@ -28,7 +28,7 @@
 - Hermes behavior changes
 - Benchmark threshold relaxation
 
-**Target:** `v2.0.0`
+**Target:** `v3.0.0`
 
 ---
 

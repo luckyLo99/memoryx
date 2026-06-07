@@ -33,7 +33,7 @@ class TraceEvent:
     session_id: str = ""
     phase: str = ""
     timestamp: str = ""
-    memoryx_version: str = "2.1.0"
+    memoryx_version: str = "3.0.0"
     hermes_version: str = ""
     code_commit: str = ""
     input_hash: str = ""
@@ -58,7 +58,7 @@ class TraceEvent:
             session_id=str(data.get("session_id", "")),
             phase=str(data.get("phase", "")),
             timestamp=str(data.get("timestamp", "")),
-            memoryx_version=str(data.get("memoryx_version", "2.1.0")),
+            memoryx_version=str(data.get("memoryx_version", "3.0.0")),
             hermes_version=str(data.get("hermes_version", "")),
             code_commit=str(data.get("code_commit", "")),
             input_hash=str(data.get("input_hash", "")),
@@ -108,7 +108,7 @@ class ReplayCase:
             replay_id=str(data.get("replay_id", "")),
             source_trace_ids=list(data.get("source_trace_ids") or []),
             session_id_hash=str(data.get("session_id_hash", "")),
-            memoryx_version=str(data.get("memoryx_version", "2.1.0")),
+            memoryx_version=str(data.get("memoryx_version", "3.0.0")),
             hermes_version=str(data.get("hermes_version", "")),
             scenario=str(data.get("scenario", "")),
             steps=[ReplayStep.from_dict(step) if isinstance(step, dict) else step for step in (data.get("steps") or [])],

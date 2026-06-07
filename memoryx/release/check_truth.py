@@ -2,7 +2,7 @@
 """Release truth consistency check for MemoryX.
 
 Usage: python -m memoryx.dev.check_release_truth
-Expected output: PASS release truth consistent: 2.1.0
+Expected output: PASS release truth consistent: 3.0.0
 """
 
 import sys

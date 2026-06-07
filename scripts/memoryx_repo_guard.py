@@ -22,7 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROTECTED_TAGS = ["v2.0.0", "v2.0.0-rc.1", "v2.0.0-rc.2"]
+PROTECTED_TAGS = ["v3.0.0", "v3.0.0-rc.1", "v3.0.0-rc.2"]
 FORBIDDEN_PATH_PATTERNS = [
     re.compile(r"(^|/)\.env($|/)"),
     re.compile(r"(^|/)reports($|/)"),

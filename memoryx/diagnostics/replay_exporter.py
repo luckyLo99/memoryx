@@ -46,7 +46,7 @@ class ReplayExporter:
         steps: list[ReplayStep] = []
         failure_parts: list[str] = []
         session_id_hash = ""
-        memoryx_version = "2.1.0"
+        memoryx_version = "3.0.0"
         hermes_version = ""
 
         for index, event in enumerate(redacted_events, start=1):

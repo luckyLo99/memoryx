@@ -4,4 +4,4 @@
 #
 # Do not change this to a branch name or local path.
 
-memoryx @ git+https://github.com/luckyl214/memoryx.git@v2.0.0
+memoryx @ git+https://github.com/luckyl214/memoryx.git@v3.0.0
