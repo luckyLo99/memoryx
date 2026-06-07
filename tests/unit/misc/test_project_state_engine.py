@@ -9,13 +9,13 @@ from memoryx.project_state import ProjectStateEngine
 async def test_project_state_tracks_goals_tasks_and_blocks() -> None:
     engine = ProjectStateEngine()
 
-    await engine.set_goal(project_id="mnx", goal="build production-grade cognitive memory OS")
+    await engine.set_goal(project_id="mnx", goal="build a cognitive memory OS")
     await engine.add_active_task(project_id="mnx", task="implement project state engine")
     await engine.add_blocked_issue(project_id="mnx", issue="missing deployment health check")
 
     state = await engine.get_state(project_id="mnx")
 
-    assert state.goal == "build production-grade cognitive memory OS"
+    assert state.goal == "build a cognitive memory OS"
     assert state.active_tasks == ["implement project state engine"]
     assert state.blocked_issues == ["missing deployment health check"]
 

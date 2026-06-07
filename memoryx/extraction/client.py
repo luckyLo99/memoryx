@@ -33,7 +33,7 @@ class GenericLLMExtractionClient:
     @staticmethod
     def build_prompt(request: ExtractionRequest) -> str:
         sections = [
-            "You are a production-grade cognitive memory extraction engine.",
+            "You are a cognitive memory extraction engine.",
             "Extract only long-term valuable memories as structured JSON.",
             "Must recognize: user preferences, project context, coding patterns, recurring issues, emotional intensity, long-term goals, relationships, workflow habits, debugging history, deployment incidents.",
             "Filter low-value chat and small talk.",

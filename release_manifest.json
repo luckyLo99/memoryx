@@ -4,9 +4,9 @@
   "python": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",
   "git": {
-    "commit": "54af1eca98708a2b453ee6d9eceb61095bc7869d",
+    "commit": "d1e61fac015ed29b1f05f49245fa5776575fe958",
     "branch": "memoryx-2-kernel",
-    "status_short": "M CODEX_USAGE_PLAN.md\n M README.md\n M README_MEMORYX_PRODUCTION_SELFCHECK.md\n M RELEASE_NOTES.md\n D RELEASE_NOTES_v2.0.0-rc.1.md\n D RELEASE_NOTES_v2.0.0-rc.2.md\n M dist_manifest.json\nM  memoryx/context/engine.py\nM  memoryx/context/models.py\nM  memoryx/context_budget/policy.py\nM  memoryx/context_budget/profiles.py\nM  memoryx/runtime_context/budget.py\n M pyproject.toml\nM  tests/unit/context/test_context_budget_contract.py\nM  tests/unit/context/test_context_profiles.py\n?? _check_clean.py\n?? _clean_files.py\n?? _cleanup2.py\n?? _write_readme.py\n?? tmpi5ms8wlo\n?? tmppzhrvd9i"
+    "status_short": "M CITATION.cff\n M SECURITY_THREAT_MODEL.md\n M memoryx/extraction/client.py\n M release_manifest.json\n M tests/unit/misc/test_project_state_engine.py\n?? _fix_remaining.py"
   },
   "files": {
     "pyproject.toml": {
