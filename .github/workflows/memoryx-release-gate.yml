@@ -53,11 +53,10 @@ jobs:
 
       - name: Collect tests
         run: |
-          python -m pytest --collect-only -q \
+          python -m pytest --collect-only --tb=short \
             --ignore=memoryx-pure-release \
             --ignore=tools \
-            --ignore=scripts/test_siliconflow_embedding.py \
-            2>&1 | tail -200
+            --ignore=scripts/test_siliconflow_embedding.py
 
       - name: Run tests
         run: |
