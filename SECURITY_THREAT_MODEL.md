@@ -63,12 +63,12 @@
 | Gap | Severity | Plan |
 |-----|----------|------|
 | No automated CI security scan | P2 | Target 24.9-D: CodeQL / Bandit / pip-audit |
-| No runtime taint tracking for model-inferred content | P3 | Design review — may exceed Codex OSS scope |
+| No runtime taint tracking for model-inferred content | P3 | Design review — may exceed scope of available resources |
 | REST rate-limiting per key | P3 | Basic rate-limit exists; not per-key granular |
 | LanceDB access control | P3 | File-system permission only; no internal ACL |
 
 ## Review & Update Policy
 
 - This document is reviewed with each major release batch.
-- Codex Security review scope: taint flow, auth boundary, poisoning vectors, dependency risk, release artifact integrity.
+- Security review scope: taint flow, auth boundary, poisoning vectors, dependency risk, release artifact integrity.
 - Report vulnerabilities via GitHub Security Advisories (see `SECURITY.md`).
