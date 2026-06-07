@@ -51,6 +51,23 @@ jobs:
           python -m pip install --upgrade pip setuptools
           python -m pip install -e ".[dev,mcp]"
 
+      - name: Diagnose package imports
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import memoryx
+          print("memoryx file:", memoryx.__file__)
+          for name in ["memoryx.runtime", "memoryx.runtime.events", "fastapi"]:
+              spec = importlib.util.find_spec(name)
+              print(name, "=>", spec.origin if spec else None)
+              if spec is None:
+                  raise SystemExit(f"missing import: {name}")
+          PY
+
+      - name: Collect representative runtime test
+        run: |
+          python -m pytest --collect-only --tb=long -vv tests/unit/runtime/test_app_factory_lifespan.py
+
       - name: Collect tests
         run: |
           python -m pytest --collect-only --tb=short \
