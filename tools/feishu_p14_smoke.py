@@ -214,25 +214,28 @@ def test_8_tool_records():
 
 def test_queue():
     """场景 9: 队列基本操作"""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
-    queue = FeishuSQLiteQueue(db_path)
+    fd, db_name = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    db_path = Path(db_name)
+    try:
+        queue = FeishuSQLiteQueue(db_path)
 
-    job = _job()
-    job_id = queue.enqueue(job, priority=50)
-    assert job_id == job.job_id
+        job = _job()
+        job_id = queue.enqueue(job, priority=50)
+        assert job_id == job.job_id
 
-    claimed = queue.claim_next()
-    assert claimed is not None
-    assert claimed.state == HermesRunState.RUNNING
+        claimed = queue.claim_next()
+        assert claimed is not None
+        assert claimed.state == HermesRunState.RUNNING
 
-    claimed.state = HermesRunState.DONE
-    claimed.answer = "测试完成"
-    queue.update(claimed)
+        claimed.state = HermesRunState.DONE
+        claimed.answer = "测试完成"
+        queue.update(claimed)
 
-    stats = queue.stats()
-    assert stats.get("done", 0) == 1
-
-    db_path.unlink(missing_ok=True)
+        stats = queue.stats()
+        assert stats.get("done", 0) == 1
+    finally:
+        db_path.unlink(missing_ok=True)
     print("✅ 场景 9: 队列操作")
 
 

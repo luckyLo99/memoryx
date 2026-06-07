@@ -127,7 +127,7 @@ def test_chunking_splits_correctly() -> None:
 
 def test_batch_query_is_parameterised() -> None:
     """Verify that the batch helper uses parameterised queries, not raw SQL concat."""
-    # _row_to_dict is a staticmethod on MemoryRepository — verifies reuse
+    # _row_to_dict is a staticmethod on MemoryRepository - verifies reuse
     row = {"id": "x", "content": "test", "memory_type": "FACT"}
     from memoryx.storage.repository import MemoryRepository
     d = MemoryRepository._row_to_dict(row)
@@ -321,7 +321,7 @@ async def test_final_ordering_not_regressed(ready_repo) -> None:
 def test_no_sqlite_json1() -> None:
     """The batch hydrator must not use json_extract / json_each."""
     repo_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "storage" / "repository.py"
-    text = repo_path.read_text()
+    text = repo_path.read_text(encoding="utf-8")
     assert "json_extract" not in text
     assert "json_each" not in text
 
@@ -333,9 +333,9 @@ def test_no_sqlite_json1() -> None:
 def test_fk_zero_structural() -> None:
     """Ensure the batch hydrator doesn't close FK."""
     repo_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "storage" / "repository.py"
-    text = repo_path.read_text()
+    text = repo_path.read_text(encoding="utf-8")
     # The batch_get_memories method must not close foreign_keys
-    # (INSERT OR IGNORE is pre-existing in unrelated store paths — not our concern here)
+    # (INSERT OR IGNORE is pre-existing in unrelated store paths - not our concern here)
     import re
     batch_block = text[text.index("def batch_get_memories"):text.index("async def list_memories")]
     assert "foreign_keys = OFF" not in batch_block

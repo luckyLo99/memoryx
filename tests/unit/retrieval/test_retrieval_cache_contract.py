@@ -62,7 +62,7 @@ async def test_retrieve_has_hydration_cache(ready_repo) -> None:
 def test_no_repo_cache() -> None:
     """Repository must not have global cache decorators or attributes."""
     from memoryx.storage.repository import MemoryRepository
-    # batch_get_memories is a plain async method — no lru_cache
+    # batch_get_memories is a plain async method - no lru_cache
     import inspect
     sig = inspect.signature(MemoryRepository.batch_get_memories)
     assert "cache" not in str(sig).lower()
@@ -74,11 +74,11 @@ def test_no_repo_cache() -> None:
 
 def test_no_lru_cache() -> None:
     repo_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "storage" / "repository.py"
-    text = repo_path.read_text()
+    text = repo_path.read_text(encoding="utf-8")
     assert "lru_cache" not in text
     # Check retrieval engine too
     engine_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "retrieval" / "engine.py"
-    engine_text = engine_path.read_text()
+    engine_text = engine_path.read_text(encoding="utf-8")
     assert "lru_cache" not in engine_text
 
 
@@ -264,8 +264,8 @@ def test_include_lessons_cache() -> None:
 def test_no_eligibility_cache() -> None:
     """hydration_cache stores raw hydrated dicts, not post-eligibility results."""
     engine_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "retrieval" / "engine.py"
-    text = engine_path.read_text()
-    # batch_get_memories returns raw rows — no eligibility applied until after cache lookup
+    text = engine_path.read_text(encoding="utf-8")
+    # batch_get_memories returns raw rows - no eligibility applied until after cache lookup
     assert "hydration_cache" in text
 
 
@@ -276,7 +276,7 @@ def test_no_eligibility_cache() -> None:
 def test_no_context_cache() -> None:
     """Context assembly must be separate from retrieval cache."""
     ctx_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "context" / "engine.py"
-    text = ctx_path.read_text()
+    text = ctx_path.read_text(encoding="utf-8")
     assert "hydration_cache" not in text
 
 
@@ -294,5 +294,5 @@ def test_no_schema_change_cache() -> None:
 
 def test_fk_zero_cache() -> None:
     repo_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "storage" / "repository.py"
-    text = repo_path.read_text()
+    text = repo_path.read_text(encoding="utf-8")
     assert "foreign_keys = OFF" not in text

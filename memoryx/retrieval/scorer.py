@@ -1,4 +1,4 @@
-"""Scoring utilities for retrieval 鈥?ported from legacy core/scoring.py.
+"""Scoring utilities for retrieval - ported from legacy core/scoring.py.
 
 Provides composable score components (recency, decay, boost, penalty)
 and a unified ScoreBreakdown that can be used by any retrieval path.

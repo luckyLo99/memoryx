@@ -629,7 +629,7 @@ def create_p11_router(
     @router.post("/task/start")
     async def task_start(body: TaskStartRequest, repo: Any = Depends(repo_dep)) -> dict:
         """Start a task — creates a running task entry."""
-        import json, traceback, uuid
+        import json, uuid
         from datetime import datetime, timezone
 
         task_id = uuid.uuid4().hex
@@ -649,16 +649,16 @@ def create_p11_router(
             )
             raw.commit()
             raw.close()
-        except Exception as exc:
-            logger.error("task_start error: %s", traceback.format_exc())
-            return {"error": str(exc)}
+        except Exception:
+            logger.exception("task_start error")
+            raise HTTPException(status_code=500, detail="task lifecycle operation failed")
 
         return {"task_id": task_id, "session_id": body.session_id, "status": "running", "started_at": now_iso}
 
     @router.post("/task/end")
     async def task_end(body: TaskEndRequest, repo: Any = Depends(repo_dep)) -> dict:
         """End the most recent running task for this session/entity."""
-        import json, traceback, uuid
+        import json, uuid
         from datetime import datetime, timezone
 
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -715,9 +715,9 @@ def create_p11_router(
             )
             raw.commit()
             raw.close()
-        except Exception as exc:
-            logger.error("task_start error: %s", traceback.format_exc())
-            return {"error": str(exc)}
+        except Exception:
+            logger.exception("task_end error")
+            raise HTTPException(status_code=500, detail="task lifecycle operation failed")
 
         return {
             "task_id": task_id,

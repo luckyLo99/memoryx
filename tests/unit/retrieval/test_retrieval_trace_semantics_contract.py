@@ -278,5 +278,5 @@ def test_no_schema_change_trace() -> None:
 
 def test_fk_zero_trace() -> None:
     repo_path = Path(__file__).parent.parent.parent.parent / "memoryx" / "storage" / "repository.py"
-    text = repo_path.read_text()
+    text = repo_path.read_text(encoding="utf-8")
     assert "foreign_keys = OFF" not in text

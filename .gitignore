@@ -136,7 +136,7 @@ htmlcov/
 *.crt
 *.p12
 *.pfx
-token*
-secret*
+/token*
+/secret*
 
 pytest-of-lucky/

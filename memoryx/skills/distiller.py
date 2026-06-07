@@ -1,12 +1,32 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+
+def _safe_skill_install_root(path: str | Path) -> Path:
+    configured = os.getenv(
+        "MEMORYX_ALLOWED_SKILL_DIR",
+        os.getenv("HERMES_SKILL_DIR", "~/.hermes/skills"),
+    )
+    allowed_root = Path(os.path.realpath(os.path.expanduser(configured)))
+    candidate = Path(os.path.realpath(os.path.expanduser(os.fspath(path))))
+    if os.path.commonpath([str(allowed_root), str(candidate)]) != str(allowed_root):
+        raise ValueError("skill install directory must be inside the configured skill root")
+    return candidate
+
+
+def _safe_skill_key(skill_key: str) -> str:
+    safe_key = re.sub(r"[^\w\-.]", "_", skill_key).strip("._-")
+    if not safe_key:
+        raise ValueError("skill key is empty after sanitization")
+    return safe_key
 
 
 @dataclass(slots=True)
@@ -221,7 +241,7 @@ class MemoryXSkillDistiller:
         draft_id: str,
         hermes_skill_dir: str | Path,
     ) -> Path:
-        hermes_skill_dir = Path(hermes_skill_dir)
+        hermes_skill_dir = _safe_skill_install_root(hermes_skill_dir)
 
         with self._connect() as conn:
             row = conn.execute(
@@ -236,7 +256,7 @@ class MemoryXSkillDistiller:
                 raise RuntimeError(f"draft status is not draft: {row['status']}")
 
             skill_key = row["skill_key"]
-            safe_key = re.sub(r"[^\w\-.]", "_", skill_key)
+            safe_key = _safe_skill_key(skill_key)
             out_dir = hermes_skill_dir / safe_key
             out_dir.mkdir(parents=True, exist_ok=True)
 

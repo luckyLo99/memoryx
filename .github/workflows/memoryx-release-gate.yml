@@ -51,6 +51,10 @@ jobs:
           python -m pip install --upgrade pip setuptools
           python -m pip install -e ".[dev,mcp]"
 
+      - name: Check text encoding
+        run: |
+          python scripts/check_text_encoding.py .
+
       - name: Diagnose package imports
         run: |
           python - <<'PY'

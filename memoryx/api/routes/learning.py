@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from memoryx.learning.engine import LearningEngine
@@ -116,17 +116,20 @@ class WriteReviewRequest(BaseModel):
 
 @router.post("/artifact/session-review")
 async def write_session_review(req: WriteReviewRequest):
-    builder = StudyArtifactBuilder(req.root)
-    path = builder.append_session_review(
-        project_id=req.project_id,
-        topic=req.topic,
-        goal=req.goal,
-        learned=req.learned,
-        unclear=req.unclear,
-        mistakes=req.mistakes,
-        reusable_methods=req.reusable_methods,
-        next_actions=req.next_actions,
-    )
+    try:
+        builder = StudyArtifactBuilder(req.root)
+        path = builder.append_session_review(
+            project_id=req.project_id,
+            topic=req.topic,
+            goal=req.goal,
+            learned=req.learned,
+            unclear=req.unclear,
+            mistakes=req.mistakes,
+            reusable_methods=req.reusable_methods,
+            next_actions=req.next_actions,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"ok": True, "path": str(path)}
 
 
@@ -156,8 +159,11 @@ class ApproveDraftRequest(BaseModel):
 @distill_router.post("/draft/approve")
 async def approve_draft(req: ApproveDraftRequest):
     distiller = MemoryXSkillDistiller(_db_path())
-    path = distiller.approve_draft(
-        draft_id=req.draft_id,
-        hermes_skill_dir=req.hermes_skill_dir,
-    )
+    try:
+        path = distiller.approve_draft(
+            draft_id=req.draft_id,
+            hermes_skill_dir=req.hermes_skill_dir,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"ok": True, "installed_path": str(path)}

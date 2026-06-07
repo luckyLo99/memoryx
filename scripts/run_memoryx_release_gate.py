@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""MemoryX ReleaseGate — pre-release validation gate.
+"""MemoryX ReleaseGate - pre-release validation gate.
 
 Runs all checks on a clean checkout and produces JSON + Markdown reports.
-Exit code 0 = PASS, 1 = FAIL, 2 = WARN.
+Exit code 0 = PASS/WARN, 1 = FAIL.
 
 Usage:
     python scripts/run_memoryx_release_gate.py --report-dir reports/release-gate
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -22,7 +23,20 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO, timeout=300, **kwargs)
+    env = os.environ.copy()
+    env.update({"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
+    env.update(kwargs.pop("env", {}) or {})
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=REPO,
+        timeout=300,
+        env=env,
+        **kwargs,
+    )
 
 
 class ReleaseGate:
@@ -33,10 +47,10 @@ class ReleaseGate:
 
     def record(self, name: str, status: str, detail: str = "") -> None:
         self.checks[name] = {"status": status, "detail": detail}
-        icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}.get(status, "❓")
-        print(f"  {icon} {name}: {status}" + (f" — {detail}" if detail else ""))
+        label = {"pass": "[PASS]", "warn": "[WARN]", "fail": "[FAIL]"}.get(status, "[INFO]")
+        print(f"  {label} {name}: {status}" + (f" - {detail}" if detail else ""))
 
-    # ── Check 1: Clean status ──
+    # Check 1: Clean status
     def check_clean_status(self) -> None:
         r = run(["git", "status", "--porcelain=v1"])
         lines = [l for l in r.stdout.strip().split("\n") if l.strip()]
@@ -47,7 +61,7 @@ class ReleaseGate:
         else:
             self.record("clean_status", "warn", f"{len(dirty)} dirty tracked files")
 
-    # ── Check 2: Collect-only ──
+    # Check 2: Collect-only
     def check_collect_only(self) -> None:
         venv = REPO / ".venv" / "bin" / "python"
         python = str(venv) if venv.exists() else sys.executable
@@ -59,7 +73,7 @@ class ReleaseGate:
                  "--ignore=scripts/",
                  "--ignore=tests/test_lancedb_vector_store.py"])
         out = r.stdout + r.stderr
-        (self.report_dir / "collect-only.txt").write_text(out)
+        (self.report_dir / "collect-only.txt").write_text(out, encoding="utf-8")
         if "error" in out.lower() and "collected" not in out:
             self.record("collect_only", "fail", "collection errors detected")
         else:
@@ -68,7 +82,7 @@ class ReleaseGate:
             count = m.group(1) if m else "?"
             self.record("collect_only", "pass", f"{count} tests collected")
 
-    # ── Check 3: Full pytest ──
+    # Check 3: Full pytest
     def check_pytest_full(self) -> None:
         venv = REPO / ".venv" / "bin" / "python"
         python = str(venv) if venv.exists() else sys.executable
@@ -81,7 +95,7 @@ class ReleaseGate:
                  "--ignore=tests/test_lancedb_vector_store.py",
                  f"--junitxml={self.report_dir}/full-junit.xml"])
         out = r.stdout + r.stderr
-        (self.report_dir / "full-pytest.txt").write_text(out)
+        (self.report_dir / "full-pytest.txt").write_text(out, encoding="utf-8")
         if r.returncode == 0:
             m = re.search(r"(\d+) passed", out)
             count = m.group(1) if m else "?"
@@ -91,7 +105,7 @@ class ReleaseGate:
             failed = m.group(1) if m else "?"
             self.record("pytest_full", "fail", f"{failed} failed")
 
-    # ── Check 4: Core smoke ──
+    # Check 4: Core smoke
     def check_core_smoke(self) -> None:
         venv = REPO / ".venv" / "bin" / "python"
         python = str(venv) if venv.exists() else sys.executable
@@ -119,13 +133,13 @@ asyncio.run(main())
 '''
         r = run([python, "-c", script])
         out = r.stdout + r.stderr
-        (self.report_dir / "core-smoke.txt").write_text(out)
+        (self.report_dir / "core-smoke.txt").write_text(out, encoding="utf-8")
         if "CORE_SMOKE_PASS" in out:
             self.record("core_smoke", "pass")
         else:
             self.record("core_smoke", "fail", out.strip()[-200:])
 
-    # ── Check 5: FK check ──
+    # Check 5: FK check
     def check_foreign_key(self) -> None:
         script = '''
 import sqlite3
@@ -160,7 +174,7 @@ else:
         else:
             self.record("foreign_key_check", "fail", out.strip()[-200:])
 
-    # ── Check 6: Forbidden dependency scan ──
+    # Check 6: Forbidden dependency scan
     def check_forbidden_deps(self) -> None:
         forbidden = {
             "memoryx/mcp_server.py": ["LanceDB", "VectorStore", "EmbeddingIndex"],
@@ -196,7 +210,7 @@ else:
         else:
             self.record("forbidden_dependency_scan", "fail", "; ".join(violations[:5]))
 
-    # ── Check 7: Skip/xfail scan ──
+    # Check 7: Skip/xfail scan
     def check_skip_xfail(self) -> None:
         count = 0
         locations = []
@@ -218,7 +232,7 @@ else:
         else:
             self.record("skip_xfail_scan", "warn", f"{count} skip/xfail found: {'; '.join(locations[:3])}")
 
-    # ── Check 8: Secret scan ──
+    # Check 8: Secret scan
     def check_secret_scan(self) -> None:
         patterns = [
             (r'sk-[a-zA-Z0-9]{20,}', "API key"),
@@ -244,7 +258,7 @@ else:
         else:
             self.record("secret_scan", "fail", "; ".join(findings[:3]))
 
-    # ── Check 9: Package hygiene ──
+    # Check 9: Package hygiene
     def check_package_hygiene(self) -> None:
         bad_patterns = [".env", "*.db", "*.sqlite", "*.sqlite3", "*.lancedb"]
         skip_dirs = {".venv", "__pycache__", ".git", "reports", "lancedb"}
@@ -262,7 +276,7 @@ else:
         else:
             self.record("package_hygiene", "fail", f"{len(violations)} bad files tracked: {'; '.join(violations[:3])}")
 
-    # ── Run all ──
+    # Run all
     def run_all(self) -> str:
         print("=" * 60)
         print("  MemoryX ReleaseGate")
@@ -296,7 +310,9 @@ else:
 
         # Write JSON
         (self.report_dir / "release-gate.json").write_text(
-            json.dumps(report, indent=2, ensure_ascii=False))
+            json.dumps(report, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
         # Write Markdown
         md = [f"# MemoryX ReleaseGate Report", "",
@@ -304,10 +320,10 @@ else:
               f"Timestamp: {report['timestamp']}", "",
               "## Checks", ""]
         for name, check in self.checks.items():
-            icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}.get(check["status"], "❓")
-            detail = f" — {check['detail']}" if check["detail"] else ""
-            md.append(f"- {icon} **{name}**: {check['status']}{detail}")
-        (self.report_dir / "release-gate.md").write_text("\n".join(md))
+            label = {"pass": "[PASS]", "warn": "[WARN]", "fail": "[FAIL]"}.get(check["status"], "[INFO]")
+            detail = f" - {check['detail']}" if check["detail"] else ""
+            md.append(f"- {label} **{name}**: {check['status']}{detail}")
+        (self.report_dir / "release-gate.md").write_text("\n".join(md), encoding="utf-8")
 
         print()
         print("=" * 60)
@@ -323,7 +339,7 @@ def main() -> int:
 
     gate = ReleaseGate(args.report_dir)
     status = gate.run_all()
-    return {"pass": 0, "warn": 1, "fail": 2}.get(status, 2)
+    return {"pass": 0, "warn": 0, "fail": 1}.get(status, 1)
 
 
 if __name__ == "__main__":

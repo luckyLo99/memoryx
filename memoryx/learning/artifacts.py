@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -9,9 +10,19 @@ from datetime import datetime
 CST = ZoneInfo("Asia/Shanghai")
 
 
+def _safe_artifact_root(root: str | Path) -> Path:
+    allowed_root = Path(
+        os.path.realpath(os.getenv("MEMORYX_ARTIFACT_ROOT", os.getenv("MEMORYX_ROOT", "data")))
+    )
+    candidate = Path(os.path.realpath(os.fspath(root)))
+    if os.path.commonpath([str(allowed_root), str(candidate)]) != str(allowed_root):
+        raise ValueError("artifact root must be inside the configured MemoryX artifact root")
+    return candidate
+
+
 class StudyArtifactBuilder:
     def __init__(self, root: str | Path) -> None:
-        self.root = Path(root)
+        self.root = _safe_artifact_root(root)
         self.study_dir = self.root / "study"
         self.study_dir.mkdir(parents=True, exist_ok=True)
 
