@@ -30,7 +30,7 @@ class FakeResult:
 
 def test_budget_policy_defaults() -> None:
     p = ContextBudgetPolicy()
-    assert p.max_tokens == 100000
+    assert p.max_tokens == 1200
     assert p.hard_reserve_working == 120
     assert p.hard_reserve_warnings == 120
     assert p.hard_reserve_policy == 240
@@ -84,10 +84,10 @@ def test_policy_context_hard_reserve() -> None:
 # ===================================================================
 
 def test_budget_report_in_bundle() -> None:
-    bundle = ContextBundle(rendered="", token_count=0, budget_report={"max_tokens": 100000})
+    bundle = ContextBundle(rendered="", token_count=0, budget_report={"max_tokens": 1200})
     d = bundle.to_dict()
     assert "budget_report" in d
-    assert d["budget_report"]["max_tokens"] == 100000
+    assert d["budget_report"]["max_tokens"] == 1200
 
 
 # ===================================================================
@@ -202,7 +202,7 @@ def test_backward_compatible_output() -> None:
 def test_budget_report_structure() -> None:
     p = ContextBudgetPolicy()
     engine = ContextAssemblyEngine(policy=p)
-    report = {"max_tokens": 100000, "sections": {"working_context": {"allocated": 120}}}
+    report = {"max_tokens": 1200, "sections": {"working_context": {"allocated": 120}}}
     assert "max_tokens" in report
     assert "sections" in report
 
@@ -283,7 +283,7 @@ def test_legacy_fields_populated() -> None:
 def test_to_dict_includes_budget_fields() -> None:
     bundle = ContextBundle(
         rendered="test", token_count=1,
-        budget_report={"max_tokens": 100000, "sections": {}},
+        budget_report={"max_tokens": 1200, "sections": {}},
         truncation_reason=None,
     )
     d = bundle.to_dict()

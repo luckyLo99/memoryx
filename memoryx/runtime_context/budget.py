@@ -8,7 +8,7 @@ class RuntimeBudgetViolation(RuntimeError):
 
 @dataclass(frozen=True)
 class RuntimeContextBudget:
-    max_prompt_tokens: int = 1_000_000
+    max_prompt_tokens: int = 64_000
     max_task_capsule_tokens: int = 12_000
     max_tool_summary_tokens: int = 8_000
     max_artifact_ref_tokens: int = 2_000
@@ -23,7 +23,7 @@ class RuntimeContextBudget:
     @classmethod
     def from_env(cls) -> "RuntimeContextBudget":
         return cls(
-            max_prompt_tokens=int(os.getenv("MEMORYX_RUNTIME_MAX_PROMPT_TOKENS", "1000000")),
+            max_prompt_tokens=int(os.getenv("MEMORYX_RUNTIME_MAX_PROMPT_TOKENS", "64000")),
             max_task_capsule_tokens=int(os.getenv("MEMORYX_RUNTIME_MAX_TASK_CAPSULE_TOKENS", "12000")),
             max_tool_summary_tokens=int(os.getenv("MEMORYX_RUNTIME_MAX_TOOL_SUMMARY_TOKENS", "8000")),
             max_artifact_ref_tokens=int(os.getenv("MEMORYX_RUNTIME_MAX_ARTIFACT_REF_TOKENS", "2000")),

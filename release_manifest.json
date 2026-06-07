@@ -4,20 +4,20 @@
   "python": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",
   "git": {
-    "commit": "e0181518ffeda94c0707d9ebc017e0ec1d58e049",
+    "commit": "54af1eca98708a2b453ee6d9eceb61095bc7869d",
     "branch": "memoryx-2-kernel",
-    "status_short": "M CODEX_USAGE_PLAN.md\n M README.md\n M constraints-memoryx-stable.txt\n M docs/release_tracks.md\n M docs/vector_backend_migration.md\n M memoryx/_version.py\n M memoryx/api/app_factory.py\n M memoryx/context/engine.py\n M memoryx/context/models.py\n M memoryx/context_budget/policy.py\n M memoryx/context_budget/profiles.py\n M memoryx/diagnostics/gpt_diagnoser.py\n M memoryx/diagnostics/replay_exporter.py\n M memoryx/diagnostics/schemas.py\n M memoryx/release/check_truth.py\n M memoryx/runtime_context/budget.py\n M release_manifest.json\n M scripts/memoryx_patch_flow.sh\n M scripts/memoryx_production_acceptance.sh\n M scripts/memoryx_repo_guard.py\n M scripts/memoryx_runtime_lockdown.sh\n M tests/unit/context/test_context_budget_contract.py\n M tests/unit/context/test_context_profiles.py\n?? _fix_test_assert.py\n?? pytest-of-lucky/\n?? tmpkekw4ofr\n?? tmpp9cijber"
+    "status_short": "M CODEX_USAGE_PLAN.md\n M README.md\n M README_MEMORYX_PRODUCTION_SELFCHECK.md\n M RELEASE_NOTES.md\n D RELEASE_NOTES_v2.0.0-rc.1.md\n D RELEASE_NOTES_v2.0.0-rc.2.md\n M dist_manifest.json\nM  memoryx/context/engine.py\nM  memoryx/context/models.py\nM  memoryx/context_budget/policy.py\nM  memoryx/context_budget/profiles.py\nM  memoryx/runtime_context/budget.py\n M pyproject.toml\nM  tests/unit/context/test_context_budget_contract.py\nM  tests/unit/context/test_context_profiles.py\n?? _check_clean.py\n?? _clean_files.py\n?? _cleanup2.py\n?? _write_readme.py\n?? tmpi5ms8wlo\n?? tmppzhrvd9i"
   },
   "files": {
     "pyproject.toml": {
       "path": "pyproject.toml",
-      "bytes": 2353,
-      "sha256": "616a79aa32e1192db134bda7c5de839f38ff2fe95858d0b55c00045ab1eb4079"
+      "bytes": 2463,
+      "sha256": "5d3ca38be375a5b58dc4c2c9e2d058a44f746a9aa801b80b793204c39b5c3e8b"
     },
     "README.md": {
       "path": "README.md",
-      "bytes": 10896,
-      "sha256": "f2c2cced7615322fc161af4d9242caa9877d0515ee22c31ee31aa50ee8e56cef"
+      "bytes": 3884,
+      "sha256": "890e9209c9c28874b3157bdf2b1b4162b8df3b06856543b82feb430ee890df39"
     },
     "CHANGELOG.md": {
       "path": "CHANGELOG.md",
@@ -30,5 +30,11 @@
       "sha256": "c9163ff21f1f2b0390dc48bdda47179718f772f507a7cebceca59ce1a7129029"
     }
   },
-  "dist": []
+  "dist": [
+    {
+      "path": "dist\\memoryx-3.0.0.zip",
+      "bytes": 888561,
+      "sha256": "4b43f6ff7a85cf68bdddc4a4d03adeb392d25d0cb420b087c159c18a55c51f59"
+    }
+  ]
 }

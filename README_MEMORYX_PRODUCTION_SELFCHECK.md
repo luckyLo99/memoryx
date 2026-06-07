@@ -14,13 +14,13 @@ cd /path/to/memoryx
 ## Fast self-check
 
 ```bash
-python tools/memoryx_production_selfcheck.py --root .
+python tools/memoryx_system_selfcheck.py --root .
 ```
 
 ## Full self-check
 
 ```bash
-python tools/memoryx_production_selfcheck.py \
+python tools/memoryx_system_selfcheck.py \
   --root . \
   --run-pytest \
   --run-pip-check \
@@ -32,14 +32,14 @@ python tools/memoryx_production_selfcheck.py \
 ## Pytest contract mode
 
 ```bash
-pytest -q tests/production/test_memoryx_production_contracts.py
+pytest -q tests/system/test_memoryx_system_contracts.py
 ```
 
 ## Reports
 
 The script writes:
 
-- `production_selfcheck_report.json`
-- `production_selfcheck_report.md`
+- `system_selfcheck_report.json`
+- `system_selfcheck_report.md`
 
 The JSON report includes an `summary.agent_instruction` field designed for an autonomous repair agent.

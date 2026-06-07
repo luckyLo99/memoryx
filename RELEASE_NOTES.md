@@ -4,7 +4,7 @@ Release date: 2026-06-07
 
 ## What's New
 
-MemoryX v3.0.0 is a major release that introduces comprehensive cognitive science models, completes the architecture restructuring, and adds production-grade reliability features.
+MemoryX v3.0.0 is a major release that introduces comprehensive cognitive science models, completes the architecture restructuring, and adds  reliability features.
 
 ### Cognitive Architecture (Phase 7)
 
@@ -26,7 +26,7 @@ MemoryX v3.0.0 is a major release that introduces comprehensive cognitive scienc
 - Root directory cleanup — all modules properly namespaced
 - Architecture contract tests enforce quality gates
 
-### Production Hardening
+### Stability Improvements
 
 - ConsolidationScheduler with health checks, metrics, and exponential-backoff retry
 - Competitive benchmark suite (MemoryX vs Mem0/Letta/Zep)

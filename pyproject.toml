@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "memoryx"
 dynamic = ["version"]
-description = "Cognitive Memory Operating System - Production-grade long-term memory for AI agents"
+description = "Long-term memory system for AI agents with hybrid retrieval, cognitive models, and Hermes Agent integration"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"

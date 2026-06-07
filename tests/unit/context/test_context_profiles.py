@@ -9,4 +9,4 @@ def test_profiles_order():
 def test_profile_clamps_to_small_model():
     profile = get_context_profile("debug")
     clamped = clamp_profile_to_model_window(profile, 32000)
-    assert clamped.max_context_tokens <= int(32000 * 0.20)
+    assert clamped.max_context_tokens <= int(32000 * 0.08)
