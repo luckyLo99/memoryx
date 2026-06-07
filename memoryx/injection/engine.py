@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from memoryx.context import ContextAssemblyEngine
 from memoryx.routing import RoutePlan
+from memoryx.safety.llm_firewall import safety_preamble
 
 from .models import InjectedPrompt
 
@@ -36,6 +37,7 @@ class PromptInjectionEngine:
         rendered = bundle.rendered
         for middleware in self._middleware:
             rendered = middleware(rendered)
+        rendered = self._ensure_safety_contract(rendered)
         rendered = self._enforce_budget(rendered)
         return InjectedPrompt(
             rendered=rendered,
@@ -48,10 +50,16 @@ class PromptInjectionEngine:
         rendered = base_prompt
         for middleware in self._middleware:
             rendered = middleware(rendered)
+        rendered = self._ensure_safety_contract(rendered)
         if not rendered.endswith("\n"):
             rendered += "\n"
         rendered = self._enforce_budget(rendered)
         return InjectedPrompt(rendered=rendered, token_count=len(rendered.split()))
+
+    def _ensure_safety_contract(self, rendered: str) -> str:
+        if "MemoryX Safety Contract" in (rendered or ""):
+            return rendered
+        return safety_preamble() + "\n" + (rendered or "")
 
     def _enforce_budget(self, rendered: str) -> str:
         tokens = rendered.split()

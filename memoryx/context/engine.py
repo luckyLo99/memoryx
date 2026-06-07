@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import html
 import json
+import re
 from memoryx.retrieval import RetrievalResult
 from memoryx.routing import RoutePlan
+from memoryx.safety.llm_firewall import LLMFirewall, safety_preamble
 
 from .models import ContextBundle, ContextBudgetPolicy
 
@@ -58,21 +61,22 @@ def _compress_priority_key(result: RetrievalResult) -> tuple[int, float]:
 
 
 def _annotate_line(result: RetrievalResult, *, evidence: bool, source: bool, layer: bool) -> str:
-    """Add evidence/source/layer annotation to a memory line (24.5-B)."""
-    parts = [f"- ({result.memory_id}) {result.content}"]
-    tags = []
+    """Backward-compatible helper that now returns isolated memory data."""
+    metadata = {}
     if evidence:
-        ev = getattr(result, "evidence_level", None) or "unknown"
-        tags.append(f"evidence={ev}")
+        metadata["evidence"] = getattr(result, "evidence_level", None) or "unknown"
     if source:
-        stype = getattr(result, "source_type", None) or "unknown"
-        tags.append(f"source={stype}")
+        metadata["source"] = getattr(result, "source_type", None) or "unknown"
     if layer:
-        lyr = _resolve_layer_from_result(result) or "legacy"
-        tags.append(f"layer={lyr}")
-    if tags:
-        parts.append(" [" + " ".join(tags) + "]")
-    return "".join(parts)
+        metadata["layer"] = _resolve_layer_from_result(result) or "legacy"
+    annotation = " ".join(f"{key}={value}" for key, value in metadata.items())
+    content = str(getattr(result, "content", ""))
+    if annotation:
+        content = f"{annotation}\n{content}"
+    return LLMFirewall().wrap_untrusted_memory(
+        content,
+        memory_id=str(getattr(result, "memory_id", "")),
+    )
 
 
 def _resolve_layer_from_result(result: RetrievalResult) -> str:
@@ -101,6 +105,7 @@ class ContextAssemblyEngine:
     def __init__(self, max_token_budget: int = 1200, policy: ContextBudgetPolicy | None = None) -> None:
         self.max_token_budget = max_token_budget
         self.policy = policy or ContextBudgetPolicy.from_max_token_budget(max_token_budget)
+        self.firewall = LLMFirewall()
 
     def assemble(
         self,
@@ -124,24 +129,29 @@ class ContextAssemblyEngine:
             deduped = self._auto_page(deduped)
         grouped = self._group_memories_by_layer(deduped, progressive=progressive)
 
-        # Annotate lines if policy says so
-        if policy.evidence_annotation or policy.source_annotation or policy.layer_annotation:
-            annotated_grouped = {}
-            for key, lines in grouped.items():
-                annotated_grouped[key] = self._annotate_lines(
-                    deduped, lines, key,
-                    evidence=policy.evidence_annotation,
-                    source=policy.source_annotation,
-                    layer=policy.layer_annotation,
-                )
-            grouped = annotated_grouped
-
-        wc = working_context or []
-        oc = open_conflicts or []
+        wc = [
+            self._wrap_untrusted_text(
+                line,
+                record_id=f"working_context:{idx}",
+                source="memoryx.working_context",
+                kind="session_context",
+            )
+            for idx, line in enumerate(working_context or [])
+        ]
+        oc = [
+            self._wrap_untrusted_text(
+                line,
+                record_id=f"open_conflict:{idx}",
+                source="memoryx.conflict",
+                kind="session_context",
+            )
+            for idx, line in enumerate(open_conflicts or [])
+        ]
         warnings_lines = list(oc)
 
         # Build ordered sections with quota info
         section_specs: list[dict] = [
+            {"title": "MemoryX Safety Contract", "lines": [safety_preamble()], "quota": 9999, "hard": True, "key": "safety_contract"},
             {"title": "System Prompt", "lines": [system_prompt], "quota": 9999, "hard": False, "key": "system"},
             {"title": "SOUL", "lines": [soul_prompt], "quota": 9999, "hard": False, "key": "soul"},
             {"title": "Current Task", "lines": [current_task], "quota": 9999, "hard": False, "key": "task"},
@@ -154,7 +164,15 @@ class ContextAssemblyEngine:
             {"title": "User Preferences", "lines": grouped.get("user", []), "quota": policy.max_long_term, "hard": False, "key": "user"},
             {"title": "Lessons", "lines": grouped.get("lessons", []), "quota": policy.max_long_term, "hard": False, "key": "lessons"},
             {"title": "Relevant Episodes", "lines": grouped.get("episodic", []), "quota": policy.max_long_term, "hard": False, "key": "episodic"},
-            {"title": "Recent Conversation", "lines": recent_conversation, "quota": 9999, "hard": False, "key": "recent"},
+            {"title": "Recent Conversation", "lines": [
+                self._wrap_untrusted_text(
+                    line,
+                    record_id=f"recent:{idx}",
+                    source="memoryx.recent_conversation",
+                    kind="session_context",
+                )
+                for idx, line in enumerate(recent_conversation)
+            ], "quota": 9999, "hard": False, "key": "recent"},
         ]
 
         rendered, token_count, trunc_reason, budget_report, section_map = self._render_with_budget_policy(
@@ -281,8 +299,11 @@ class ContextAssemblyEngine:
         token_count = self._token_count(rendered)
         if token_count > max_tokens:
             trunc_reason = "global_overflow"
-            rendered = " ".join(rendered.split()[:max_tokens])
+            rendered = self._trim_parts_to_budget(parts, max_tokens)
             token_count = self._token_count(rendered)
+            if "<untrusted_" in rendered and not self._untrusted_blocks_are_balanced(rendered):
+                rendered = safety_preamble()
+                token_count = self._token_count(rendered)
 
         budget_report = {
             "max_tokens": max_tokens,
@@ -303,29 +324,36 @@ class ContextAssemblyEngine:
             total += cost
         return kept
 
-    def _annotate_lines(
-        self, results: list[RetrievalResult], lines: list[str], group_key: str,
-        *, evidence: bool, source: bool, layer: bool,
-    ) -> list[str]:
-        """Add evidence/source/layer tags to lines based on matching results."""
-        # Build lookup from content snippet to result
-        result_map: dict[str, RetrievalResult] = {}
-        for r in results:
-            snippet = r.content.strip()[:80].lower()
-            result_map[snippet] = r
+    def _trim_parts_to_budget(self, parts: list[str], max_tokens: int) -> str:
+        kept = list(parts)
+        while kept:
+            rendered = "\n".join(kept).strip() + "\n"
+            if self._token_count(rendered) <= max_tokens and self._untrusted_blocks_are_balanced(rendered):
+                return rendered
 
-        annotated: list[str] = []
-        for line in lines:
-            matched = None
-            for snippet, r in result_map.items():
-                if snippet in line.lower():
-                    matched = r
-                    break
-            if matched:
-                annotated.append(_annotate_line(matched, evidence=evidence, source=source, layer=layer))
+            remove_idx = None
+            for idx in range(len(kept) - 1, -1, -1):
+                part = kept[idx].strip()
+                if not part or (part.startswith("[") and part.endswith("]")):
+                    continue
+                remove_idx = idx
+                break
+            if remove_idx is None:
+                kept.pop()
             else:
-                annotated.append(line)
-        return annotated
+                kept.pop(remove_idx)
+
+        return safety_preamble()
+
+    @staticmethod
+    def _untrusted_blocks_are_balanced(text: str) -> bool:
+        tags = ("memory", "session_context", "tool_output", "artifact", "context")
+        for tag in tags:
+            opening = text.count(f"<untrusted_{tag}>")
+            closing = text.count(f"</untrusted_{tag}>")
+            if opening != closing:
+                return False
+        return True
 
     def _deduplicate(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
         seen: set[str] = set()
@@ -357,10 +385,7 @@ class ContextAssemblyEngine:
         }
         for result in ordered:
             layer = _resolve_layer_from_result(result)
-            if progressive:
-                line = f"- [{result.memory_id}] ({result.memory_type}, scope={result.scope}, layer={layer or 'legacy'}, score={result.final_score:.2f})"
-            else:
-                line = f"- ({result.memory_id}) {result.content}"
+            line = self._wrap_result(result, progressive=progressive)
 
             # Layer-based grouping
             if layer in ("policy", "guard"):
@@ -397,6 +422,59 @@ class ContextAssemblyEngine:
                     grouped["long_term"].append(line)
 
         return grouped
+
+    def _wrap_result(self, result: RetrievalResult, *, progressive: bool = False) -> str:
+        layer = _resolve_layer_from_result(result) or "legacy"
+        metadata = {
+            "memory_type": result.memory_type,
+            "scope": result.scope,
+            "layer": layer,
+            "score": round(float(result.final_score), 4),
+            "source_type": getattr(result, "source_type", "unknown"),
+            "verification_status": getattr(result, "verification_status", "unverified"),
+            "trust_score": round(float(getattr(result, "trust_score", 0.5)), 4),
+        }
+        if progressive:
+            content = (
+                f"memory_id={result.memory_id}; memory_type={result.memory_type}; "
+                f"scope={result.scope}; layer={layer}; score={result.final_score:.2f}"
+            )
+        else:
+            content = result.content
+        return self._wrap_untrusted_text(
+            content,
+            record_id=result.memory_id,
+            source="memoryx.retrieval",
+            kind="memory",
+            metadata=metadata,
+        )
+
+    def _wrap_untrusted_text(
+        self,
+        text: str,
+        *,
+        record_id: str | None,
+        source: str,
+        kind: str,
+        metadata: dict | None = None,
+    ) -> str:
+        if kind == "memory":
+            decision = self.firewall.inspect_memory_context_sync(text)
+            return self.firewall.wrap_untrusted_memory(
+                text,
+                memory_id=record_id,
+                risk_flags=decision.flags,
+            )
+        from memoryx.safety.context_isolation import wrap_untrusted_session_context
+
+        decision = self.firewall.inspect_memory_context_sync(text)
+        return wrap_untrusted_session_context(
+            text,
+            record_id=record_id,
+            source=source,
+            risk_flags=decision.flags,
+            metadata=metadata or {},
+        )
 
     def _render_with_budget(self, sections: list[tuple[str, list[str]]]) -> tuple[str, int, bool, bool, dict[str, list[str]]]:
         used_summary_fallback = False
@@ -448,13 +526,51 @@ class ContextAssemblyEngine:
         token_limit = policy.summarize_token_limit_per_line if policy else 8
         summaries: list[str] = []
         for line in lines[:line_limit]:
+            if "<untrusted_" in line:
+                summaries.append(self._summarize_untrusted_line(line, token_limit=token_limit))
+                continue
             tokens = line.split()
             summaries.append(" ".join(tokens[:token_limit]))
+        if all("<untrusted_" in line for line in lines[:line_limit]):
+            return summaries
         return [f"- Summary: {' | '.join(summaries)}"]
 
+    def _summarize_untrusted_line(self, line: str, *, token_limit: int) -> str:
+        content_match = re.search(r"<content>\s*(.*?)\s*</content>", line, flags=re.S)
+        content = html.unescape(content_match.group(1).strip()) if content_match else ""
+        preview = " ".join(content.split()[:token_limit]) or "[omitted untrusted context due to budget]"
+        id_match = re.search(r'\bid="([^"]*)"', line)
+        memory_id = html.unescape(id_match.group(1)) if id_match else None
+        if "<untrusted_memory>" in line:
+            return self.firewall.wrap_untrusted_memory(
+                preview,
+                memory_id=memory_id,
+                risk_flags=["budget_summary"],
+            )
+        from memoryx.safety.context_isolation import wrap_untrusted_session_context
+
+        return wrap_untrusted_session_context(
+            preview,
+            record_id=memory_id,
+            source="memoryx.context_budget_summary",
+            risk_flags=["budget_summary"],
+        )
+
     def _trim_rendered(self, rendered: str) -> str:
-        tokens = rendered.split()
-        return " ".join(tokens[: self.max_token_budget])
+        lines = rendered.splitlines()
+        while lines and self._token_count("\n".join(lines) + "\n") > self.max_token_budget:
+            remove_idx = None
+            for idx in range(len(lines) - 1, -1, -1):
+                line = lines[idx].strip()
+                if not line or (line.startswith("[") and line.endswith("]")):
+                    continue
+                remove_idx = idx
+                break
+            if remove_idx is None:
+                lines.pop()
+            else:
+                lines.pop(remove_idx)
+        return "\n".join(lines).strip() + "\n"
 
     def _token_count(self, text: str) -> int:
         return len(text.split())

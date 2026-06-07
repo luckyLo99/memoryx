@@ -1,6 +1,9 @@
 from __future__ import annotations
+import hashlib
 from dataclasses import dataclass, asdict, field
 from typing import Any
+from memoryx.safety.llm_firewall import LLMFirewall, safety_preamble
+from memoryx.safety.context_isolation import wrap_untrusted_session_context
 from .policy import ContextBudgetPolicy
 from .tokens import TokenEstimator
 
@@ -23,7 +26,7 @@ class ContextPack:
 
 class ContextPacker:
     def __init__(self, policy: ContextBudgetPolicy | None = None, estimator: TokenEstimator | None = None):
-        self.policy = policy or ContextBudgetPolicy.from_env(); self.estimator = estimator or TokenEstimator()
+        self.policy = policy or ContextBudgetPolicy.from_env(); self.estimator = estimator or TokenEstimator(); self.firewall = LLMFirewall()
 
     def pack(self, *, request_id: str, session_id: str | None, query: str, items: list[ContextItem],
              mode: str = "standard", pack_id: str | None = None,
@@ -48,9 +51,21 @@ class ContextPacker:
             item_budget = min(self.policy.max_item_tokens, max(0, s_cap - used), max(0, remaining))
             if item_budget <= 8: dropped += 1; continue
             content = self.estimator.truncate_to_tokens(item.content, item_budget)
-            tc = self.estimator.estimate_text(content).estimated_tokens
+            decision = self.firewall.inspect_memory_context_sync(content)
+            render_content = self._render_item_for_prompt(item, content, decision.flags)
+            tc = self.estimator.estimate_text(render_content).estimated_tokens
             if tc > remaining: dropped += 1; continue
-            entry = {"id": item.item_id, "type": item.item_type, "content": content, "score": round(item.score, 4), "estimated_tokens": tc}
+            entry = {
+                "id": item.item_id,
+                "type": item.item_type,
+                "content": render_content,
+                "raw_preview": self.estimator.truncate_to_tokens(content, 16),
+                "content_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                "score": round(item.score, 4),
+                "estimated_tokens": tc,
+                "risk_flags": decision.flags,
+                "isolated": True,
+            }
             if item.metadata:
                 safe = {k: v for k, v in item.metadata.items() if k in {"claim_type", "status", "confidence", "source", "created_at", "updated_at", "summary_updated_at", "turn_count"}}
                 if safe: entry["metadata"] = safe
@@ -60,17 +75,20 @@ class ContextPacker:
         if dropped: warnings.append(f"dropped {dropped} items due to budget/scope/score limits")
         if repeated: warnings.append(f"omitted {repeated} repeated items from previous pack")
 
-        lines = ["# MemoryX Context Pack", "", "## Task Focus", query.strip()]
+        lines = ["# MemoryX Context Pack", "", safety_preamble(), "", "## Task Focus", query.strip()]
         if sections.get("session_summary"):
             lines.extend(["", "## Session Summary"])
-            for item in sections["session_summary"]: lines.append(f"- {item['content']}")
+            for item in sections["session_summary"]:
+                lines.append(item["content"])
         lines.extend(["", "## Relevant Memories"])
         if sections.get("relevant_memories"):
-            for item in sections["relevant_memories"]: lines.append(f"- ({item['score']:.4f}) {item['content']}")
+            for item in sections["relevant_memories"]:
+                lines.append(item["content"])
         else: lines.append("- No relevant memories selected within budget.")
         if sections.get("session_context"):
             lines.extend(["", "## Session Context"])
-            for item in sections["session_context"]: lines.append(f"- {item['content']}")
+            for item in sections["session_context"]:
+                lines.append(item["content"])
         if warnings:
             lines.extend(["", "## Warnings"])
             for w in warnings: lines.append(f"- {w}")
@@ -79,3 +97,19 @@ class ContextPacker:
         return ContextPack("memoryx.context_pack.v1", request_id, session_id, query, max_tokens, used,
                            included, dropped + repeated, sections, warnings, text,
                            mode=mode, pack_id=pack_id, diff={"previous_repeated_count": repeated, "omitted_repeated_item_ids": omitted_repeated})
+
+    def _render_item_for_prompt(self, item: ContextItem, content: str, risk_flags: list[str]) -> str:
+        if item.section == "relevant_memories":
+            return self.firewall.wrap_untrusted_memory(
+                content,
+                memory_id=item.item_id,
+                risk_flags=risk_flags,
+            )
+        source = "memoryx.session_summary" if item.section == "session_summary" else "memoryx.session_context"
+        return wrap_untrusted_session_context(
+            content,
+            record_id=item.item_id,
+            source=source,
+            risk_flags=risk_flags,
+            metadata={"score": round(item.score, 4), "type": item.item_type},
+        )
