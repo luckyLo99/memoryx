@@ -44,7 +44,7 @@ jobs:
           python --version
           pip list 2>/dev/null || true
           echo "--- specific deps ---"
-          pip list 2>/dev/null | grep -iE 'aiohttp|pydantic|structlog|mcp|lancedb' || true'
+          pip list 2>/dev/null | grep -iE 'aiohttp|pydantic|structlog|mcp|lancedb' || true
 
       - name: Install package
         run: |

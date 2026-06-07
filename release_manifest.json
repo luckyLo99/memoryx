@@ -9,45 +9,100 @@
     "status_short": "A  .env.example.lite\nM  .github/workflows/memoryx-release-gate.yml\nM  .gitignore\nM  memoryx/cognitive/persona.py\nA  memoryx/dev/__init__.py\nA  memoryx/dev/check_release_truth.py\nM  memoryx/feishu/bot_service.py\nM  memoryx/migration/engine.py\nA  memoryx/runtime/__init__.py\nA  memoryx/runtime/__pycache__/__init__.cpython-314.pyc\nA  memoryx/runtime/__pycache__/event_bus.cpython-314.pyc\nA  memoryx/runtime/__pycache__/events.cpython-314.pyc\nA  memoryx/runtime/__pycache__/orchestrator.cpython-314.pyc\nA  memoryx/runtime/event_bus.py\nA  memoryx/runtime/events.py\nA  memoryx/runtime/orchestrator.py\nM  memoryx/storage/bank.py\nM  memoryx/storage/seed.py\nM  pyproject.toml\nM  release_manifest.json\nM  scripts/verify_memoryx.py\nM  tests/unit/context/test_context_budget_contract.py\nA  tests/unit/runtime/__init__.py\nA  tests/unit/runtime/test_app_factory_lifespan.py\nA  tests/unit/runtime/test_conversation_log_contract.py\nA  tests/unit/runtime/test_hermes_bridge_contract.py\nA  tests/unit/runtime/test_hook.py\nA  tests/unit/runtime/test_hook_contract_hardening.py\nA  tests/unit/runtime/test_lifecycle_contract.py\nA  tests/unit/runtime/test_llm_firewall.py\nA  tests/unit/runtime/test_metrics_contract.py\nA  tests/unit/runtime/test_migration_quality.py\nA  tests/unit/runtime/test_orchestrator.py\nA  tests/unit/runtime/test_p11_routes_lazy_dependencies.py\nA  tests/unit/runtime/test_run_guard.py\nA  tests/unit/runtime/test_runtime_command_runner.py\nA  tests/unit/runtime/test_runtime_context_truncate.py\nA  tests/unit/runtime/test_runtime_prompt_assembler.py\nA  tests/unit/runtime/test_runtime_replay_contract.py\nA  tests/unit/runtime/test_runtime_task_guard.py\nA  tests/unit/runtime/test_runtime_transcript_store.py"
   },
   "files": {
-    "pyproject.toml": {
-      "path": "pyproject.toml",
-      "bytes": 2434,
-      "sha256": "4e78a1121d8da92882fb672e5b37985ee0248ee384fd46a4d537dbd3277ff067"
+    ".env.example.lite": {
+      "path": ".env.example.lite",
+      "bytes": 379,
+      "sha256": "f7e8dc496417b9d7b9844ad64d57c557edfb91891df1d21afa11897163dd89b6"
     },
-    "README.md": {
-      "path": "README.md",
-      "bytes": 3884,
-      "sha256": "890e9209c9c28874b3157bdf2b1b4162b8df3b06856543b82feb430ee890df39"
+    ".gitignore": {
+      "path": ".gitignore",
+      "bytes": 1342,
+      "sha256": "4b4b1b5befc640b68aa84c68420dc99e5ebef3dd7ffcd3cc86d13dd65857102a"
     },
     "CHANGELOG.md": {
       "path": "CHANGELOG.md",
       "bytes": 5589,
       "sha256": "aa53682268cf0e5fe195d8396967b70de14c056f135bdb7825040d8186c20c8a"
     },
+    "README.md": {
+      "path": "README.md",
+      "bytes": 3763,
+      "sha256": "4d2123dc55ce13531503dbaa27e78b30b25b790a0ea0f2bf5ec90d4b42c250b3"
+    },
     "VERSION": {
       "path": "VERSION",
       "bytes": 5,
       "sha256": "c9163ff21f1f2b0390dc48bdda47179718f772f507a7cebceca59ce1a7129029"
     },
-    ".env.example.lite": {
-      "path": ".env.example.lite",
-      "bytes": 392,
-      "sha256": "6ee0f31d71b1495ac7c612b4f9c8ec657ca750355e1c99d3bc6d8bb7d9da47b5"
+    "memoryx/cognitive/persona.py": {
+      "path": "memoryx/cognitive/persona.py",
+      "bytes": 3271,
+      "sha256": "daaf6503b7864e42c77cd1d151a9a79331185c6cbafdc1ea88f799d48a7261b3"
     },
     "memoryx/dev/__init__.py": {
       "path": "memoryx/dev/__init__.py",
-      "bytes": 39,
-      "sha256": "f6432c3222fc4acea2b99cc0b4612700018fce8b382853e19e7a338c153b7f46"
+      "bytes": 38,
+      "sha256": "237b6fe15ed60fe91104e6ceb5c3f07d5585bf60fd834c7ec6fd0f31cd1b60fe"
     },
     "memoryx/dev/check_release_truth.py": {
       "path": "memoryx/dev/check_release_truth.py",
-      "bytes": 1542,
-      "sha256": "8529e2ce89532d2fab82a60e05c48f531a27c6a52e7ad5c8f589b82a2537bec0"
+      "bytes": 1499,
+      "sha256": "8676acc9473f75d395f8470fc6c2df2a0bd664df72ff718a9c53842aa9e65a0c"
+    },
+    "memoryx/feishu/bot_service.py": {
+      "path": "memoryx/feishu/bot_service.py",
+      "bytes": 21360,
+      "sha256": "90e6764386ccd6aacc04751836e871b9168b7b2c287859a576e16d4e18ced5c4"
+    },
+    "memoryx/migration/engine.py": {
+      "path": "memoryx/migration/engine.py",
+      "bytes": 5409,
+      "sha256": "c87c5b72f215847154d830f774cc75b54566b809f5fcbf9a9082bfd68c09a403"
     },
     "memoryx/runtime/__init__.py": {
       "path": "memoryx/runtime/__init__.py",
-      "bytes": 444,
-      "sha256": "a15262d27357801cc8047ed48b2bedb80f3c03697a4424ea46c3588b03c07fa1"
+      "bytes": 435,
+      "sha256": "f4a795f1cac752c6d4bf82e8cf85f9c750b7a1a12e771c02e91348785ea718cf"
+    },
+    "memoryx/runtime/event_bus.py": {
+      "path": "memoryx/runtime/event_bus.py",
+      "bytes": 1724,
+      "sha256": "118fd46c9a0684001fc5ad1796011f3153c53a738d66ccb53d57f2d32f87fb4c"
+    },
+    "memoryx/runtime/events.py": {
+      "path": "memoryx/runtime/events.py",
+      "bytes": 1708,
+      "sha256": "3b65856d299bcde95d9f425d70f677874eea4ae9c342f47ccb1d1fcfd0ec7600"
+    },
+    "memoryx/runtime/orchestrator.py": {
+      "path": "memoryx/runtime/orchestrator.py",
+      "bytes": 5891,
+      "sha256": "9d019c8ce36c72819d7220ac5c925977c8b524b1e840e0061d3330d7aa1802f8"
+    },
+    "memoryx/storage/bank.py": {
+      "path": "memoryx/storage/bank.py",
+      "bytes": 2569,
+      "sha256": "ec417c89ebc586ada1432fb76a3cd4b3cf0ec665506726277ea95c0efc857af8"
+    },
+    "memoryx/storage/seed.py": {
+      "path": "memoryx/storage/seed.py",
+      "bytes": 3040,
+      "sha256": "123984a509ef80768659bf27ddd976ddaf38bbeced0ebd806fd40f30b49280fd"
+    },
+    "pyproject.toml": {
+      "path": "pyproject.toml",
+      "bytes": 2434,
+      "sha256": "4e78a1121d8da92882fb672e5b37985ee0248ee384fd46a4d537dbd3277ff067"
+    },
+    "scripts/verify_memoryx.py": {
+      "path": "scripts/verify_memoryx.py",
+      "bytes": 7715,
+      "sha256": "d502fd136de0609a30a3ccc1ea7a11d63d5c43f7b0b9c239fe8e6b09a4fb581b"
+    },
+    "tests/unit/context/test_context_budget_contract.py": {
+      "path": "tests/unit/context/test_context_budget_contract.py",
+      "bytes": 16798,
+      "sha256": "2e5dd817a994247a2b9a4bb941a0b1ae0d7879e9fcb79f2bbe60a9b2cfc15999"
     }
   },
   "dist": [
