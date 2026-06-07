@@ -22,3 +22,6 @@ __all__ = [
     "PropagationResult", "ReflectionFinding", "ReflectionRepairPlanner", "SessionTaskTracker",
     "TaskDuration", "TaskDurationEngine",
 ]
+
+from .ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome, SpacedRepetitionScheduler
+from .working_memory import BaddeleyWorkingMemory, CentralExecutive, ModalityType, PhonologicalLoop, WorkingMemoryState

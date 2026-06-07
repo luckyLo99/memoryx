@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass, field
+from memoryx.cognitive.ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome
+
 from datetime import datetime, timezone
 from typing import Any, Literal
 
@@ -90,6 +92,27 @@ def decay_multiplier(
         max_multiplier,
     )
 
+
+def ebbinghaus_decay_multiplier(
+    importance: float = 0.5,
+    retrieval_count: int = 0,
+    last_accessed_at: str | None = None,
+    updated_at: str | None = None,
+    min_mult: float = 0.20,
+    max_mult: float = 1.15,
+) -> float:
+    # Ebbinghaus-forgetting-curve decay multiplier
+    if last_accessed_at is None and updated_at is None:
+        return 1.0
+    strength = EbbinghausForgettingCurve.initial_strength(importance)
+    strength.retrieval_count = max(0, retrieval_count)
+    if retrieval_count > 0:
+        for _ in range(retrieval_count):
+            strength = EbbinghausForgettingCurve.update_after_retrieval(
+                strength, RetrievalOutcome.GOOD,
+                strength.last_accessed_at + 1.0,
+            )
+    return EbbinghausForgettingCurve.decay_multiplier(strength, min_mult, max_mult)
 
 def status_penalty(status: str) -> float:
     return {

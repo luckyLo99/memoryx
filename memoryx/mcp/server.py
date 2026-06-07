@@ -1,25 +1,30 @@
+"""MCP server - exposes MemoryX as MCP native tools.
+Compatible with Claude Code, Gemini CLI, and other MCP clients.
 """
-MCP 服务器 — 将 memoryx 暴露为 MCP 原生工具。
 
-兼容 Claude Code、Gemini CLI 等 MCP 客户端。
-"""
 from __future__ import annotations
 
-import json
 from typing import Any
-
-from memoryx.api import MemoryQueryAPI
 
 
 class MCPServer:
-    """轻量 MCP 服务器，暴露 memoryx 工具。"""
-    def __init__(self, api, embedding_manager=None, *, allow_embedding_fallback: bool = False) -> None:
+    """Lightweight MCP server exposing memoryx tools."""
+
+    def __init__(
+        self,
+        api,
+        embedding_manager=None,
+        *,
+        allow_embedding_fallback: bool = False,
+        candidate_service=None,
+    ) -> None:
         self.api = api
         self.embedding_manager = embedding_manager
         self.allow_embedding_fallback = allow_embedding_fallback
+        self._candidate_service = candidate_service
         self._tools: dict[str, dict] = {}
 
-        # P8: instrument MCP tools for observability
+        # instrument MCP tools for observability
         try:
             from memoryx.mcp.observed import instrument_mcp_server
             instrument_mcp_server(
@@ -30,38 +35,30 @@ class MCPServer:
             pass
 
     async def _query_vector(self, query: str) -> list[float]:
-        """Generate query vector using embedding_manager if available.
-
-        Falls back to empty vector when no embedding_manager is configured.
-        Controlled by allow_embedding_fallback flag.
-        """
         if self.embedding_manager is not None:
             try:
                 return await self.embedding_manager.embed_text(query)
             except Exception:
                 pass
-        # strict: require_embeddings=False, allow_fts_fallback=True
         return []
 
     def list_tools(self) -> list[dict]:
-        """返回 MCP 工具列表。"""
         return [
             {
                 "name": "memoryx_search",
-                "description": "搜索结构化长期记忆",
+                "description": "Search structured long-term memory",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "搜索查询"},
+                        "query": {"type": "string"},
                         "limit": {"type": "integer", "default": 5},
-                        "tag_filter": {"type": "array", "items": {"type": "string"}, "description": "标签过滤"},
                     },
                     "required": ["query"],
                 },
             },
             {
                 "name": "memoryx_conversation_search",
-                "description": "搜索原始对话历史",
+                "description": "Search raw conversation history",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -74,7 +71,7 @@ class MCPServer:
             },
             {
                 "name": "memoryx_reflect",
-                "description": "跨记忆 LLM 合成推理",
+                "description": "Cross-memory LLM synthesis reasoning",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -86,7 +83,7 @@ class MCPServer:
             },
             {
                 "name": "memoryx_feedback",
-                "description": "为记忆提供纠正反馈",
+                "description": "Provide feedback for a memory",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -98,7 +95,7 @@ class MCPServer:
             },
             {
                 "name": "memoryx_store",
-                "description": "手动存储一条记忆",
+                "description": "Store a memory",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -112,7 +109,6 @@ class MCPServer:
         ]
 
     async def handle_call(self, tool_name: str, arguments: dict) -> Any:
-        """处理 MCP 工具调用。"""
         if tool_name == "memoryx_search":
             query = arguments["query"]
             query_vector = await self._query_vector(query)
@@ -131,21 +127,39 @@ class MCPServer:
         elif tool_name == "memoryx_reflect":
             query = arguments["query"]
             query_vector = await self._query_vector(query)
-            result = await self.api.reflect_synthesis(
+            return await self.api.reflect_synthesis(
                 query=query,
                 query_vector=query_vector,
                 limit=arguments.get("limit", 10),
             )
-            return result
         elif tool_name == "memoryx_feedback":
             return await self.api.feedback(
                 memory_id=arguments["memory_id"],
                 positive=arguments["positive"],
             )
         elif tool_name == "memoryx_store":
-            return {"memory_id": await self.api.store(
-                content=arguments["content"],
-                memory_type=arguments.get("memory_type", "FACT"),
-                scope=arguments.get("scope", "global"),
-            )}
+            cs = getattr(self, "_candidate_service", None)
+            if cs is not None:
+                from memoryx.services.memory_candidate_service import (
+                    CandidateDecision,
+                    EvidenceLevel,
+                    MemoryCandidateRequest,
+                )
+                req = MemoryCandidateRequest(
+                    content=arguments["content"],
+                    memory_type=arguments.get("memory_type", "FACT"),
+                    scope=arguments.get("scope", "global"),
+                    source_event_id="mcp_memoryx_store",
+                    evidence_level=EvidenceLevel.E3_TOOL_OR_TEST_SUPPORTED,
+                    decision=CandidateDecision.AUTO_PROMOTE,
+                )
+                result = await cs.submit_candidate(req)
+                return {"memory_id": result.memory_id} if result else {"error": "candidate submission failed"}
+            return {
+                "memory_id": await self.api.store(
+                    content=arguments["content"],
+                    memory_type=arguments.get("memory_type", "FACT"),
+                    scope=arguments.get("scope", "global"),
+                )
+            }
         return {"error": f"Unknown tool: {tool_name}"}

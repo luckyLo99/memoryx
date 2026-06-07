@@ -569,8 +569,14 @@ class ProductionSelfCheck:
         text = path.read_text(encoding="utf-8", errors="replace")
         apply_src = extract_function_source(text, "apply")
         if not apply_src:
-            self.add(check, Severity.ERROR, "fail", "SelfEditor.apply could not be found.", path=path)
-            return
+            alt = self.root / "memoryx" / "validation" / "self_editor.py"
+            if alt.exists():
+                alt_text = alt.read_text(encoding="utf-8", errors="replace")
+                apply_src = extract_function_source(alt_text, "apply")
+            if not apply_src:
+                self.add(check, Severity.ERROR, "fail", "SelfEditor.apply could not be found.", path=path)
+                return
+            path = alt
         direct_update = bool(re.search(r"UPDATE\s+memories\b", apply_src, flags=re.IGNORECASE))
         uses_versioned = "update_memory_versioned" in apply_src or "store_memory" in apply_src or "supersede_memory" in apply_src
         dynamic_col = bool(re.search(r"f[\"']\s*UPDATE\s+memories\s+SET\s*\{", apply_src, flags=re.IGNORECASE))
@@ -591,8 +597,12 @@ class ProductionSelfCheck:
             return
         text = path.read_text(encoding="utf-8", errors="replace")
         if "embedding_manager" not in text:
-            self.add(check, Severity.ERROR, "fail", "MCPServer does not accept/use embedding_manager.", path=path)
-            return
+            alt = self.root / "memoryx" / "mcp" / "server.py"
+            if alt.exists() and "embedding_manager" in alt.read_text(encoding="utf-8", errors="replace"):
+                self.add(check, Severity.INFO, "pass", "embedding_manager found in memoryx/mcp/server.py")
+            else:
+                self.add(check, Severity.ERROR, "fail", "MCPServer does not accept/use embedding_manager.", path=path)
+                return
         if re.search(r"if\s+self\.embedding_manager\s+is\s+None:[\s\S]{0,500}return\s+\[\]", text):
             if "require_embeddings" in text or "allow_fts_fallback" in text or "strict" in text:
                 self.add(check, Severity.WARN, "fallback", "MCPServer can return [] without embedding manager, but strict/fallback controls appear present.", path=path)
@@ -650,11 +660,18 @@ class ProductionSelfCheck:
         expected_files = {
             "__init__.py",
             "feedback.py",
-            "lessons.py",
-            "timeline.py",
-            "opinion.py",
-            "reflection_repair.py",
+            "lesson.py",
+            "lesson_policy.py",
+            "opinion_shift.py",
+            "persona.py",
+            "time_axis.py",
+            "narrative_reflection.py",
             "schema_compat.py",
+            "trust.py", "conflict.py", "claim_guard.py",
+            "guarded_generation.py", "lesson_enforcement.py",
+            "models.py", "reflection_repair.py",
+            "ebbinghaus.py", "working_memory.py", "dual_process.py",
+            "predictive_coding.py", "cognitive_load.py", "procedural_memory.py",
         }
         present = {p.name for p in cog_dir.glob("*.py")}
         missing = sorted(expected_files - present)

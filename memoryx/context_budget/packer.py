@@ -13,7 +13,13 @@ class ContextPack:
     schema: str; request_id: str; session_id: str | None; query: str; max_tokens: int; used_tokens: int
     included_items: int; dropped_items: int; sections: dict[str, list[dict[str, Any]]]; warnings: list[str]; text: str
     mode: str = "standard"; pack_id: str | None = None; diff: dict[str, Any] = field(default_factory=dict)
-    def to_dict(self) -> dict[str, Any]: return asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["cache_layout"] = {
+            "omitted_repeated_item_ids": getattr(self, '_omitted_repeated_item_ids', []),
+            "previous_repeated_count": getattr(self, '_previous_repeated_count', 0),
+        }
+        return d
 
 class ContextPacker:
     def __init__(self, policy: ContextBudgetPolicy | None = None, estimator: TokenEstimator | None = None):

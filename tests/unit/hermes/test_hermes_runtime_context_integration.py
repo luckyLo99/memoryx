@@ -25,7 +25,7 @@ def test_hermes_runtime_context_blocks_large_outputs(tmp_path):
     result = runtime.run_command(
         task_id=task_id,
         request_id=request_id,
-        command="python3 -c \"print('Y' * 300000)\"",
+        command="python -c \"print('Y' * 300000)\"",
         cwd=str(tmp_path),
     )
     assert result["prompt_safe"] is True
@@ -50,7 +50,7 @@ def test_hermes_runtime_context_rejects_stale(tmp_path):
     result = runtime.run_command(
         task_id="task",
         request_id="old",
-        command="python3 -c 'print(1)'",
+        command="python -c 'print(1)'",
         cwd=str(tmp_path),
     )
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 import uuid
 from typing import Any
-from memoryx.core.hybrid_retriever import HybridRetriever
-from memoryx.core.types import SearchOptions
+from memoryx.retrieval import HybridRetriever
+from memoryx.retrieval import SearchOptions
 from memoryx.embeddings.vector_store import NullVectorProvider
 from .diff import ContextPackHistory
 from .packer import ContextItem, ContextPacker

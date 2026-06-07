@@ -4,9 +4,9 @@ import asyncio
 from typing import Any
 
 from memoryx.context_budget import BudgetedContextAssembler
-from memoryx.core import HermesAdapter, MemoryKernel
-from memoryx.core.hybrid_retriever import HybridRetriever
-from memoryx.core.types import SearchOptions
+from memoryx.mcp._compat import HermesAdapter, MemoryKernel
+from memoryx.retrieval import HybridRetriever
+from memoryx.retrieval import SearchOptions
 from memoryx.embeddings.vector_store import NullVectorProvider
 from .session import current_mcp_session
 

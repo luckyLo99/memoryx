@@ -1,4 +1,5 @@
 from __future__ import annotations
+from memoryx.cognitive.ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome, SpacedRepetitionScheduler
 
 import hashlib
 from collections import defaultdict
@@ -85,3 +86,53 @@ class ConsolidationEngine:
                 await self.repository.supersede_memory(duplicate["memory_id"], primary["memory_id"])
                 merged += 1
         return merged
+
+    async def spaced_repetition_review(self, memory_id, outcome, importance=0.5):
+        memory = await self.repository.get_memory(memory_id) if hasattr(self.repository, 'get_memory') else None
+        if not memory:
+            return
+        raw = memory.get('ebbinghaus_data', {})
+        if isinstance(raw, str):
+            try: raw = json.loads(raw)
+            except: raw = {}
+        strength = MemoryStrength.from_dict(raw) if raw else EbbinghausForgettingCurve.initial_strength(importance)
+        try:
+            outcome_enum = RetrievalOutcome(outcome)
+        except ValueError:
+            outcome_enum = RetrievalOutcome.GOOD
+        strength = EbbinghausForgettingCurve.update_after_retrieval(strength, outcome_enum)
+        ebbinghaus_data = strength.to_dict()
+        meta_raw = memory.get('metadata_json', '{}')
+        if isinstance(meta_raw, str):
+            try: meta = json.loads(meta_raw)
+            except: meta = {}
+        else: meta = meta_raw
+        meta['ebbinghaus'] = ebbinghaus_data
+        await self.repository.db.execute(
+            'UPDATE memories SET metadata_json = ?, access_count = access_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            (json.dumps(meta), memory_id)
+        )
+
+    async def process_due_reviews(self, max_items=50):
+        try:
+            memories = await self.repository.list_active_memories(limit=max_items * 3)
+            strengths = []
+            for m in memories:
+                raw = m.get('ebbinghaus_data', {})
+                if isinstance(raw, str):
+                    try: raw = json.loads(raw)
+                    except: raw = {}
+                s = MemoryStrength.from_dict(raw) if raw else None
+                if s:
+                    mid = m.get('memory_id') or m.get('id')
+                    if mid:
+                        strengths.append((mid, s))
+            due = SpacedRepetitionScheduler.batch_due_memories(strengths, max_items=max_items)
+            processed = 0
+            for mid, _ in due:
+                await self.spaced_repetition_review(mid, 'good', importance=0.5)
+                processed += 1
+            return processed
+        except Exception:
+            return 0
+

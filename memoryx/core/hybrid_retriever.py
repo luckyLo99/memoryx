@@ -9,12 +9,20 @@ from .types import RetrievalResult, SearchOptions
 from memoryx.embeddings.vector_store import NullVectorProvider, VectorProvider
 
 class HybridRetriever:
-    def __init__(self, db_path: str, vector_provider: VectorProvider | None = None):
+    def __init__(
+        self, db_path: str,
+        vector_provider: VectorProvider | None = None,
+        *,
+        engine: Any = None,
+    ):
         self.db_path = db_path
         self.vector_provider = vector_provider or NullVectorProvider()
         self.lite_retriever = Retriever(db_path)
+        self._engine = engine
 
     def search(self, query: str, limit: int = 10, options: SearchOptions | None = None) -> list[RetrievalResult]:
+        if self._engine is not None:
+            return self._engine_search(query, limit, options)
         opts = options or SearchOptions(limit=limit, mode="auto")
 
         if opts.mode == "lite" or (opts.mode == "auto" and not self.vector_provider.available):
@@ -27,6 +35,34 @@ class HybridRetriever:
             return self._vector_only_search(query, limit, opts)
 
         return self.lite_retriever.search(query, limit=limit, options=opts)
+
+    def _engine_search(self, query: str, limit: int, options: SearchOptions | None) -> list[RetrievalResult]:
+        """Delegate to HybridRetrievalEngine and adapt results."""
+        import asyncio
+        from memoryx.retrieval.models import RetrievalResult as NewResult
+        opts = options or SearchOptions(limit=limit)
+        explain = getattr(opts, "explain", False)
+        try:
+            results: list[NewResult] = asyncio.run(
+                self._engine.retrieve(
+                    query=query, query_vector=[], limit=limit, explain_scores=explain,
+                )
+            )
+        except Exception:
+            return self.lite_retriever.search(query, limit=limit, options=opts)
+        mapped: list[RetrievalResult] = []
+        for r in results:
+            label = "high" if r.final_score >= 0.7 else "medium" if r.final_score >= 0.4 else "low"
+            mapped.append(RetrievalResult(
+                claim_id=getattr(r, "memory_id", ""),
+                content=r.content,
+                claim_type=getattr(r, "memory_type", "FACT"),
+                status="active",
+                final_score=r.final_score,
+                confidence_label=label,
+                explanation={"delegated_to": "HybridRetrievalEngine"} if explain else {},
+            ))
+        return mapped[:limit]
 
     def _hybrid_search(self, query: str, limit: int, opts: SearchOptions) -> list[RetrievalResult]:
         fts_ids = self._fts_claim_ids(query, limit * 4, opts.include_inactive)
