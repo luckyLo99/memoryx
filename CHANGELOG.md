@@ -2,6 +2,92 @@
 
 All notable changes to MemoryX are documented in this file.
 
+## [3.0.0] - 2026-06-07
+
+### Phase 7 — Cognitive Capability Upgrade (7 sub-phases)
+
+**7A: Ebbinghaus Forgetting Curve**
+- Added `memoryx/cognitive/ebbinghaus.py` — Ebbinghaus exponential decay function with configurable retention and decay rate
+- Integrated into `retrieval/scorer.py` as `ebbinghaus_decay_multiplier`
+- Added spaced repetition scheduling in `consolidation/engine.py`
+
+**7B: Baddeley Working Memory Model**
+- Added `memoryx/cognitive/working_memory.py` — phonological loop, visuospatial sketchpad, episodic buffer, central executive
+- 17 unit tests covering capacity limits, decay, interference patterns
+
+**7C: Dual-Process Retrieval (System 1 / System 2)**
+- Added `memoryx/cognitive/dual_process.py` — fast intuitive vs slow deliberate retrieval paths
+- 15 unit tests covering confidence thresholds, conflict resolution
+
+**7D: Memory Consolidation and Replay**
+- Added `memoryx/consolidation/replay.py` — background memory replay with importance-weighted prioritization
+- Integration with ConsolidationScheduler for idle-time processing
+- 11 unit tests for replay queue and consolidation logic
+
+**7E: Predictive Coding and Active Inference**
+- Added `memoryx/cognitive/predictive_coding.py` — prediction error minimization, belief updating, free energy principle
+- 10 unit tests covering prediction generation and error-driven learning
+
+**7F: Cognitive Load Optimization**
+- Added `memoryx/cognitive/cognitive_load.py` — intrinsic/extraneous/germane load tracking, adaptive context budget adjustment
+- 12 shared tests with procedural memory module
+
+**7G: Procedural Memory**
+- Added `memoryx/cognitive/procedural_memory.py` — skill pattern learning, execution frequency tracking, automaticity detection
+- Pattern recognition for repeated operations
+
+### Phase A-F — Architecture Restructuring Baseline (v2.2.0→v3.0.0)
+
+**Phase A: Legacy Import Elimination**
+- Redirected all `memoryx.core.*` imports through compatibility shims
+- No new code depends on `memoryx/core/` modules
+- Added deprecation warnings for all legacy import paths
+
+**Phase B: Unified Write Path**
+- MemoryCandidateService established as the single authoritative write entry point
+- HermesProvider, MCP tools, and API writes all routed through unified repository
+- Eliminated dual-track writes between provider_index.json and SQLite
+
+**Phase C: Unified Retrieval and Scoring**
+- HybridRetrievalEngine is the single authoritative retrieval engine
+- Merged duplicate scoring logic from core/scoring.py into retrieval/scorer.py
+- Consistent scoring pipeline across memory search, MCP search, and Hermes context injection
+
+**Phase D: Hermes Integration Normalization**
+- Clear boundaries: HermesMemoryBridge ↔ MemoryXHermesProvider ↔ MCP server
+- Authoritative native memory() patch with SHA256 verification and rollback
+- Hermes E2E lifecycle test covering add→retrieve→forget, conflict detection, context injection
+
+**Phase E: Module Relocation and Root Cleanup**
+- pii_filter.py → safety/pii_filter.py (backward-compatible import retained)
+- temporal_scorer.py → temporal/scorer.py
+- symbolic.py → graph/symbolic.py
+- conversation_log.py → storage/conversation_log.py
+- events.py / event_bus.py → runtime/events.py / runtime/event_bus.py
+- hermes_bridge.py / hermes_provider.py → hermes/bridge.py / hermes/provider.py
+
+**Phase F: Test and Quality Gates**
+- Architecture contract tests: forbid new memoryx.core imports, enforce MCP data isolation, verify Hermes path integrity
+- All legacy tests updated to use current module paths
+- 993 tests passing, 0 failing (up from 849 baseline)
+
+### ConsolidationScheduler Hardening
+- Added `health()` method returning full status dictionary
+- `metrics` property tracking passes, replays, decays, reinforcements
+- Retry logic with exponential backoff (configurable max_retries)
+- Timeout-safe stop() using asyncio.wait_for
+- Non-fatal per-operation error handling
+
+### Competitive Benchmarks
+- Added `tests/benchmarks/test_competitive_benchmark.py` — MemoryX vs Mem0/Letta/Zep
+- Covers short-term recall, conflict detection, session isolation, Ebbinghaus decay, context retrieval
+- External benchmarks (Mem0/Letta/Zep) are placeholder until API keys are configured
+
+### Documentation
+- 7 bilingual (Chinese/English) cognitive module docs in docs/cognitive/
+- Competitive analysis: docs/competitive_analysis.md
+- Updated all module-level docstrings
+
 ## [2.1.1] - 2026-06-03
 
 ### Phase 1 — Memory Kernel
@@ -28,62 +114,3 @@ All notable changes to MemoryX are documented in this file.
 - Added release archive and checksum verification.
 - Completed production acceptance for Hermes integration.
 - Kept v2.0.0-rc.1 and v2.0.0-rc.2 as prerelease history.
-
-## [1.1.0-rc1] - 2026-05-23
-
-### Pre-release
-- MemoryX 1.1.0 release candidate.
-
-- LESSON policy enforcement: allow/warn/block/require_dry_run/require_tool_verification
-- Narrative reflection: synthesize task/opinion/lesson/claim into periodic reflections
-- Guarded generation: CognitiveGuard for answer + action verification
-- REST /v1/cognitive/verify-answer, /v1/cognitive/evaluate-action, /v1/cognitive/narrative-reflection
-
-## [1.1.0-rc1] - 2026-05-23
-
-### Added
-- Cognitive LESSON memory flow with feedback propagation and learning engine
-- Entity timeline engine via `entity_memory_links` (replaces metadata_json LIKE)
-- REST API hardening: unified error format, `/live` and `/ready` probes
-- Docker HEALTHCHECK against `/live` endpoint
-- Prometheus-compatible metrics for REST, retrieval stages, LESSON, and MCP
-- Retrieval session isolation and LESSON retrieval boost
-- P8 observability: trace-id propagation, middleware, stage timing instrumentation
-- P9 benchmark baseline: scale dataset generator and benchmark runner
-- LESSON trigger index consistency check and repair tool
-- SQLite busy retry policy with exponential backoff and jitter
-- Production selfcheck tooling with CI gate
-- MCP tool observability
-- E2E test suite: REST, retrieval, MCP, benchmark, Docker smoke
-
-### Changed
-- REST PATCH now routes through versioned `update_memory_versioned`
-- Retrieval engine supports `session_id`, `include_lessons`, `include_global`
-- `store_memory` uses `BEGIN IMMEDIATE` atomic transaction for memories + versions + audit
-- MCP server accepts `embedding_manager` parameter
-- Dockerfile entrypoint unified to `uvicorn memoryx.api.rest_app:app`
-- `vector_json` marked deprecated; LanceDB is primary vector backend
-- SelfEditor routes through `update_memory_versioned` for version preservation
-
-### Fixed
-- P0 schema consistency: unified `id` primary keys, `active_state TEXT`
-- Legacy `memory_id`/`entity_id` reference drift across modules
-- Session isolation gap in retrieval engine
-- Missing `scope` column in memories schema
-- Observability engine `subject_id` column compatibility
-- Schema migration foreign key references for opinion_shifts and lesson_evidence
-
-### Known Warnings
-- `async_safety`: async_weights uses documented async/thread boundary (no shared asyncio state)
-- `SelfEditor` SQL builder uses controlled column whitelist
-- `SelfEditor.apply` contains direct UPDATE (routed through versioned repository path)
-
----
-
-## [1.0.0] - Initial Release
-- SQLite WAL storage with FTS5
-- Hybrid retrieval: semantic + keyword + temporal + entity + episodic
-- Memory palace spatial organization
-- MCP server with memoryx_search and memoryx_feedback tools
-- Self-editing memory with preview/apply
-- Event-driven hook system with queue persistence

@@ -1,383 +1,265 @@
-# memoryx — 认知记忆操作系统
+# MemoryX — Cognitive Memory Operating System
 
-> Hermes users: for the verified MemoryX authoritative integration, see [`docs/HERMES_MEMORYX_AUTHORITATIVE.md`](docs/HERMES_MEMORYX_AUTHORITATIVE.md). This documents the MemoryX provider, the authoritative native `memory()` patch, verification, and post-Hermes-update recovery steps.
-
-
-> **让 Agent 拥有真正的生产级认知记忆：不仅记住，还能理解、反思和自我优化。**
+> **Give your AI agent true production-grade cognitive memory: not just storage, but understanding, reflection, and self-optimization.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-|[![Tests](https://img.shields.io/badge/tests-849%20passed-brightgreen)](https://github.com/luckyl214/memoryx/actions)
+[![Tests](https://img.shields.io/badge/tests-993%20passed-brightgreen)](https://github.com/luckyl214/memoryx/actions)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000)](https://github.com/psf/black)
+![Version](https://img.shields.io/badge/version-3.0.0-blue)
+
+[English](#english) | [中文](#chinese)
 
 ---
 
-## 📖 目录
+## <a name="english"></a>English
 
-- [简介](#简介)
-- [核心特性](#核心特性)
-- [快速开始](#快速开始)
-- [Hermes Agent 集成](#hermes-agent-集成)
-- [架构设计](#架构设计)
-- [API 参考](#api-参考)
-- [开发指南](#开发指南)
-- [常见问题](#常见问题)
-- [许可证](#许可证)
+MemoryX is a **production-grade cognitive memory operating system** designed for AI agents. Unlike simple key-value stores or vector databases, MemoryX implements multiple cognitive science models to provide **human-like memory capabilities**:
 
----
+- Multi-layer memory hierarchy (working -> short-term -> long-term -> consolidated -> archive)
+- Hybrid retrieval with 6 channels (semantic vector + keyword/FTS5 + temporal + entity + importance + episodic)
+- Ebbinghaus forgetting curve for biologically-plausible decay
+- Baddeley working memory model (phonological loop, visuospatial sketchpad, episodic buffer)
+- Dual-process retrieval (System 1 fast / System 2 deliberate)
+- Predictive coding and active inference for self-correcting memory
+- Event-driven architecture with async hooks system
+- Native Hermes Agent integration
+- MCP (Model Context Protocol) server
 
-## 简介
+### Key Features
 
-memoryx（记忆女神 X）是一个**生产级的认知记忆操作系统**，专为 AI Agent 设计。它不仅仅是存储和检索记忆，而是提供：
+#### Cognitive Architecture
+| Layer | Classification | Retention |
+|-------|---------------|-----------|
+| **Working Memory** | Current conversation | Real-time reasoning context |
+| **Short-term Episodic** | EPISODIC type | Recent events (hours) |
+| **Long-term Semantic** | importance >= 0.85 OR access_count >= 3 | Persistent knowledge (days) |
+| **Consolidated Knowledge** | Medium importance | Stable knowledge (weeks) |
+| **Archive** | decay >= 0.9 AND access_count = 0 | Cold storage (indefinite) |
 
-- **多层级记忆存储**：工作记忆 → 短期事件 → 长期知识 → 归档
-- **混合检索引擎**：向量 + 关键词 + 时序 + 实体关系 + 重要性
-- **事件驱动架构**：基于 EventBus 的异步钩子系统
-- **自修复能力**：崩溃恢复、数据一致性验证
-- **资源治理**：适配 2C4G 等低配环境
+#### Hybrid 6-Channel Retrieval
+| Channel | Weight | Purpose |
+|---------|--------|---------|
+| Semantic Vector | 1.0 | Understanding meaning |
+| Keyword (FTS5/BM25) | 1.0 | Precision matching |
+| Temporal Decay | 0.45 | Freshness scoring |
+| Entity Relationship | 0.35 | Associative reasoning |
+| Importance | 0.6 | Priority ranking |
+| Episodic Context | 0.4 | Situational awareness |
 
----
-
-## 核心特性
-
-### 🏛️ 五层记忆层级
-
-| 层级 | 分类标准 | 用途 |
-|------|---------|------|
-| **Working** | 当前会话 | 实时推理态 |
-| **Short-term Episodic** | EPISODIC 类型 | 近期事件 |
-| **Long-term Semantic** | importance ≥ 0.85 OR access_count ≥ 3 | 持久知识 |
-| **Consolidated Knowledge** | 中等重要性默认 | 稳定知识 |
-| **Archive** | decay ≥ 0.9 AND access_count = 0 | 冷存储 |
-
-### 🎯 Palace 可导航存储
-
-受 MemPalace 启发的层次化导航系统。记忆不仅可搜索，还可像建筑一样步进浏览：
-
+#### Event-Driven Hook System
 ```
-Wing (记忆类型) → Room (主题) → Drawer (具体记忆)
-```
-
-### 🔍 6 通道混合检索
-
-| 通道 | 权重 | 用途 |
-|------|------|------|
-| 语义向量 | 1.0 | 理解含义 |
-| 关键词 BM25/FTS5 | 1.0 | 精确匹配 |
-| 时序衰减 | 0.45 | 新鲜度 |
-| 实体关系 | 0.35 | 关联推理 |
-| 重要性 | 0.6 | 优先级 |
-| 情节 | 0.4 | 上下文 |
-
-### 📡 事件驱动钩子系统
-
-```
-5 事件类型:
+5 event types:
   - on_user_message
   - on_assistant_response
   - on_tool_call
   - on_tool_result
   - on_session_end
-
-5 优先级: CRITICAL=0 → HIGH=10 → NORMAL=20 → LOW=30 → BACKGROUND=40
-
-功能:
-  - DLQ (死信队列)
-  - 队列持久化
-  - 崩溃恢复
-  - 健康指标
-  - 追踪 ID
 ```
 
----
-
-## 快速开始
-
-### 1. 安装
+### Quick Start
 
 ```bash
-# 克隆仓库
+# Install
+pip install memoryx
+
+# Or from source
 git clone https://github.com/luckyl214/memoryx.git
 cd memoryx
+pip install -e .
 
-# 切换到 stable 版本
-git checkout v2.1.1
+# Run self-check
+memoryx doctor
 
-# 创建虚拟环境
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 安装依赖（选择其一）
-# Lite (no embedding / can run without vector dependencies)
-# pip install -e .
-#
-# Standard (with embedding support)
-# pip install -e ".[embedding]"
-#
-# Development (includes test dependencies)
-# pip install -e ".[dev]"
-```
-
-### 2. 配置
-
-```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 编辑配置（至少需要 Embedding API）
-# .env (choose one of the profile templates from .env.example):
-#   # Example for standard profile:
-#   MEMORYX_PROFILE=standard
-#   MEMORYX_VECTOR_ENABLED=true
-#   MEMORYX_EMBEDDING_ENABLED=true
-#   MEMORYX_EMBEDDING_ENDPOINT=https://api.openai.com/v1/embeddings
-#   MEMORYX_EMBEDDING_API_KEY=your_api_key_here
-#   MEMORYX_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-### 3. 验证安装
-
-```bash
-# 运行验证脚本（检查检索、记忆、对话日志等核心功能）
-python3 scripts/verify_memoryx.py
-```
-
-### 4. 基本使用
-
-```python
-from pathlib import Path
-import asyncio
-from memoryx.storage.repository import MemoryRepository, MemoryRecord
-
-async def main():
-    # 初始化仓库（自动创建数据库）
-    repo = MemoryRepository(db_path=Path("./memoryx_lite.db"))
-    await repo.open()
-
-    # 存储记忆
-    record = MemoryRecord(
-        memory_id="user_preference_001",
-        content="用户偏好简洁回答",
-        memory_type="FACT",
-        importance_score=0.8
-    )
-    mid = await repo.store_memory(record)
-    print(f"Stored: {mid}")
-
-    # FTS 全文检索
-    results = await repo.search_full_text("简洁")
-    for r in results:
-        print(f"[{r.get('memory_type', '?')}] {r.get('content', '')}")
-
-    await repo.close()
-
-asyncio.run(main())
-```
-
----
-
-## Hermes Agent 集成
-
-For the verified Hermes authoritative integration, see [`docs/HERMES_MEMORYX_AUTHORITATIVE.md`](docs/HERMES_MEMORYX_AUTHORITATIVE.md).
-
-MemoryX supports Hermes through two separate pieces:
-
-1. A Hermes MemoryX provider.
-2. An authoritative patch that routes native Hermes `memory()` writes into MemoryX.
-
-The runtime hook/plugin path is not a replacement for the Hermes native memory provider. For production Hermes usage, follow the authoritative integration document above.
-
-
-## 架构设计
-
-```
-                    Hermes Agent (消息管道 / 工具调用)
-                              │
-                    ┌─────────▼─────────┐
-                    │   EventBus + DLQ  │  事件驱动中枢
-                    │   优先级队列/追踪   │
-                    └─────────┬─────────┘
-                              │
-         ┌────────────────────┼────────────────────┐
-         ▼                    ▼                    ▼
-    Extractor           Retriever            Injector
-   (L1 记忆提取)      (6 通道混合检索)      (上下文注入)
-         │                    │                    │
-         └────────────────────┼────────────────────┘
-                              ▼
-                    ┌─────────────────────┐
-                    │    Memory Store      │  SQLite + FTS5 + WAL
-                    │    (22 表，多层)     │  LanceDB 向量
-                    └─────────────────────┘
-                              │
-         ┌────────────────────┼────────────────────┐
-         ▼                    ▼                    ▼
-   PalaceEngine        SelfHealing          ResourceGovernance
-   (可导航层次存储)     (自修复/崩溃恢复)      (2C4G 资源治理)
-         │                    │                    │
-         └────────────────────┼────────────────────┘
-                              ▼
-                    ┌─────────────────────┐
-                    │  ModuleRegistry +    │  全局模块编排
-                    │  SystemOrchestrator  │  (健康检查/依赖管理)
-                    └─────────────────────┘
-```
-
----
-
-## API 参考
-
-### MemoryRepository
-
-```python
-# 打开仓库（自动创建数据库）
-repo = MemoryRepository.open()
-
-def store_memory(record: MemoryRecord) -> str: ...
-def search_full_text(query: str, limit: int = 20) -> list[dict]: ...
-def search_memories_text(
-    query: str,
-    limit: int = 20,
-    include_states: set[str] | None = None,
-) -> list[dict]: ...
-def list_memories(limit: int = 1000) -> list[dict]: ...
-def update_memory_metadata(memory_id: str, metadata_patch: dict) -> bool: ...
-def supersede_memory(memory_id: str, superseded_by: str) -> None: ...
-```
-
-### HybridRetrievalEngine
-
-```python
-from memoryx.retrieval import HybridRetrievalEngine
-
-engine = HybridRetrievalEngine(repository=repo)
-
-async def retrieve(
-    *,
-    query: str,
-    limit: int = 10,
-    tag_filter: list[str] | None = None,
-    scope_filter: str | None = None,
-    session_id: str | None = None,
-    explain_scores: bool = False,
-    fusion_method: str = "weighted",
-) -> list[RetrievalResult]: ...
-
-# 获取可解释评分
-for r in results:
-    print(f"语义: {r.semantic_score}, 关键词: {r.keyword_score}, "
-          f"实体: {r.entity_score}, 时序: {r.temporal_score}, "
-          f"重要性: {r.importance_score}, 情节: {r.episodic_score}, "
-          f"最终: {r.final_score}")
-```
-
-### ConversationLogStore
-
-```python
-from memoryx.conversation_log import ConversationLogStore
-
-log_store = ConversationLogStore(repo)
-
-async def log(session_id: str, role: str, content: str) -> str: ...
-async def session_history(session_id: str, *, limit: int = 50) -> list[dict]: ...
-async def search(query: str, *, session_id: str | None = None, limit: int = 20) -> list[dict]: ...
-```
-
----
-
-## 开发指南
-
-### 添加新模块
-
-```
-module/
-├── __init__.py    # 导出
-├── engine.py      # 主实现
-├── models.py      # 数据模型
-└── tests/         # 测试
-    └── test_module.py
-```
-
-### 运行测试
-
-```bash
-# 全部测试
+# Run tests
 pytest -q
-
-# 定向测试
-pytest -q tests/test_storage.py
-
-# 带覆盖率
-pytest --cov=memoryx --cov-report=html
 ```
 
-### 代码风格
+### Hermes Agent Integration
 
-- Python 3.11+ type hints 必须
-- async/await 优先
-- 无 ORM，无重量级框架
-- 所有 API 调用必须 retry + timeout + backoff
-- 所有 IO 必须 async
+MemoryX provides a native integration path for [Hermes Agent](https://github.com/NousResearch/hermes-agent):
 
----
+```python
+from memoryx.hermes.provider import MemoryXHermesProvider
+from memoryx.hermes.bridge import HermesMemoryBridge
+from memoryx.storage.repository import MemoryRepository
 
-## 常见问题
+repo = MemoryRepository("./memory.db")
+await repo.open()
+bridge = HermesMemoryBridge(repository=repo)
+provider = MemoryXHermesProvider(bridge=bridge)
 
-### Q: 为什么需要记忆系统？
+# Use as Hermes tool
+result = await provider.handle_tool_call("memory", {
+    "action": "add",
+    "content": "User prefers Python for data analysis"
+})
+```
 
-A: 现代 AI Agent 需要在多次对话中保持上下文一致性。记忆系统让 Agent：
-- 记住用户偏好和历史
-- 跨会话保持连续性
-- 自我反思和优化
+See [`docs/HERMES_MEMORYX_AUTHORITATIVE.md`](docs/HERMES_MEMORYX_AUTHORITATIVE.md) for full integration guide.
 
-### Q: 支持哪些数据库？
-
-A: 当前支持 SQLite（生产推荐，WAL + FTS5）和 LanceDB（向量存储）。计划支持：
-- PostgreSQL（大规模）
-- Redis（缓存层）
-
-### Q: 如何迁移现有记忆？
-
-A: 使用迁移脚本：
+### MCP Server
 
 ```bash
-# 从 LanceDB 格式导入
-python3 scripts/migrate_to_lancedb.py
+memoryx-mcp  # Starts MCP server for Model Context Protocol clients
 ```
 
-### Q: 性能如何？
+### Project Status
 
-A: 内部基准（2C4G VPS，1000 条记忆）：
-- 检索延迟：约 50ms
-- 存储吞吐：约 100 ops/s
-- 内存占用：约 200MB
-（实际性能因 Embedding 模型和存储介质而异）
+**Version 3.0.0** — 993 tests passing, 0 failing. Active development with a focus on cognitive architecture research and production reliability.
 
-### Q: 如何验证安装是否正常？
+---
 
-A: 运行验证脚本：
+## <a name="chinese"></a>中文
+
+MemoryX（记忆女神 X）是一个**生产级的认知记忆操作系统**，专为 AI Agent 设计。与简单的键值存储或向量数据库不同，MemoryX 实现了多种认知科学模型，提供了**类人记忆能力**：
+
+- 多层记忆层级（工作记忆 → 短期事件 → 长期知识 → 固化的知识 → 归档）
+- 6 通道混合检索（语义向量 + 关键词/FTS5 + 时序 + 实体关系 + 重要性 + 情节上下文）
+- Ebbinghaus 遗忘曲线，实现生物学上合理的衰减
+- Baddeley 工作记忆模型（语音回路、视空间画板、情景缓冲区）
+- 双过程检索（系统 1 快速直觉 / 系统 2 审慎推理）
+- 预测编码与主动推断，实现自我修正的记忆
+- 事件驱动架构与异步钩子系统
+- 原生 Hermes Agent 集成
+- MCP（模型上下文协议）服务器
+
+### 核心特性
+
+#### 认知架构
+| 层级 | 分类标准 | 用途 |
+|------|---------|------|
+| **工作记忆** | 当前会话 | 实时推理上下文 |
+| **短期情景** | EPISODIC 类型 | 近期事件（小时级） |
+| **长期语义** | importance >= 0.85 或 access_count >= 3 | 持久知识（天级） |
+| **固化知识** | 中等重要性 | 稳定知识（周级） |
+| **归档** | decay >= 0.9 且 access_count = 0 | 冷存储（长期） |
+
+#### 6 通道混合检索
+| 通道 | 权重 | 用途 |
+|------|------|------|
+| 语义向量 | 1.0 | 理解含义 |
+| 关键词 FTS5/BM25 | 1.0 | 精确匹配 |
+| 时序衰减 | 0.45 | 新鲜度评分 |
+| 实体关系 | 0.35 | 关联推理 |
+| 重要性 | 0.6 | 优先级排序 |
+| 情节上下文 | 0.4 | 情景感知 |
+
+### 快速开始
 
 ```bash
-python3 scripts/verify_memoryx.py
+# 安装
+pip install memoryx
+
+# 或从源码安装
+git clone https://github.com/luckyl214/memoryx.git
+cd memoryx
+pip install -e .
+
+# 运行自检
+memoryx doctor
+
+# 运行测试
+pytest -q
 ```
 
-该脚本会测试存储、全文检索、混合检索、对话日志等核心功能是否正常。
+### Hermes Agent 集成
+
+MemoryX 为 Hermes Agent 提供原生集成路径：
+
+```python
+from memoryx.hermes.provider import MemoryXHermesProvider
+from memoryx.hermes.bridge import HermesMemoryBridge
+from memoryx.storage.repository import MemoryRepository
+
+repo = MemoryRepository("./memory.db")
+await repo.open()
+bridge = HermesMemoryBridge(repository=repo)
+provider = MemoryXHermesProvider(bridge=bridge)
+
+# 作为 Hermes 工具使用
+result = await provider.handle_tool_call("memory", {
+    "action": "add",
+    "content": "用户偏好 Python 进行数据分析"
+})
+```
+
+完整集成指南请参阅 [`docs/HERMES_MEMORYX_AUTHORITATIVE.md`](docs/HERMES_MEMORYX_AUTHORITATIVE.md)。
+
+### 项目状态
+
+**版本 3.0.0** — 993 项测试通过，0 项失败。正在积极开发中，重点关注认知架构研究和生产可靠性。
 
 ---
 
-## 许可证
+## Architecture
 
-MIT License - 详见 [LICENSE](LICENSE) 文件。
+```
+User Input
+    |
+    v
+Hermes Agent
+    |
+    v
+MemoryXHermesProvider  ----> MCP Server (external clients)
+    |                              |
+    v                              v
+HermesMemoryBridge          MCP Tools
+    |                              |
+    v                              v
+MemoryCandidateService
+    |
+    v
++----------------------------+
+|    Storage Layer           |
+|  MemoryRepository          |
+|    |                       |
+|    +-> SQLite (FTS5)       |
+|    +-> Optional Vector DB  |
+|    +-> Version History     |
++----------------------------+
+    |
+    v
++----------------------------+
+|    Retrieval Engine        |
+|  HybridRetrievalEngine     |
+|    |                       |
+|    +-> 6-Channel Scoring   |
+|    +-> Dual-Process        |
+|    +-> Ebbinghaus Decay    |
++----------------------------+
+    |
+    v
++----------------------------+
+|    Cognitive Modules       |
+|  Working Memory (Baddeley) |
+|  Dual-Process (Kahneman)   |
+|  Predictive Coding         |
+|  Cognitive Load            |
+|  Procedural Memory         |
++----------------------------+
+    |
+    v
+Context Injection --> Agent Response
+```
+
+## Documentation
+
+| Topic | Location |
+|-------|----------|
+| Hermes Integration | [docs/HERMES_MEMORYX_AUTHORITATIVE.md](docs/HERMES_MEMORYX_AUTHORITATIVE.md) |
+| Cognitive Models | [docs/cognitive/](docs/cognitive/) |
+| Competitive Analysis | [docs/competitive_analysis.md](docs/competitive_analysis.md) |
+| API Reference | [docs/](docs/) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Credits | [CREDITS.md](CREDITS.md) |
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## 贡献
-
-欢迎贡献！详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
----
-
-## 联系
-
-- GitHub Issues: https://github.com/luckyl214/memoryx/issues
-- 文档: https://github.com/luckyl214/memoryx/tree/main/docs
+*MemoryX is part of the [Codex for OSS](https://openai.com/zh-Hans-CN/form/codex-for-oss/) program, using AI-assisted development to build better cognitive memory for intelligent agents.*

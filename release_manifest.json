@@ -1,33 +1,33 @@
 {
   "project": "memoryx",
-  "version": "2.1.1",
+  "version": "3.0.0",
   "python": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",
   "git": {
-    "commit": "01305ece27a6a181b23ef984444a14d6749f390e",
+    "commit": "f87bf807026c98838c9cde38e0016ea42af8f6a4",
     "branch": "memoryx-2-kernel",
-    "status_short": "M integrations/hermes/scripts/patch_hermes_memory_tool.py\n M memoryx/cognitive/__init__.py\n M memoryx/consolidation/__init__.py\n M memoryx/consolidation/engine.py\n M memoryx/context_budget/assembler.py\n M memoryx/context_budget/packer.py\n M memoryx/core/hybrid_retriever.py\n M memoryx/mcp/adapter.py\n M memoryx/mcp/server.py\n M memoryx/retrieval/__init__.py\n M memoryx/retrieval/scorer.py\n M release_manifest.json\n M tests/unit/context/test_context_cache_integration.py\n M tests/unit/hermes/test_hermes_runtime_context_integration.py\n M tests/unit/misc/test_phase14_e2e_harness.py\n M tools/memoryx_production_selfcheck.py\n?? _bm_content.py\n?? _bm_part1.py\n?? _bm_test2.py\n?? _build_benchmark.py\n?? _gen_benchmark.py\n?? _test_gen.py\n?? _test_gen2.py\n?? docs/cognitive/\n?? docs/competitive_analysis.md\n?? memoryx/cognitive/cognitive_load.py\n?? memoryx/cognitive/dual_process.py\n?? memoryx/cognitive/ebbinghaus.py\n?? memoryx/cognitive/predictive_coding.py\n?? memoryx/cognitive/procedural_memory.py\n?? memoryx/cognitive/working_memory.py\n?? memoryx/consolidation/replay.py\n?? memoryx/mcp/_compat.py\n?? tests/benchmarks/\n?? tests/integration/test_hermes_lifecycle_e2e.py\n?? tests/unit/architecture/\n?? tests/unit/cognitive/test_cognitive_load_and_procedural.py\n?? tests/unit/cognitive/test_dual_process.py\n?? tests/unit/cognitive/test_ebbinghaus.py\n?? tests/unit/cognitive/test_predictive_coding.py\n?? tests/unit/cognitive/test_working_memory.py\n?? tests/unit/consolidation/"
+    "status_short": "M AGENT_RULES.md\n M CHANGELOG.md\n M CITATION.cff\n M CONTRIBUTING.md\n M CREDITS.md\n M README.md\n M RELEASE_NOTES.md\n M SUPPORT.md\n M VERSION\n M pyproject.toml\n M release_manifest.json\n M tests/unit/misc/test_version_contract.py\n M tests/unit/storage/test_auto_upgrade.py\n?? _pyproject_base.py\n?? _pyproject_deps.py\n?? _readme_debug.txt\n?? _readme_head.txt\n?? _readme_preview.txt"
   },
   "files": {
     "pyproject.toml": {
       "path": "pyproject.toml",
-      "bytes": 1894,
-      "sha256": "a8ada94561c3abcac61fd7088667b88202b93c4b08eb4af8894fda771de4e785"
+      "bytes": 2353,
+      "sha256": "616a79aa32e1192db134bda7c5de839f38ff2fe95858d0b55c00045ab1eb4079"
     },
     "README.md": {
       "path": "README.md",
-      "bytes": 11545,
-      "sha256": "b036f6984a748428ad544972077b94008551da9cc11c5c30fe747786b101cc8a"
+      "bytes": 8586,
+      "sha256": "ef6fbd4f8099ab989cf986ce52d47dbc9a15104d525fd71ba534ab48876b2925"
     },
     "CHANGELOG.md": {
       "path": "CHANGELOG.md",
-      "bytes": 4025,
-      "sha256": "fac31ef96abe9bf56294caa2ab092e67ab5180a4fd17f7023111426fa1c78eba"
+      "bytes": 5589,
+      "sha256": "aa53682268cf0e5fe195d8396967b70de14c056f135bdb7825040d8186c20c8a"
     },
     "VERSION": {
       "path": "VERSION",
-      "bytes": 7,
-      "sha256": "f9526c4a14038a3be9cc4c4aab6502bb785311e05a08117768244fe5c9183816"
+      "bytes": 5,
+      "sha256": "c9163ff21f1f2b0390dc48bdda47179718f772f507a7cebceca59ce1a7129029"
     }
   },
   "dist": []

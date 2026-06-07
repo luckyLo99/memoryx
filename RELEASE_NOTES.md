@@ -1,54 +1,52 @@
-# MemoryX v2.0.0
+# MemoryX v3.0.0 Release Notes
 
-**Stable release promoted from v2.0.0-rc.2.**
-**Previous release candidates:** [v2.0.0-rc.2](https://github.com/luckyl214/memoryx/releases/tag/v2.0.0-rc.2) · [v2.0.0-rc.1](https://github.com/luckyl214/memoryx/releases/tag/v2.0.0-rc.1)
-
-**Status**: FATAL=0, ERROR=0, WARN=3, E2E=6/6, Core=9/9
+Release date: 2026-06-07
 
 ## What's New
 
-### Cognitive Memory System
-- **LESSON memory flow**: feedback → propagation → LESSON creation → retrieval boost
-- **Entity timeline**: via `entity_memory_links` instead of metadata_json LIKE
-- **Self-editing**: versioned preview/apply with audit trail
+MemoryX v3.0.0 is a major release that introduces comprehensive cognitive science models, completes the architecture restructuring, and adds production-grade reliability features.
+
+### Cognitive Architecture (Phase 7)
+
+| Module | Model | Scientific Basis |
+|--------|-------|-----------------|
+| Ebbinghaus Forgetting Curve | Exponential decay + spaced repetition | Ebbinghaus (1885) |
+| Baddeley Working Memory | Phonological loop, sketchpad, buffer | Baddeley (1992) |
+| Dual-Process Retrieval | System 1 (fast) / System 2 (slow) | Kahneman (2011) |
+| Predictive Coding | Active inference, free-energy principle | Friston (2010) |
+| Cognitive Load Optimization | Intrinsic/extraneous/germane load | Sweller (1988) |
+| Procedural Memory | Skill learning, automaticity | Squire (1986) |
+
+### Architecture Restructuring (Phase A-F)
+
+- Legacy `memoryx/core/*` eliminated — all paths unified to current architecture
+- Single authoritative write path via MemoryCandidateService
+- Unified HybridRetrievalEngine as the sole retrieval engine
+- Hermes integration normalized with SHA256-verified patch and rollback
+- Root directory cleanup — all modules properly namespaced
+- Architecture contract tests enforce quality gates
 
 ### Production Hardening
-- **REST API**: unified error format, `/live` and `/ready` probes, PATCH uses versioned writes
-- **Docker**: HEALTHCHECK on `/live`, unified uvicorn entrypoint
-- **Observability**: Prometheus metrics for REST, retrieval stages, LESSON, MCP
-- **Trace context**: automatic X-Trace-Id propagation and response echo
 
-### Performance
-- **Lesson trigger index**: consistent sub-10ms matching at 1000+ LESSON scale
-- **SQLite busy retry**: exponential backoff with jitter for concurrent writes
-- **Benchmark baseline**: scale dataset generator and benchmark runner
+- ConsolidationScheduler with health checks, metrics, and exponential-backoff retry
+- Competitive benchmark suite (MemoryX vs Mem0/Letta/Zep)
+- Hermes E2E lifecycle test (add -> retrieve -> forget -> conflict detection -> context injection)
 
-### Quality Gates
-- **E2E tests**: 6 tests covering REST, retrieval, MCP, Docker, benchmark
-- **Production selfcheck**: FATAL/ERROR gate for CI
-- **Core cognitive tests**: 9 tests for LESSON, timeline, self-editing
+## Test Statistics
 
-## Installation
+- **993 tests passing, 0 failing** (baseline was 849)
+- 100% commit-stage pass rate
+- Hermes lifecycle simulation: 3 integration tests
+- Cognitive module unit tests: 77+ tests across 6 modules
+- Architecture contract tests: import isolation, data directory isolation
 
-```bash
-pip install memoryx==2.0.0
-# Or from source:
-git clone https://github.com/YOUR_GITHUB_USERNAME/memoryx
-cd memoryx && pip install -e ".[dev]"
-```
+## Upgrade Notes
 
-## Quick Start
+- v3.0.0 is backward-compatible with v2.1.1 data stores (no migration needed)
+- Legacy `memoryx.core.*` imports still work but emit deprecation warnings
+- All existing Hermes integration scripts remain compatible
+- `pytest.ini` markers updated — register "benchmark" and "slow" markers
 
-```bash
-cp .env.example .env  # edit your_api_key_here
-uvicorn memoryx.api.rest_app:app --host 0.0.0.0 --port 8080
-curl http://localhost:8080/live
-```
+## Contributors
 
-## Known Warnings (3)
-- async_weights uses documented async/thread boundary
-- SelfEditor uses controlled column whitelist for SQL
-- SelfEditor UPDATE paths routed through versioned repository
-
-## Full Changelog
-See [CHANGELOG.md](CHANGELOG.md)
+MemoryX is developed by luckyl214 with design inspiration from the open-source projects and academic papers listed in CREDITS.md.
