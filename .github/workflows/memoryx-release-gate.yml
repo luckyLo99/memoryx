@@ -61,7 +61,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest -q \
+          python -m pytest --tb=short \
             --ignore=memoryx-pure-release \
             --ignore=tools \
             --ignore=scripts/test_siliconflow_embedding.py
