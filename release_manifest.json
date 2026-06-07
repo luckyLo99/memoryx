@@ -4,9 +4,9 @@
   "python": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",
   "git": {
-    "commit": "f87bf807026c98838c9cde38e0016ea42af8f6a4",
+    "commit": "368455696d68a6256caedd981c34f0140a5f8666",
     "branch": "memoryx-2-kernel",
-    "status_short": "M AGENT_RULES.md\n M CHANGELOG.md\n M CITATION.cff\n M CONTRIBUTING.md\n M CREDITS.md\n M README.md\n M RELEASE_NOTES.md\n M SUPPORT.md\n M VERSION\n M pyproject.toml\n M release_manifest.json\n M tests/unit/misc/test_version_contract.py\n M tests/unit/storage/test_auto_upgrade.py\n?? _pyproject_base.py\n?? _pyproject_deps.py\n?? _readme_debug.txt\n?? _readme_head.txt\n?? _readme_preview.txt"
+    "status_short": "M .gitattributes\n M README.md\n M memoryx/cognitive/ebbinghaus.py\n M memoryx/retrieval/scorer.py\n M release_manifest.json\n M tests/unit/api/__init__.py\n M tests/unit/cognitive/__init__.py\n M tests/unit/context/__init__.py\n M tests/unit/embeddings/__init__.py\n M tests/unit/episodic/__init__.py\n M tests/unit/extraction/__init__.py\n M tests/unit/graph/__init__.py\n M tests/unit/hermes/__init__.py\n M tests/unit/mcp/__init__.py\n M tests/unit/memory/__init__.py\n M tests/unit/meta/__init__.py\n M tests/unit/misc/__init__.py\n M tests/unit/palace/__init__.py\n M tests/unit/release/__init__.py\n M tests/unit/retrieval/__init__.py\n M tests/unit/safety/__init__.py\n M tests/unit/storage/__init__.py\n M tests/unit/storage/test_schema_path_single_source.py\n M tests/unit/temporal/__init__.py\n M tests/unit/validation/__init__.py\n?? pytest-of-lucky/\n?? tmpauvr0pl7\n?? tmphnvblsyk"
   },
   "files": {
     "pyproject.toml": {
@@ -16,8 +16,8 @@
     },
     "README.md": {
       "path": "README.md",
-      "bytes": 8586,
-      "sha256": "ef6fbd4f8099ab989cf986ce52d47dbc9a15104d525fd71ba534ab48876b2925"
+      "bytes": 10801,
+      "sha256": "b3e4b339c9e6147152c05ca267d15783f19f4e3a24ebb7de70200cd1f43d7ad8"
     },
     "CHANGELOG.md": {
       "path": "CHANGELOG.md",

@@ -1,31 +1,27 @@
-# Auto detect text files and normalize line endings
-* text=auto
-
-# Python source
-*.py text diff=python
-
-# Markdown
-*.md text
-
-# YAML/JSON
-*.yml text
-*.yaml text
-*.json text
-
-# Shell scripts
+﻿*.py text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
 *.sh text eol=lf
-*.ps1 text eol=crlf
-
-# Batch files
-*.bat text eol=crlf
-
-# Git files
-.gitattributes text
-.gitignore text
-
-# Binary files - don't touch
+*.cff text eol=lf
+*.txt text eol=lf
+*.example text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+.gitignore text eol=lf
 *.png binary
 *.jpg binary
 *.ico binary
 *.db binary
+*.db-wal binary
+*.db-shm binary
 *.sqlite3 binary
+*.parquet binary
+*.tar binary
+*.gz binary
+*.zip binary
+* text=auto
