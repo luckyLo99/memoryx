@@ -2,6 +2,15 @@
 
 All notable changes to MemoryX are documented in this file.
 
+## [3.0.1] - 2026-06-07
+
+### Security and Release Completion
+- Hardened context isolation so retrieved memory, tool output, artifacts, and runtime context are rendered as untrusted data blocks.
+- Added adversarial tests proving malicious retrieved memories do not become executable instructions.
+- Improved semantic compression with deterministic clustering, conservative archive decisions, and source-memory provenance.
+- Added compression audit coverage for source IDs, checksums, rollback metadata, and archive decisions.
+- Published this patch release from the current hardening commit because the existing `v3.0.0` tag predates the final safety hardening changes.
+
 ## [3.0.0] - 2026-06-07
 
 ### Phase 7 — Cognitive Capability Upgrade (7 sub-phases)

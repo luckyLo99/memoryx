@@ -1,6 +1,21 @@
-# MemoryX v3.0.0 Release Notes
+# MemoryX v3.0.1 Release Notes
 
 Release date: 2026-06-07
+
+## Security and Release Completion
+
+MemoryX v3.0.1 publishes the final context-isolation and compression hardening
+from the current release branch. The earlier `v3.0.0` tag existed before these
+last safety changes and did not have a GitHub Release entry, so this patch
+release is the canonical GitHub release for the completed v3 line.
+
+### Highlights
+
+- Strong untrusted-context rendering for retrieved memory, tool output, artifacts, and runtime context.
+- Adversarial tests that verify malicious memories stay data-only and cannot become instructions.
+- Deterministic semantic compression clustering with conservative archive gates.
+- Compression provenance that records source memory IDs, checksums, rollback metadata, and archive decisions.
+- GitHub Actions green for release gate, privacy guard, and security scans on the hardening commit.
 
 ## What's New
 
