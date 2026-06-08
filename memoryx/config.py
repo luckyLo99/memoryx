@@ -106,4 +106,4 @@ from pathlib import Path as _Path
 _REPO_ROOT = _Path(__file__).resolve().parents[1]
 REPO_ROOT = _REPO_ROOT
 SCHEMA_PATH = _REPO_ROOT / "memoryx" / "storage" / "sql" / "schema.sql"
-MIGRATIONS_DIR = _REPO_ROOT / "db" / "migrations"
+MIGRATIONS_DIR = _REPO_ROOT / "memoryx" / "storage" / "sql" / "migrations"
