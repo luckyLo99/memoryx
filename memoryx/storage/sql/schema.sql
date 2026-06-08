@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS memory_conflicts (
     FOREIGN KEY (conflicting_memory_id) REFERENCES memories(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_memory_conflicts_resolved_state ON memory_conflicts(resolved_state);
+
 CREATE TABLE IF NOT EXISTS archived_memories (
     id TEXT PRIMARY KEY,
     memory_id TEXT NOT NULL,
