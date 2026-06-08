@@ -45,6 +45,7 @@ class ConversationLogStore:
             """,
             (log_id, session_id, scope, int(turn_index), role, content, token_count, metadata_json),
         )
+
         return log_id
 
     async def log(self, session_id: str, role: str, content: str, **kwargs: Any) -> str:

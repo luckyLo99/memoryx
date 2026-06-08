@@ -354,9 +354,27 @@ CREATE TABLE IF NOT EXISTS conversation_logs (
 CREATE VIRTUAL TABLE IF NOT EXISTS conversation_logs_fts USING fts5(
     content,
     role,
+    content='conversation_logs',
     content_rowid='rowid',
     tokenize='unicode61'
 );
+
+CREATE TRIGGER IF NOT EXISTS conversation_logs_ai AFTER INSERT ON conversation_logs BEGIN
+    INSERT INTO conversation_logs_fts(rowid, content, role)
+    VALUES (new.rowid, new.content, new.role);
+END;
+
+CREATE TRIGGER IF NOT EXISTS conversation_logs_ad AFTER DELETE ON conversation_logs BEGIN
+    INSERT INTO conversation_logs_fts(conversation_logs_fts, rowid, content, role)
+    VALUES('delete', old.rowid, old.content, old.role);
+END;
+
+CREATE TRIGGER IF NOT EXISTS conversation_logs_au AFTER UPDATE ON conversation_logs BEGIN
+    INSERT INTO conversation_logs_fts(conversation_logs_fts, rowid, content, role)
+    VALUES('delete', old.rowid, old.content, old.role);
+    INSERT INTO conversation_logs_fts(rowid, content, role)
+    VALUES (new.rowid, new.content, new.role);
+END;
 
 CREATE INDEX IF NOT EXISTS idx_palace_wing_active
 ON palace_wings(active_state, name);
