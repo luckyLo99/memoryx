@@ -1,0 +1,79 @@
+{
+  "evidence_events": [
+    {
+      "evidence_id": "c606fb[REDACTED_PHONE]aa9d192ee83",
+      "source_type": "user_message",
+      "session_id": "e2e-session",
+      "agent_id": "memoryx-e2e-agent",
+      "user_id": "e2e-user",
+      "content": "For MCP e2e tests, always prefer concise structured responses.",
+      "content_hash": "4edb48bc9a13f761e6509f660b7fb8d5143fc[REDACTED_PHONE]f427d0720e1fe0fefa",
+      "metadata_json": "{\"source\": \"phase14_e2e\", \"event_id\": \"1c9b8d74-00f6-49ae-9322-7ee8130d40ea\", \"timestamp\": \"[REDACTED_PHONE]T07:51:[REDACTED_PHONE]+00:00\"}",
+      "created_at": "[REDACTED_PHONE]:51:26"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+      "claim_type": "preference",
+      "content": "For MCP e2e tests, always prefer concise structured responses.",
+      "status": "active",
+      "confidence": 0.65,
+      "importance": 0.65,
+      "valid_from": null,
+      "valid_to": null,
+      "created_at": "[REDACTED_PHONE]T07:51:[REDACTED_PHONE]+00:00",
+      "updated_at": "[REDACTED_PHONE]T07:51:[REDACTED_PHONE]+00:00",
+      "decay_score": 1.0,
+      "access_count": 2,
+      "last_accessed_at": "[REDACTED_PHONE]T07:51:[REDACTED_PHONE]+00:00",
+      "contradiction_group_id": null,
+      "superseded_by": null,
+      "source_evidence_ids": "c606fb[REDACTED_PHONE]aa9d192ee83",
+      "scope": "user",
+      "memory_type": "generic",
+      "summary": null,
+      "causal_score": 0.5
+    }
+  ],
+  "claim_versions": [
+    {
+      "version_id": "f571c[REDACTED_PHONE]e4c-0356f2874b1a",
+      "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+      "evidence_ids": "c606fb[REDACTED_PHONE]aa9d192ee83",
+      "operation": "create",
+      "before_json": "{}",
+      "after_json": "{\"claim_id\": \"28a66092-e77f-446f-adb3-d06d8a387daf\", \"claim_type\": \"preference\", \"content\": \"For MCP e2e tests, always prefer concise structured responses.\", \"status\": \"active\", \"confidence\": 0.65, \"importance\": 0.65, \"valid_from\": null, \"valid_to\": null, \"created_at\": \"[REDACTED_PHONE]T07:51:[REDACTED_PHONE]+00:00\", \"updated_at\": \"[REDACTED_PHONE]T07:51:[REDACTED_PHONE]+00:00\", \"decay_score\": 1.0, \"access_count\": 0, \"last_accessed_at\": null, \"contradiction_group_id\": null, \"superseded_by\": null, \"source_evidence_ids\": \"c606fb[REDACTED_PHONE]aa9d192ee83\", \"scope\": \"user\", \"memory_type\": \"generic\", \"summary\": null, \"causal_score\": 0.5}",
+      "reason": "create",
+      "created_at": "[REDACTED_PHONE]:51:26"
+    }
+  ],
+  "retrieval_events": [
+    {
+      "retrieval_id": "e499dab5-5ea1-4b94-a8a3-ce7a2d40dc06",
+      "query": "concise structured MCP e2e responses",
+      "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+      "rank": 1,
+      "final_score": 0.8762975840641466,
+      "confidence_label": "high",
+      "retriever": "lite",
+      "explanation_json": "{\"bm25_score\": -[REDACTED_PHONE]e-06, \"lexical_score\": [REDACTED_PHONE], \"vector_score\": null, \"recency_score\": [REDACTED_PHONE], \"importance_score\": 0.65, \"confidence_score\": 0.65, \"decay_multiplier\": [REDACTED_PHONE], \"access_boost\": 0.0, \"status_penalty\": 0.0, \"rrf_score\": null, \"graph_boost\": 0.0, \"causal_score\": 0.5, \"feedback_boost\": 0.0, \"final_score\": [REDACTED_PHONE]}",
+      "created_at": "[REDACTED_PHONE]:51:26"
+    },
+    {
+      "retrieval_id": "b9384e40-594b-45d1-878d-40a5620ec44b",
+      "query": "concise structured",
+      "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+      "rank": 1,
+      "final_score": 0.9072702253774809,
+      "confidence_label": "high",
+      "retriever": "lite",
+      "explanation_json": "{\"bm25_score\": -2e-06, \"lexical_score\": [REDACTED_PHONE], \"vector_score\": null, \"recency_score\": [REDACTED_PHONE], \"importance_score\": 0.65, \"confidence_score\": 0.65, \"decay_multiplier\": [REDACTED_PHONE], \"access_boost\": [REDACTED_PHONE], \"status_penalty\": 0.0, \"rrf_score\": null, \"graph_boost\": 0.0, \"causal_score\": 0.5, \"feedback_boost\": 0.0, \"final_score\": [REDACTED_PHONE]}",
+      "created_at": "[REDACTED_PHONE]:51:26"
+    }
+  ],
+  "claim_edges": [],
+  "memory_edges": [],
+  "memory_summaries": [],
+  "feedback_events": []
+}

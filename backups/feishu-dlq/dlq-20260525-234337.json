@@ -1,0 +1,66 @@
+[
+  {
+    "job_id": "5ffd7378efef42559e780631801488a2",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": null, \"message_id\": \"om_x100b6e09cce528acc4ef59f4f122a39\", \"text\": \"P14.4 shadow smoke 4：验证单卡片动态状态。请后台跑真 Hermes，但飞书只显示一张 MemoryX 卡片。\", \"receive_id_type\": \"chat_id\", \"job_id\": \"5ffd7378efef42559e780631801488a2\", \"trace_id\": \"om_x100b6e09\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 5, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'started_at'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e09cc853108b2202bb5f3f39ef\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779685414.7774246, \"created_at\": null, \"updated_at\": 1779685414.7877564}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779685415.7997758
+  },
+  {
+    "job_id": "cc80ec5db2ac4946bab1b3a73cba357b",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": null, \"message_id\": \"om_x100b6e09e768c0a0c36348ef0ead46c\", \"text\": \"需要，并根据我的情况分析需要增加哪些权限或者配置\", \"receive_id_type\": \"chat_id\", \"job_id\": \"cc80ec5db2ac4946bab1b3a73cba357b\", \"trace_id\": \"om_x100b6e09\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 7, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'started_at'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e09e70dceccb12f3a08568c0a1\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779686046.5887485, \"created_at\": null, \"updated_at\": 1779686046.594086}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779686047.6014454
+  },
+  {
+    "job_id": "17df96ee70ce42e09437cac48944bf6e",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": \"42a8b432\", \"message_id\": \"om_x100b6e0a4ba50c90c3cec48cf36d963\", \"text\": \"权限都弄好了\", \"receive_id_type\": \"chat_id\", \"job_id\": \"17df96ee70ce42e09437cac48944bf6e\", \"trace_id\": \"om_x100b6e0a\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 5, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'started_at'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e0a4b5570acb21fa9a2062d046\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779687515.3934948, \"created_at\": null, \"updated_at\": 1779687515.3991797}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779687516.4088879
+  },
+  {
+    "job_id": "224ef23287864cf4a161d996a3156103",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": \"42a8b432\", \"message_id\": \"om_x100b6e0a5988b880c42427d934ab640\", \"text\": \"需要\", \"receive_id_type\": \"chat_id\", \"job_id\": \"224ef23287864cf4a161d996a3156103\", \"trace_id\": \"om_x100b6e0a\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 5, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'started_at'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e0a5996a4b4b2c3607e61913c6\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779687799.3610187, \"created_at\": null, \"updated_at\": 1779687799.3772354}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779687800.385984
+  },
+  {
+    "job_id": "d33513c95c0d41d5b4708047c571f880",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": \"42a8b432\", \"message_id\": \"om_x100b6e0a523d14b0c25197343ea03cc\", \"text\": \"测试一下\", \"receive_id_type\": \"chat_id\", \"job_id\": \"d33513c95c0d41d5b4708047c571f880\", \"trace_id\": \"om_x100b6e0a\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 5, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'started_at'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e0a53c0d4b4b3c72a4264308f2\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779687890.9083173, \"created_at\": null, \"updated_at\": 1779687890.9134133}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779687891.92106
+  },
+  {
+    "job_id": "e5155299e8f642f9b8f528db54afb6b4",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": \"42a8b432\", \"message_id\": \"om_x100b6e0a9684acb0c266efe870e5181\", \"text\": \"P14.4 shadow smoke 5：验证 MemoryX 是飞书唯一输出 owner。只允许一张动态卡片，不允许 execute_code、import os、sqlite3、systemctl 等短消息。卡片应从已收到→正在处理→整理结果→已完成，最终只显示结果。\", \"receive_id_type\": \"chat_id\", \"job_id\": \"e5155299e8f642f9b8f528db54afb6b4\", \"trace_id\": \"om_x100b6e0a\", \"state\": \"running\", \"visible_state\": \"thinking\", \"phase\": \"prepare\", \"revision\": 4, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": null, \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779691127.9914887, \"created_at\": null, \"updated_at\": null, \"started_at\": null, \"ended_at\": null}",
+    "reason": "stale_running_max_attempts",
+    "attempts": 3,
+    "last_error": null,
+    "created_at": 1779691248.214133
+  },
+  {
+    "job_id": "169ebc256b8d45faaa58a86224d2279f",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": \"42a8b432\", \"message_id\": \"om_x100b6e0b5522fc90c452e748047afdb\", \"text\": \"你还记得昨天做了什么事吗\", \"receive_id_type\": \"chat_id\", \"job_id\": \"169ebc256b8d45faaa58a86224d2279f\", \"trace_id\": \"om_x100b6e0b\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 11, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'updated_at_display'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e0b52d04c80b298bfbef906413\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779691972.4933724, \"created_at\": null, \"updated_at\": 1779691972.4994702, \"started_at\": 1779691972.4993706, \"ended_at\": null}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779691973.5078888
+  },
+  {
+    "job_id": "cfea57deeb9744a3ad5d5bcf26cd1bfe",
+    "payload_json": "{\"chat_id\": \"oc_61a38f265bb24b9df24b2d6791e72fe6\", \"user_id\": \"42a8b432\", \"message_id\": \"om_x100b6e0b1f7144b0c455246fa2b4aa2\", \"text\": \"暂停，现在几点了\", \"receive_id_type\": \"chat_id\", \"job_id\": \"cfea57deeb9744a3ad5d5bcf26cd1bfe\", \"trace_id\": \"om_x100b6e0b\", \"state\": \"error\", \"visible_state\": \"error\", \"phase\": \"error\", \"revision\": 11, \"title\": \"Hermes · MemoryX\", \"context_summary\": \"\", \"answer\": \"\", \"error\": \"'FeishuRenderJob' object has no attribute 'updated_at_display'\", \"attachments\": [], \"tools\": [], \"memoryx_badges\": [\"MemoryX ✅\", \"Semantic ✅\", \"P13 ✅\"], \"card_message_id\": \"om_x100b6e0b1f3968bcb20b2ff2947223b\", \"metadata\": {}, \"priority\": 100, \"attempts\": 3, \"locked_at\": 1779692833.9215922, \"created_at\": null, \"updated_at\": 1779692833.935153, \"started_at\": 1779692833.9350264, \"ended_at\": null}",
+    "reason": "max_attempts_exceeded",
+    "attempts": 3,
+    "last_error": "",
+    "created_at": 1779692834.9566197
+  }
+]

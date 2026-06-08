@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+  "query_result_count": 1,
+  "retrieval_event_count": 32,
+  "artifacts": {
+    "debug": "phase14_artifacts/e2e_retrieval_debug.json",
+    "diagnostics": "phase14_artifacts/e2e_diagnostics.zip",
+    "profile_json": "phase14_artifacts/e2e_profile.json",
+    "profile_md": "phase14_artifacts/e2e_profile.md",
+    "quality_json": "phase14_artifacts/e2e_quality_report.json",
+    "quality_md": "phase14_artifacts/e2e_quality_report.md",
+    "quality_failures": "phase14_artifacts/e2e_quality_failures.jsonl",
+    "audit": "phase14_artifacts/e2e_audit_export.json",
+    "metrics": "phase14_artifacts/e2e_metrics.json"
+  },
+  "metrics": {
+    "counters": {},
+    "histograms": {},
+    "gauges": {}
+  },
+  "trace": {
+    "trace_id": "c5c8e5f60ec24addb8e18dad03e2d1a7",
+    "request_id": "e2e-request",
+    "run_id": "e2e-run",
+    "session_id": "e2e-session",
+    "agent_id": "memoryx-e2e-agent",
+    "user_id": "e2e-user"
+  }
+}

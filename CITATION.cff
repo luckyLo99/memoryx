@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: "MemoryX: Cognitive Memory Operating System for AI Agents"
+message: "If you use MemoryX in your research or project, please cite it."
+type: software
+authors:
+  - family-names: "luckyl214"
+    given-names: "lucky"
+    orcid: ""
+version: "3.0.0"
+date-released: "2026-06-07"
+license: MIT
+repository-code: "https://github.com/luckyl214/memoryx"
+abstract: "A cognitive memory operating system for AI agents, featuring Ebbinghaus forgetting curves, Baddeley working memory model, dual-process retrieval, semantic conflict detection, MCP server, and native Hermes Agent integration."
+keywords:
+  - "cognitive architecture"
+  - "agent memory"
+  - "AI memory"
+  - "hermes agent"
+  - "knowledge graph"

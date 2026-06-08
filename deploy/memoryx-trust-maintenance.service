@@ -1,0 +1,11 @@
+# === Template: replace __MEMORYX_HOME__ with the actual deployment path ===
+[Unit]
+Description=MemoryX Trust/Forgetting Maintenance
+After=memoryx-rest.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__MEMORYX_HOME__
+Environment=MEMORYX_DB_PATH=__MEMORYX_HOME__/data/memoryx.db
+EnvironmentFile=-__MEMORYX_HOME__/.env
+ExecStart=__MEMORYX_HOME__/.venv/bin/python tools/memoryx_forgetting_cycle.py

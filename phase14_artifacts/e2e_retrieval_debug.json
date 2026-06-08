@@ -1,0 +1,43 @@
+{
+  "query": "concise structured",
+  "raw_fts_candidates": [
+    {
+      "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+      "content": "For MCP e2e tests, always prefer concise structured responses.",
+      "status": "active",
+      "bm25_score": -2e-06
+    }
+  ],
+  "final_results": [
+    {
+      "claim_id": "28a66092-e77f-446f-adb3-d06d8a387daf",
+      "content": "For MCP e2e tests, always prefer concise structured responses.",
+      "claim_type": "preference",
+      "status": "active",
+      "final_score": 0.9072702253774809,
+      "confidence_label": "high",
+      "explanation": {
+        "bm25_score": -2e-06,
+        "lexical_score": 0.999998000004,
+        "vector_score": null,
+        "recency_score": 0.9999999963631166,
+        "importance_score": 0.65,
+        "confidence_score": 0.65,
+        "decay_multiplier": 1.1499999993199026,
+        "access_boost": 0.3366433967134441,
+        "status_penalty": 0.0,
+        "rrf_score": null,
+        "graph_boost": 0.0,
+        "causal_score": 0.5,
+        "feedback_boost": 0.0,
+        "final_score": 0.9072702253774809
+      }
+    }
+  ],
+  "rejected": [],
+  "diagnostics": {
+    "raw_count": 1,
+    "final_count": 1,
+    "rejected_count": 0
+  }
+}

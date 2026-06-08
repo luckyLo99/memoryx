@@ -1,0 +1,10 @@
+[Unit]
+Description=Run MemoryX trust/forgetting maintenance daily
+
+[Timer]
+OnCalendar=*-*-* 04:10:00
+Persistent=true
+Unit=memoryx-trust-maintenance.service
+
+[Install]
+WantedBy=timers.target

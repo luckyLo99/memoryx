@@ -1,0 +1,152 @@
+{
+  "total_cases": 6,
+  "passed_cases": 6,
+  "failed_cases": 0,
+  "quality_score": 0.8750000000000001,
+  "precision_at_5": 0.8333333333333334,
+  "recall_at_5": 0.8333333333333334,
+  "mrr_at_5": 0.8333333333333334,
+  "ndcg_at_5": 0.8333333333333334,
+  "abstention_accuracy": 1.0,
+  "update_accuracy": 1.0,
+  "conflict_accuracy": 1.0,
+  "results": [
+    {
+      "case_id": "ie_001",
+      "ability": "information_extraction",
+      "query": "concise",
+      "passed": true,
+      "should_abstain": false,
+      "did_abstain": false,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "forbidden_hit": false,
+      "retrieved": [
+        {
+          "claim_id": "680e4178-47f6-4efe-b829-7b4299b32174",
+          "content": "I prefer concise answers.",
+          "score": 0.8923995168500184,
+          "confidence": "high",
+          "status": "active"
+        }
+      ],
+      "failure_reasons": []
+    },
+    {
+      "case_id": "ms_001",
+      "ability": "multi_session_reasoning",
+      "query": "MemoryX",
+      "passed": true,
+      "should_abstain": false,
+      "did_abstain": false,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "forbidden_hit": false,
+      "retrieved": [
+        {
+          "claim_id": "5a92467f-c767-4794-a1a3-79eb14267ea8",
+          "content": "MemoryX should stay SQLite-first.",
+          "score": 0.8923995168543127,
+          "confidence": "high",
+          "status": "active"
+        },
+        {
+          "claim_id": "73ed4edd-d026-46b5-8eba-ca2718cb303a",
+          "content": "My project codename is MemoryX.",
+          "score": 0.8923995167847469,
+          "confidence": "high",
+          "status": "active"
+        }
+      ],
+      "failure_reasons": []
+    },
+    {
+      "case_id": "tr_001",
+      "ability": "temporal_reasoning",
+      "query": "lsof",
+      "passed": true,
+      "should_abstain": false,
+      "did_abstain": false,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "forbidden_hit": false,
+      "retrieved": [
+        {
+          "claim_id": "73387225-77eb-471e-9be5-a3dc5d55bc32",
+          "content": "On Tuesday we fixed deploy by checking lsof before start.",
+          "score": 0.8923995270508912,
+          "confidence": "high",
+          "status": "active"
+        }
+      ],
+      "failure_reasons": []
+    },
+    {
+      "case_id": "ku_001",
+      "ability": "knowledge_update",
+      "query": "Seattle",
+      "passed": true,
+      "should_abstain": false,
+      "did_abstain": false,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "forbidden_hit": false,
+      "retrieved": [
+        {
+          "claim_id": "778f632d-8c1a-4d06-b7fb-f55ac3c1fade",
+          "content": "I moved to Seattle.",
+          "score": 0.9084995168427442,
+          "confidence": "high",
+          "status": "active"
+        }
+      ],
+      "failure_reasons": []
+    },
+    {
+      "case_id": "abs_001",
+      "ability": "abstention",
+      "query": "passport",
+      "passed": true,
+      "should_abstain": true,
+      "did_abstain": true,
+      "precision_at_5": 0.0,
+      "recall_at_5": 0.0,
+      "mrr_at_5": 0.0,
+      "ndcg_at_5": 0.0,
+      "forbidden_hit": false,
+      "retrieved": [],
+      "failure_reasons": []
+    },
+    {
+      "case_id": "conf_001",
+      "ability": "conflict_resolution",
+      "query": "concise",
+      "passed": true,
+      "should_abstain": false,
+      "did_abstain": false,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "forbidden_hit": false,
+      "retrieved": [
+        {
+          "claim_id": "ebfc253e-f290-4f65-afe0-0deb62309c0e",
+          "content": "Use concise responses by default.",
+          "score": 0.9084995169036748,
+          "confidence": "high",
+          "status": "active"
+        }
+      ],
+      "failure_reasons": []
+    }
+  ]
+}

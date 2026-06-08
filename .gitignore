@@ -1,0 +1,146 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Data / DB (created at runtime)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+logs/
+cache/
+archive/
+markdown/
+exports/
+dead_letters/
+queue/
+
+# Secrets
+.env
+config.yaml
+config.yml
+*.key
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution
+build/
+dist/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
+
+# Additional patterns (security hardening)
+*.bak
+*.old
+*.tmp
+*.temp
+*.swn
+*.swl
+*.swx
+*.env
+*.env.*
+.secrets
+credentials/
+data/
+output/
+*.pem
+*.cert
+*.key
+*.crt
+data/API_CONFIG_REPORT.md
+
+# Reports / artifacts (generated, not source)
+reports/
+artifacts/
+traces/
+lancedb/
+study/
+
+# Memory archives
+*.tar
+*.tar.gz
+*.zip
+
+# MemoryX runtime
+memoryx-pure-release/
+*.tar.gz
+
+# local private config
+.env
+.env.*
+!.env.example*
+
+# local runtime data
+db/
+logs/
+cache/
+archive/
+exports/
+markdown/
+/runtime/
+tmp/
+temp/
+
+# Hermes and MemoryX local runtime
+.hermes/
+.memoryx/
+memoryx_data/
+provider_index.json
+
+# databases and vector stores
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.lancedb/
+*.lance/
+*.parquet
+
+# traces, sessions, reports, generated artifacts
+*.log
+*.trace
+*.jsonl
+reports/
+artifacts/
+coverage/
+htmlcov/
+
+# local credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+/token*
+/secret*
+
+pytest-of-lucky/
+.env
+.memoryx/
+.venv/
+__pycache__/

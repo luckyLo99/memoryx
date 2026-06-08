@@ -1,0 +1,368 @@
+# memoryx/feishu/client.py
+"""
+飞书 OpenAPI 客户端：发送消息、更新卡片、上传图片/文件。
+
+P14.1 硬化：
+  - 所有请求走 _request_json（带 retry/backoff）
+  - 429/5xx 自动重试，指数退避
+  - 飞书错误码 99991400（频控）特殊处理
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import mimetypes
+import os
+import time
+from pathlib import Path
+from typing import Any
+
+import httpx
+
+
+class FeishuAPIError(RuntimeError):
+    pass
+
+
+# 需要重试的 HTTP 状态码和飞书错误码
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+RETRYABLE_FEISHU_CODE = {99991400}  # 频控
+
+
+class FeishuClient:
+    def __init__(
+        self,
+        *,
+        app_id: str | None = None,
+        app_secret: str | None = None,
+        base_url: str = "https://open.feishu.cn",
+        timeout: float = 30.0,
+        max_retries: int = 5,
+    ) -> None:
+        self.app_id = app_id or os.getenv("FEISHU_APP_ID")
+        self.app_secret = app_secret or os.getenv("FEISHU_APP_SECRET")
+
+        if not self.app_id or not self.app_secret:
+            raise ValueError("FEISHU_APP_ID and FEISHU_APP_SECRET are required")
+
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self._tenant_token: str | None = None
+        self._tenant_token_expire_at = 0.0
+
+    async def tenant_access_token(self) -> str:
+        if self._tenant_token and time.time() < self._tenant_token_expire_at - 60:
+            return self._tenant_token
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(
+                f"{self.base_url}/open-apis/auth/v3/tenant_access_token/internal",
+                json={
+                    "app_id": self.app_id,
+                    "app_secret": self.app_secret,
+                },
+            )
+
+        data = resp.json()
+        if data.get("code") != 0:
+            raise FeishuAPIError(f"tenant token failed: {data}")
+
+        token = data.get("tenant_access_token")
+        if not token:
+            raise FeishuAPIError(f"tenant_access_token missing in response: {data}")
+
+        self._tenant_token = token
+        self._tenant_token_expire_at = time.time() + int(data.get("expire", 7200))
+        return self._tenant_token
+
+    async def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {await self.tenant_access_token()}"}
+
+    async def _request_json(self, method: str, url: str, **kwargs) -> dict:
+        """带 retry/backoff 的请求"""
+        last_error = None
+
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    resp = await client.request(method, url, **kwargs)
+
+                try:
+                    data = resp.json()
+                except json.JSONDecodeError:
+                    # 飞书 API 有时返回的 JSON 含额外字符，尝试宽松解析
+                    raw = resp.text.strip()
+                    if not raw:
+                        data = {}
+                    else:
+                        decoder = json.JSONDecoder()
+                        parsed, idx = decoder.raw_decode(raw)
+                        if isinstance(parsed, dict):
+                            data = parsed
+                        else:
+                            data = {}
+
+                # 判断是否可重试
+                is_retryable = (
+                    resp.status_code in RETRYABLE_STATUS
+                    or (isinstance(data, dict) and data.get("code") in RETRYABLE_FEISHU_CODE)
+                )
+
+                if is_retryable:
+                    backoff = min(8.0, 0.5 * (2 ** attempt))
+                    await asyncio.sleep(backoff)
+                    continue
+
+                if resp.status_code >= 400 or (isinstance(data, dict) and data.get("code", 0) != 0):
+                    raise FeishuAPIError(f"Feishu API error status={resp.status_code} body={data}")
+
+                # 非 dict 响应（如 int / bool）也视为成功并包装
+                if not isinstance(data, dict):
+                    return {"data": data}
+                return data
+
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
+                last_error = exc
+                backoff = min(8.0, 0.5 * (2 ** attempt))
+                await asyncio.sleep(backoff)
+
+        raise FeishuAPIError(f"Feishu request failed after {self.max_retries} retries: {last_error}")
+
+    async def send_message(
+        self,
+        *,
+        receive_id: str,
+        receive_id_type: str,
+        msg_type: str,
+        content: dict[str, Any] | str,
+        uuid: str | None = None,
+    ) -> dict[str, Any]:
+        body = {
+            "receive_id": receive_id,
+            "msg_type": msg_type,
+            "content": content if isinstance(content, str) else json.dumps(content, ensure_ascii=False),
+        }
+        if uuid:
+            body["uuid"] = uuid
+
+        return await self._request_json(
+            "POST",
+            f"{self.base_url}/open-apis/im/v1/messages",
+            params={"receive_id_type": receive_id_type},
+            headers={**await self._headers(), "Content-Type": "application/json"},
+            json=body,
+        )
+
+    async def send_interactive_card(
+        self,
+        *,
+        chat_id: str,
+        card: dict[str, Any],
+    ) -> dict[str, Any]:
+        """发送交互式卡片，返回 message_id 用于后续 patch。"""
+        card = self._ensure_card_v2(card)
+
+        payload = {
+            "receive_id": chat_id,
+            "msg_type": "interactive",
+            "content": json.dumps(card, ensure_ascii=False),
+        }
+
+        data = await self._request_json(
+            "POST",
+            f"{self.base_url}/open-apis/im/v1/messages",
+            params={"receive_id_type": "chat_id"},
+            headers={**await self._headers(), "Content-Type": "application/json"},
+            json=payload,
+        )
+
+        if data.get("code", 0) != 0:
+            raise FeishuAPIError(f"send_interactive_card failed: {data}")
+
+        body = data.get("data") or {}
+        message_id = (
+            body.get("message_id")
+            or (body.get("message") or {}).get("message_id")
+            or body.get("open_message_id")
+        )
+
+        if not message_id:
+            raise FeishuAPIError(f"send_interactive_card response missing message_id: {data}")
+
+        return {"message_id": message_id, "raw": data}
+
+    async def patch_interactive_card(
+        self,
+        *,
+        card_message_id: str,
+        card: dict[str, Any],
+    ) -> dict[str, Any]:
+        """更新已发送的交互式卡片。"""
+        if not card_message_id:
+            raise FeishuAPIError("patch_interactive_card requires non-empty card_message_id")
+
+        card = self._ensure_card_v2(card)
+
+        payload = {
+            "content": json.dumps(card, ensure_ascii=False),
+        }
+
+        data = await self._request_json(
+            "PATCH",
+            f"{self.base_url}/open-apis/im/v1/messages/{card_message_id}",
+            headers={**await self._headers(), "Content-Type": "application/json"},
+            json=payload,
+        )
+
+        if data.get("code", 0) != 0:
+            raise FeishuAPIError(f"patch_interactive_card failed: {data}")
+
+        return data
+
+    @staticmethod
+    def _ensure_card_v2(card: dict[str, Any]) -> dict[str, Any]:
+        """确保卡片输出 JSON 2.0 格式，带 config.update_multi=true。"""
+        card = dict(card)
+        card["schema"] = "2.0"
+
+        config = dict(card.get("config") or {})
+        config["update_multi"] = True
+        config.setdefault("width_mode", "fill")
+        card["config"] = config
+
+        # 确保 body.elements 结构
+        if "body" not in card:
+            if "elements" in card:
+                card["body"] = {"elements": card.pop("elements")}
+            else:
+                card["body"] = {"elements": []}
+        elif "elements" in card and "body" not in card:
+            card["body"] = {"elements": card.pop("elements")}
+
+        return card
+
+    async def patch_message_card(self, *, message_id: str, card: dict[str, Any]) -> dict[str, Any]:
+        """兼容旧接口：更新卡片消息。"""
+        return await self.patch_interactive_card(card_message_id=message_id, card=card)
+
+    async def upload_image(self, *, path: str | Path, image_type: str = "message") -> str:
+        path = Path(path)
+        if not path.exists() or path.stat().st_size <= 0:
+            raise ValueError(f"invalid image file: {path}")
+
+        with path.open("rb") as f:
+            data = await self._request_json(
+                "POST",
+                f"{self.base_url}/open-apis/im/v1/images",
+                headers=await self._headers(),
+                data={"image_type": image_type},
+                files={
+                    "image": (
+                        path.name,
+                        f,
+                        mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+                    )
+                },
+            )
+        return data["data"]["image_key"]
+
+    async def upload_file(self, *, path: str | Path, file_type: str = "stream") -> str:
+        path = Path(path)
+        if not path.exists() or path.stat().st_size <= 0:
+            raise ValueError(f"invalid file: {path}")
+
+        with path.open("rb") as f:
+            data = await self._request_json(
+                "POST",
+                f"{self.base_url}/open-apis/im/v1/files",
+                headers=await self._headers(),
+                data={
+                    "file_type": file_type,
+                    "file_name": path.name,
+                },
+                files={
+                    "file": (
+                        path.name,
+                        f,
+                        mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+                    )
+                },
+            )
+        return data["data"]["file_key"]
+
+    async def download_image(self, *, image_key: str, save_path: str | Path | None = None) -> Path:
+        """下载图片到本地（带 sha256 哈希和 spool 管理）"""
+        import hashlib
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(
+                f"{self.base_url}/open-apis/im/v1/images/{image_key}/image",
+                headers=await self._headers(),
+            )
+
+        if resp.status_code >= 400:
+            raise FeishuAPIError(f"Failed to download image {image_key}: status={resp.status_code}")
+
+        # 计算 sha256
+        content = resp.content
+        sha256 = hashlib.sha256(content).hexdigest()
+
+        # 确定保存路径
+        if save_path is None:
+            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            # 使用 image_key 前 8 位 + sha256 前 8 位作为文件名，避免冲突
+            file_name = f"img_{image_key[:8]}_{sha256[:8]}.png"
+            save_path = spool_dir / file_name
+
+        path = Path(save_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 如果文件已存在且 sha256 匹配，直接返回
+        if path.exists():
+            existing_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+            if existing_sha == sha256:
+                return path
+
+        # 写入文件
+        path.write_bytes(content)
+        return path
+
+    async def download_file(self, *, file_key: str, save_path: str | Path | None = None) -> Path:
+        """下载文件到本地（带 sha256 哈希和 spool 管理）"""
+        import hashlib
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(
+                f"{self.base_url}/open-apis/im/v1/files/{file_key}/file",
+                headers=await self._headers(),
+            )
+
+        if resp.status_code >= 400:
+            raise FeishuAPIError(f"Failed to download file {file_key}: status={resp.status_code}")
+
+        # 计算 sha256
+        content = resp.content
+        sha256 = hashlib.sha256(content).hexdigest()
+
+        # 确定保存路径
+        if save_path is None:
+            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            # 使用 file_key 前 8 位 + sha256 前 8 位作为文件名
+            file_name = f"file_{file_key[:8]}_{sha256[:8]}"
+            save_path = spool_dir / file_name
+
+        path = Path(save_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 如果文件已存在且 sha256 匹配，直接返回
+        if path.exists():
+            existing_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+            if existing_sha == sha256:
+                return path
+
+        # 写入文件
+        path.write_bytes(content)
+        return path
