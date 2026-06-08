@@ -352,7 +352,7 @@ class ProductionSelfCheck:
 
     def check_schema_bootstrap(self) -> None:
         check = "schema_bootstrap"
-        schema_path = self.root / "db" / "schema.sql"
+        schema_path = self.root / "memoryx" / "storage" / "sql" / "schema.sql"
         if not schema_path.exists():
             self.add(check, Severity.FATAL, "fail", "memoryx/storage/sql/schema.sql is missing.")
             return
@@ -374,13 +374,13 @@ class ProductionSelfCheck:
 
     def check_migrations_apply(self) -> None:
         check = "migrations_apply"
-        schema_path = self.root / "db" / "schema.sql"
-        migrations_dir = self.root / "db" / "migrations"
+        schema_path = self.root / "memoryx" / "storage" / "sql" / "schema.sql"
+        migrations_dir = self.root / "memoryx" / "storage" / "sql" / "migrations"
         if not schema_path.exists():
             self.add(check, Severity.FATAL, "skip", "Cannot test migrations because memoryx/storage/sql/schema.sql is missing.")
             return
         if not migrations_dir.exists():
-            self.add(check, Severity.WARN, "skip", "db/migrations/ is missing.")
+            self.add(check, Severity.WARN, "skip", "memoryx/storage/sql/migrations/ is missing.")
             return
 
         migrations = sorted(migrations_dir.glob("*.sql"))
