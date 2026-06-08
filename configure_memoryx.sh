@@ -99,7 +99,7 @@ pip install -r requirements.txt -q && info "Core deps installed"
 pip install pytest pytest-asyncio -q 2>/dev/null || true
 pip install -e . -q 2>/dev/null || true && info "MemoryX installed"
 mkdir -p .memoryx/db .memoryx/logs .memoryx/cache
-[ -f db/schema.sql ] && $PY -c "import sqlite3,os; db=\".memoryx/db/memoryx.sqlite3\"; os.makedirs(\".memoryx/db\",exist_ok=True); c=sqlite3.connect(db); c.executescript(open(\"db/schema.sql\").read()); c.commit(); c.close(); print(\"DB initialized\")" 2>&1 | grep -v "^wsl:" | tail -1
+[ -f memoryx/storage/sql/schema.sql ] && $PY -c "import sqlite3,os; db=\".memoryx/db/memoryx.sqlite3\"; os.makedirs(\".memoryx/db\",exist_ok=True); c=sqlite3.connect(db); c.executescript(open(\"db/schema.sql\").read()); c.commit(); c.close(); print(\"DB initialized\")" 2>&1 | grep -v "^wsl:" | tail -1
 $PY -c "import memoryx; print(\"import ok: v\"+memoryx.__version__)" 2>&1 | grep -v "^wsl:" | tail -1 && info "Verified"
 step "5/5 - Launch MemoryX"
 echo ""; echo "  Summary:"; echo "  Storage: ${SB}  |  LLM: ${LP:-none}  |  Embed: ${EP:-none}"

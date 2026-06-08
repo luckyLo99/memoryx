@@ -273,7 +273,7 @@ class ProductionSelfCheck:
         required = [
             "memoryx",
             "memoryx/__init__.py",
-            "db/schema.sql",
+            "memoryx/storage/sql/schema.sql",
             "tests",
             "pyproject.toml",
         ]
@@ -354,7 +354,7 @@ class ProductionSelfCheck:
         check = "schema_bootstrap"
         schema_path = self.root / "db" / "schema.sql"
         if not schema_path.exists():
-            self.add(check, Severity.FATAL, "fail", "db/schema.sql is missing.")
+            self.add(check, Severity.FATAL, "fail", "memoryx/storage/sql/schema.sql is missing.")
             return
 
         with tempfile.TemporaryDirectory() as td:
@@ -365,19 +365,19 @@ class ProductionSelfCheck:
                 conn.execute("PRAGMA foreign_key_check;").fetchall()
                 self._load_schema(conn)
             except sqlite3.DatabaseError as exc:
-                self.add(check, Severity.FATAL, "fail", f"db/schema.sql does not bootstrap cleanly: {exc}")
+                self.add(check, Severity.FATAL, "fail", f"memoryx/storage/sql/schema.sql does not bootstrap cleanly: {exc}")
                 return
             finally:
                 conn.close()
 
-        self.add(check, Severity.INFO, "pass", "db/schema.sql bootstraps a temporary SQLite database.")
+        self.add(check, Severity.INFO, "pass", "memoryx/storage/sql/schema.sql bootstraps a temporary SQLite database.")
 
     def check_migrations_apply(self) -> None:
         check = "migrations_apply"
         schema_path = self.root / "db" / "schema.sql"
         migrations_dir = self.root / "db" / "migrations"
         if not schema_path.exists():
-            self.add(check, Severity.FATAL, "skip", "Cannot test migrations because db/schema.sql is missing.")
+            self.add(check, Severity.FATAL, "skip", "Cannot test migrations because memoryx/storage/sql/schema.sql is missing.")
             return
         if not migrations_dir.exists():
             self.add(check, Severity.WARN, "skip", "db/migrations/ is missing.")
@@ -912,7 +912,7 @@ class ProductionSelfCheck:
                 for f in top
             ],
             "agent_instruction": (
-                "Fix all ERROR/FATAL findings first. Do not overwrite db/schema.sql, repository.py, or mcp_server.py "
+                "Fix all ERROR/FATAL findings first. Do not overwrite memoryx/storage/sql/schema.sql, repository.py, or mcp_server.py "
                 "from older patches; prefer additive migrations and compatibility adapters."
             ),
         }
