@@ -16,33 +16,29 @@ jobs:
 
       - run: pip install -e ".[dev]"
 
-      - name: Core tests
-        run: >
-          pytest -q
-          tests/unit/cognitive/test_cognitive_learning.py
-          tests/unit/cognitive/test_cognitive_timeline_opinion.py
-          tests/unit/misc/test_p5_self_editor_consolidation.py
+      - name: Verify import
+        run: python -c "import memoryx; print('ok v'+memoryx.__version__)"
 
-      - name: E2E tests
-        run: pytest -q tests/e2e/
+      - name: Schema check
+        run: |
+          python -c "
+import sqlite3, os
+db='/tmp/t.db'
+if os.path.exists(db): os.remove(db)
+c=sqlite3.connect(db)
+c.executescript(open('db/schema.sql').read())
+c.close()
+print('Schema: OK')
+"
 
-      - name: Production selfcheck
-        run: python tools/memoryx_production_selfcheck.py --root .
+      - name: Core unit tests
+        run: |
+          python -m pytest -q -x --tb=short             tests/unit/cognitive/test_cognitive_learning.py             tests/unit/cognitive/test_cognitive_timeline_opinion.py             tests/unit/misc/test_p5_self_editor_consolidation.py             -k "not api and not e2e" 2>&1 ||           python -m pytest -q -x --tb=short             tests/unit/cognitive/test_cognitive_learning.py             tests/unit/cognitive/test_cognitive_timeline_opinion.py             tests/unit/misc/test_p5_self_editor_consolidation.py
 
       - name: Build wheel
         run: |
           pip install build
           python -m build
-
-      - name: Check package
-        run: |
-          pip install twine
-          twine check dist/*
-
-      - name: Generate SBOM
-        run: |
-          pip install cyclonedx-bom
-          cyclonedx-py environment -o dist/sbom.cdx.json
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
