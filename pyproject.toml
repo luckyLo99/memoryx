@@ -58,11 +58,11 @@ mcp = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/luckyl214/memoryx"
-Repository = "https://github.com/luckyl214/memoryx"
-Documentation = "https://github.com/luckyl214/memoryx/tree/main/docs"
-Changelog = "https://github.com/luckyl214/memoryx/blob/main/CHANGELOG.md"
-Issues = "https://github.com/luckyl214/memoryx/issues"
+Homepage = "https://github.com/luckyLo99/memoryx"
+Repository = "https://github.com/luckyLo99/memoryx"
+Documentation = "https://github.com/luckyLo99/memoryx/tree/main/docs"
+Changelog = "https://github.com/luckyLo99/memoryx/blob/main/CHANGELOG.md"
+Issues = "https://github.com/luckyLo99/memoryx/issues"
 
 [tool.setuptools.dynamic]
 version = {file = ["VERSION"]}

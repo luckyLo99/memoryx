@@ -2,6 +2,70 @@
 
 All notable changes to MemoryX are documented in this file.
 
+## [3.2.0] - 2026-06-12
+
+### Major: Evolutionary Trajectory
+
+- **Evolutionary Trajectory System** (`memoryx/evolution/`)
+  - New data model: `EvolutionTrajectory`, `EvolutionNode`, `EvolutionKind`, `PreferenceSignal`
+  - `EvolutionManager` with `observe()` + per-slot `get_trajectory()`
+  - SQLite migration `012_evolution_trajectory.sql`
+  - Auto-decay on superseded nodes (Ebbinghaus) — no hard deletion
+  - Preference shifts (e.g. "favorite singer 张杰 → 房东的猫) no longer trigger
+    flagged as contradiction
+
+### Major: Query Understanding
+
+- **Bilingual query intent classifier (`memoryx/retrieval/query_understanding.py`)
+  - 10 intents: coding, debugging, deployment, planning, project, workflow,
+    preference, emotional, troubleshooting, fact
+  - Bilingual keyword catalog (Chinese + English, zero external deps
+  - Silent fallback to generic retrieval when intent is unknown
+  - Zero network / zero LLM call — pure keyword matching for latency safety
+
+### Major: CJK Search + Fuzzy Matching
+
+- **CJK bigram tokenizer** — contiguous 中文/日本語/한국어 text is tokenized
+  into individual chars + 2-char bigrams so "记忆系统" is searchable
+  without whitespace. Mixed-language segments like "部署docker" are
+  split automatically.
+- **Fuzzy / pinyin search** — Levenshtein edit distance + synonym alias
+  table (`config` ↔ `configuration`; `错误` ↔ `bug`; optional
+  `pypinyin` when available).
+- No breaking changes to the default `search_full_text` API.
+
+### Performance: Parallel Retrieval
+
+- Vector DB and SQLite FTS5 now run in parallel via `asyncio.gather`
+- `_enrich_evolution_meta` reimplemented with an O(n) index — reduces
+  evolution-metadata attachment — previously O(results × nodes)
+- `_entity_overlap` bug fix — was storing generators, now stores tokens.
+
+### Integration
+
+- LangChain: `memoryx/integrations/langchain/memory.py` —
+  `MemoryXChatMessageHistory` + `MemoryXRetriever`
+- ConflictResolver: preference-shift detection
+  (e.g. 张杰 → 房东的猫) no longer triggers conflict; real contradictions
+  are still detected.
+- REST route `memoryx/api/routes/evolution.py`
+  (optional;懒加载,默认不破坏现有路由)
+
+### Benchmarks & docs
+
+- `tests/benchmarks/test_longmemeval.py` +
+- `tests/benchmarks/test_evolution.py`
+- `docs/evolution/01_concept.md`, `02_data_model.md`, `03_api.md`
+- `docs/pipeline/01_extraction.md ~ `05_forgetting.md`
+- `docs/benchmarks.md`
+- README updated with QueryUnderstanding + CJK + fuzzy in features/architecture docs
+
+### Updated `.gitignore`
+
+- Added `.trae/` and ad-hoc `test_*.py` / `run_*.ps1` exclusions
+
+---
+
 ## [3.1.0] - 2026-06-08
 
 ### Major: Configuration Wizard
