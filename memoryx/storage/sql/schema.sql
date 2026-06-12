@@ -394,3 +394,27 @@ CREATE INDEX IF NOT EXISTS idx_conversation_logs_session
 ON conversation_logs(session_id, turn_index);
 CREATE INDEX IF NOT EXISTS idx_memories_session_active ON memories(session_id, active_state, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_scope_active ON memories(scope, active_state, updated_at DESC);
+
+-- =============================================================================
+-- Evolutionary Memory Trajectory (成长轨迹)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS memory_evolution (
+    id TEXT PRIMARY KEY,
+    entity_id TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    value TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    valid_from TEXT NOT NULL,
+    valid_to TEXT,
+    confidence REAL NOT NULL DEFAULT 1.0,
+    source_memory_id TEXT,
+    context TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    active_state TEXT NOT NULL DEFAULT 'active',
+    decay_score REAL NOT NULL DEFAULT 0.0
+);
+
+CREATE INDEX IF NOT EXISTS idx_evo_entity_slot ON memory_evolution(entity_id, slot, valid_from);
+CREATE INDEX IF NOT EXISTS idx_evo_active_valid ON memory_evolution(active_state, valid_to);
+CREATE INDEX IF NOT EXISTS idx_evo_source ON memory_evolution(source_memory_id);

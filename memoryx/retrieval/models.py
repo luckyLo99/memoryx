@@ -14,6 +14,7 @@ class RetrievalIntent(StrEnum):
     WORKFLOW = "workflow"
     DEBUGGING = "debugging"
     DEPLOYMENT = "deployment"
+    FACT = "fact"
 
 
 @dataclass(slots=True)
@@ -33,6 +34,7 @@ class RetrievalResult:
     source_type: str = "unknown"
     verification_status: str = "unverified"
     trust_score: float = 0.5
+    evolution_meta: dict | None = None
 
 
 @dataclass

@@ -22,7 +22,12 @@ class GenericLLMExtractionClient:
         session_factory: Callable[[], Any] | None = None,
     ) -> None:
         self.base_url = base_url
-        self.api_key = "your_api_key_here"
+        if not api_key or api_key.strip() in {
+            "", "your_api_key_here", "your_api_key", "changeme", "change_me",
+            "placeholder", "test", "example", "sk-xxx", "YOUR_API_KEY"
+        }:
+            raise ValueError("Invalid API key must be provided and not a placeholder value")
+        self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.retry_attempts = retry_attempts

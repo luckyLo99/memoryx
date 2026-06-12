@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+import shlex
 import subprocess
 import time
 import uuid
@@ -17,9 +18,13 @@ class RuntimeCommandRunner:
         self.artifacts = ArtifactStore(artifact_root)
         self.transcripts = RuntimeTranscriptStore(db_path, self.budget)
 
-    def run(self, *, task_id: str, request_id: str, command: str, cwd: str | None = None, timeout: int | None = None, shell: bool = True, env: dict[str, str] | None = None) -> dict[str, Any]:
+    def run(self, *, task_id: str, request_id: str, command: str, cwd: str | None = None, timeout: int | None = None, shell: bool = False, env: dict[str, str] | None = None) -> dict[str, Any]:
+        if shell:
+            raise ValueError("shell=True is not allowed for security reasons. Please use shell=False with properly escaped commands.")
+        
+        cmd_args = shlex.split(command)
         started = time.perf_counter()
-        proc = subprocess.run(command, cwd=cwd, shell=shell, capture_output=True, text=True, timeout=timeout, env=env)
+        proc = subprocess.run(cmd_args, cwd=cwd, shell=shell, capture_output=True, text=True, timeout=timeout, env=env)
         duration_ms = (time.perf_counter() - started) * 1000
         event_id = uuid.uuid4().hex
         stdout_ref = self.artifacts.write_text(kind="stdout", name=f"{event_id}.stdout.log", text=proc.stdout or "", summary=f"stdout for `{command}`; {len(proc.stdout or '')} chars") if proc.stdout else None

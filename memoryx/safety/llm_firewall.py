@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import unicodedata
+
+logger = logging.getLogger(__name__)
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -314,8 +317,8 @@ class LLMFirewall:
             from memoryx.observability.metrics import record_llm_safety_event
 
             record_llm_safety_event(surface=decision.surface, decision=decision.decision, severity=decision.severity)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to record LLM safety metric: %s", e, exc_info=True)
         if self.repository is None:
             return
         digest = hashlib.sha256((raw_text or "").encode("utf-8")).hexdigest()
@@ -339,9 +342,9 @@ class LLMFirewall:
                     json.dumps(decision.metadata, ensure_ascii=False, sort_keys=True),
                 ),
             )
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to persist LLM safety event to database: %s", e, exc_info=True)
             # Safety logging must not break the agent path.
-            return
 
 
 def safety_preamble() -> str:

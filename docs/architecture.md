@@ -285,3 +285,32 @@ event_bus.subscribe(
     priority=10
 )
 ```
+
+## 11. 成长轨迹 (Evolutionary Trajectory)
+
+People are not static. Their favorite singer, their opinion about a film,
+or the city they live in changes over time. MemoryX records these shifts
+as an **Evolutionary Trajectory** (成长轨迹) — an append-only, time-anchored
+timeline of values per `(entity_id, slot)` pair — rather than treating
+them as conflicts. The classic example is "my favorite singer used to be
+张杰, now it is 房东的猫": two observations, no contradiction, one evolving
+person.
+
+Conceptually the module sits between the **extraction layer** (which
+detects preference / opinion / fact signals in incoming text) and the
+**conflict-detection layer** (which would otherwise raise an alarm on
+two semantically different memories for the same entity). A preference
+shift never reaches the conflict resolver; a hard-fact contradiction
+never reaches the evolution manager. The two paths are complementary and
+disjoint.
+
+In the architecture, the `memoryx/evolution/` package lives next to
+`memoryx/cognitive/`. It owns its own `memory_evolution` table (added in
+migration `012_evolution_trajectory.sql`), its own repository, and a
+small `EvolutionIntegration` shim that the rest of the pipeline can
+call without coupling to the manager. It is wired into the extractor's
+post-write hook, sits beside the `ConflictResolver` in the validation
+stage, and is queryable by the retrieval layer through
+`EvolutionManager.get_trajectory`. The detailed design and API are
+documented in `docs/evolution/01_concept.md`, `02_data_model.md`, and
+`03_api.md`.

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import DefaultDict
 from collections import defaultdict
 
 from .events import EventHandler, EventPriority, MemoryEvent, MemoryEventType
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -41,7 +44,16 @@ class EventBus:
 
     async def publish(self, event: MemoryEvent) -> list[EventHandler]:
         async with self._lock:
-            return [item.handler for item in self._handlers.get(event.event_type, [])]
+            subscribers = list(self._handlers.get(event.event_type, []))
+        
+        handlers = [sub.handler for sub in subscribers]
+        for handler in handlers:
+            try:
+                await handler(event)
+            except Exception as e:
+                logger.error(f"Error in event handler for {event.event_type}: {e}", exc_info=True)
+        
+        return handlers
 
     async def handler_count(self, event_type: MemoryEventType) -> int:
         async with self._lock:

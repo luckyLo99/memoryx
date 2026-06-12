@@ -54,7 +54,19 @@ from .migration import MigrationEngine, MigrationReport
 from .observability import MemoryObservabilityEngine
 from .runtime.orchestrator import ModuleRegistry, ModuleStatus, SystemOrchestrator
 from .palace import PalaceDrawer, PalaceEngine, PalaceNavigator, PalaceRoom, PalaceWing
-from .cognitive.persona import PersonaEngine
+from .evolution import (
+    EvolutionDecision,
+    EvolutionIntegration,
+    EvolutionKind,
+    EvolutionManager,
+    EvolutionNode,
+    EvolutionRepository,
+    EvolutionTrajectory,
+    IntegrationDecision,
+    PreferenceSignal,
+    PreferenceSignalDetector,
+    ensure_evolution_table,
+)
 from .project_state import ProjectState, ProjectStateEngine
 from .recall import ActiveRecallEngine
 from .reflection.reflect import ReflectEngine
@@ -206,6 +218,18 @@ __all__ = [
     "VectorStore",
     "WorkingMemoryEngine",
     "WorkingMemoryState",
+    # — evolutionary trajectory —
+    "EvolutionDecision",
+    "EvolutionIntegration",
+    "EvolutionKind",
+    "EvolutionManager",
+    "EvolutionNode",
+    "EvolutionRepository",
+    "EvolutionTrajectory",
+    "IntegrationDecision",
+    "PreferenceSignal",
+    "PreferenceSignalDetector",
+    "ensure_evolution_table",
     # — retrieval scoring / fusion —
     "ScoreBreakdown",
     "ConfidenceLabel",

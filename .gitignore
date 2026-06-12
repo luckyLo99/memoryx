@@ -144,3 +144,19 @@ pytest-of-lucky/
 .memoryx/
 .venv/
 __pycache__/
+
+# Agent working directories
+.trae/
+.trae*/
+
+# Ad-hoc test scripts (not part of the formal test suite)
+test_*.py
+!tests/**/test_*.py
+run_*.sh
+run_*.ps1
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.eggs/

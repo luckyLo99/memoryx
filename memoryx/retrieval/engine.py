@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -127,9 +128,25 @@ MIN_FINAL_SCORE = 0.05
 
 
 class HybridRetrievalEngine:
-    def __init__(self, *, repository, vector_store) -> None:
+    def __init__(self, *, repository, vector_store, evolution_manager=None) -> None:
         self.repository = repository
         self.vector_store = vector_store
+        self.evolution_manager = evolution_manager
+
+    def get_trajectory(self, entity_id: str, slot: str, as_of: str | None = None):
+        """Convenience accessor for an evolution trajectory.
+
+        Returns None if evolution_manager is not configured.
+        If *as_of* is provided, only nodes with valid_from <= as_of are kept.
+        """
+        if self.evolution_manager is None:
+            return None
+        trajectory = self.evolution_manager.get_trajectory(entity_id, slot)
+        if as_of is not None:
+            trajectory.nodes = [
+                n for n in trajectory.nodes if n.valid_from <= as_of
+            ]
+        return trajectory
 
     async def retrieve(
         self,
@@ -149,6 +166,14 @@ class HybridRetrievalEngine:
         tag_mode: str = "any",
         fusion_method: str = "weighted",
     ) -> list[RetrievalResult]:
+        # --- Auto-intent detection when caller did not specify an intent ---
+        if intent is None:
+            try:
+                from .query_understanding import classify_query
+                intent, _conf = classify_query(query)
+            except Exception:
+                intent = RetrievalIntent.FACT
+
         # Build visibility filter for session isolation
         visibility_sql, visibility_params = self._build_visibility_filter(
             session_id=session_id,
@@ -157,27 +182,36 @@ class HybridRetrievalEngine:
             session_only=session_only,
         )
 
+        # --- Parallel vector + keyword search (P0-4) ---
         vector_hits: list[dict] = []
-        vector_available = False
-        if self.vector_store is not None:
-            try:
-                vector_hits = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
-                vector_available = True
-            except Exception:
-                vector_hits = []  # degraded: vector unavailable
-        vector_scores = {item["memory_id"]: float(item["score"]) for item in vector_hits}
+        keyword_hits: list[dict] = []
+        fts_trace: dict = {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": 0}
 
-        # 24.4-B: fetch_limit optimization - base 2x, fallback 3x if needed
+        async def _do_vector() -> list[dict]:
+            if self.vector_store is None or not query_vector:
+                return []
+            try:
+                return await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+            except Exception:
+                return []
+
+        async def _do_keyword() -> tuple[list[dict], dict]:
+            if explain_scores:
+                res, trace = await self.repository.search_full_text_with_trace(query, limit=max(limit * 2, 30))
+                return res, trace
+            return await self.repository.search_full_text(query, limit=max(limit * 2, 30)), {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": 0}
+
+        vector_task = asyncio.create_task(_do_vector())
+        keyword_task = asyncio.create_task(_do_keyword())
+        vector_hits, (keyword_hits, fts_trace) = await asyncio.gather(vector_task, keyword_task)
+
+        vector_scores: dict[str, float] = {item["memory_id"]: float(item["score"]) for item in vector_hits}
+
+        # 24.4-B: fetch sizes for the first-pass retrieval
         base_fetch = max(limit * 2, 30)
         fallback_fetch = max(limit * 3, 30)
-        if explain_scores:
-            keyword_hits, fts_trace = await self.repository.search_full_text_with_trace(query, limit=base_fetch)
-        else:
-            keyword_hits = await self.repository.search_full_text(query, limit=base_fetch)
-            fts_trace = {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": len(keyword_hits)}
-        keyword_map = {item["memory_id"]: item for item in keyword_hits}
 
-        candidate_ids = list(dict.fromkeys([*vector_scores.keys(), *keyword_map.keys()]))
+        candidate_ids = list(dict.fromkeys([*vector_scores.keys(), *[h.get("memory_id") or h.get("id") for h in keyword_hits]]))
         raw_hit_count = len(candidate_ids)
         memories: list[dict[str, Any]] = []
         seen_dedup: dict[str, float] = {}  # dedup_key -> best_score (24.4-B)
@@ -410,6 +444,10 @@ class HybridRetrievalEngine:
 
         results = results[:limit]
 
+        # Evolution trajectory enrichment: attach evolution_meta when available
+        if self.evolution_manager is not None:
+            results = self._enrich_evolution_meta(results)
+
         if explain_scores:
             trace = RetrievalTrace(
                 query_plan_used=fts_trace.get("query_plan_used"),
@@ -509,7 +547,27 @@ class HybridRetrievalEngine:
 
     @staticmethod
     def _tokens(text: str) -> set[str]:
-        return set("".join(ch.lower() if ch.isalnum() else " " for ch in text).split())
+        """Smart tokenizer: split by punctuation, and produce char 2-grams for CJK text.
+
+        This is much better than splitting by spaces only (which leaves entire
+        Chinese sentences as a single token). English tokens are preserved as-is.
+        """
+        import re as _re
+        if not text:
+            return set()
+        # Step 1: pre-split by non-alphanumeric characters
+        raw_parts = [p for p in _re.split(r"[^A-Za-z0-9\u4e00-\u9fff]+", text) if p]
+        tokens: set[str] = set()
+        for part in raw_parts:
+            if part.isascii():
+                tokens.add(part.lower())
+            else:
+                # CJK text: add bigrams + individual chars
+                for i in range(len(part)):
+                    tokens.add(part[i])
+                    if i + 1 < len(part):
+                        tokens.add(part[i:i + 2])
+        return tokens
 
     @staticmethod
     def _keyword_overlap(query_tokens: set[str], content_tokens: set[str]) -> float:
@@ -524,10 +582,15 @@ class HybridRetrievalEngine:
             entities = json.loads(entities_json or "[]")
         except (ValueError, TypeError):
             return 0.0
-        if not entities:
+        if not entities or not query_tokens:
             return 0.0
-        entity_tokens = set("".join(ch.lower() if ch.isalnum() else " " for ch in str(e)).split() for e in entities)
-        hits = sum(1 for t in query_tokens if any(t in e for e in entity_tokens))
+        entity_tokens: set[str] = set()
+        for e in entities:
+            text = "".join(ch.lower() if ch.isalnum() else " " for ch in str(e))
+            for token in text.split():
+                if token:
+                    entity_tokens.add(token)
+        hits = sum(1 for t in query_tokens if t in entity_tokens)
         return hits / len(query_tokens) if query_tokens else 0.0
 
     @staticmethod
@@ -552,6 +615,40 @@ class HybridRetrievalEngine:
         if mode == "all":
             return all(f in tags for f in filter_lower)
         return any(f in tags for f in filter_lower)
+
+    def _enrich_evolution_meta(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
+        """Attach evolution_meta to results whose source memory has a trajectory.
+
+        Optimized to O(n): scan memory_id once, then O(1) lookup per result.
+        Avoids the previous O(results × nodes) scan.
+        """
+        if self.evolution_manager is None:
+            return results
+        try:
+            # 1. Scan all evolution nodes once, build memory_id -> (slot, position, decay_score
+            node_index: dict[str, dict] = {}
+            for slot in self.evolution_manager.repository.list_slots("user"):
+                trajectory = self.evolution_manager.get_trajectory("user", slot)
+                for idx, node in enumerate(trajectory.nodes):
+                    nid = node.source_memory_id
+                    if nid is None:
+                        continue
+                    if nid not in node_index:
+                        # Keep the first occurrence (highest priority slot).
+                        node_index[nid] = {
+                            "is_evolved": True,
+                            "trajectory_position": idx + 1,
+                            "decay_score": node.decay_score,
+                            "slot": slot,
+                        }
+            # 2. Assign evolution_meta to results in O(results)
+            for r in results:
+                meta = node_index.get(r.memory_id)
+                if meta is not None:
+                    r.evolution_meta = meta
+            return results
+        except Exception:
+            return results
 
     def _build_explanation(
         self,

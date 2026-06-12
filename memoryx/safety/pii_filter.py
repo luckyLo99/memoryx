@@ -64,6 +64,8 @@ class PIIResult:
         return self.detected_count > 0
 
 
+import warnings
+
 class PIIFilter:
     """PII 检测 + HMAC 匿名化。
 
@@ -73,7 +75,16 @@ class PIIFilter:
 
     def __init__(self, *, secret: str | None = None) -> None:
         import os
-        self.secret = (secret or os.environ.get("MEMORYX_PII_SECRET", "memoryx-pii-default")).encode("utf-8")
+        env_secret = os.environ.get("MEMORYX_PII_SECRET")
+        if secret is None and env_secret is None:
+            warnings.warn(
+                "Using default PII secret is insecure. Please set MEMORYX_PII_SECRET environment variable or pass a secret to PIIFilter.",
+                SecurityWarning,
+                stacklevel=2
+            )
+            self.secret = b"memoryx-pii-default"
+        else:
+            self.secret = (secret or env_secret).encode("utf-8")
 
     # ── Public API ───────────────────────────────────────────────
 

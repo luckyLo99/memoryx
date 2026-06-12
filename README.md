@@ -13,6 +13,7 @@ MemoryX is a long-term memory system for AI agents with hybrid retrieval, multi-
 - **Session isolation**: per-session scoping with global fallback
 - **Conflict detection**: semantic and entity-level conflict detection
 - **Memory lifecycle**: candidate -> committed -> verified -> superseded with version history
+- **Evolutionary trajectory**: tracks how a user's preferences, opinions, and facts change over time per entity-slot (e.g. favorite singer 张杰 → 房东的猫) — kept as an append-only timeline rather than a conflict, with Ebbinghaus decay that down-weights but never deletes old nodes
 - **MCP server**: Model Context Protocol support for external clients
 - **Hermes Agent integration**: native provider, bridge, and tool interface
 

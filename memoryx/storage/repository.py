@@ -43,31 +43,55 @@ _QUERY_ALIASES: dict[str, list[str]] = {
 
 
 def tokenize_query_terms(query: str) -> list[str]:
-    """Deterministic query tokenizer for FTS5 searches (24.4-C).
+    """Deterministic query tokenizer for FTS5 searches.
 
-    Supports camelCase, snake_case, kebab-case, dot, slash, version numbers.
+    Supports camelCase, snake_case, kebab-case, path, version numbers, and
+    produces 2-char (CJK bigram) tokens for Chinese/Japanese/Korean text so
+    contiguous Chinese content can still be matched (24.4-C / stability-improved).
     Original words are preserved alongside split forms.
     """
     if not query or not query.strip():
         return []
     raw = query.strip()
     import re as _re
-    segments = _re.split(r"[-_.\\/]", raw)
+    segments = _re.split(r"[-_.\\/\s]", raw)
     tokens: list[str] = []
     for seg in segments:
         if not seg:
             continue
-        # Split camelCase
-        parts = _re.sub(r"([a-z])([A-Z])", r"\1 \2", seg).lower().split()
-        for p in parts:
-            p = _re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", p)
-            if p and p not in tokens:
-                tokens.append(p)
-    # Preserve original raw query (for LIKE fallback, not FTS5 MATCH)
-    # raw_lower = raw.lower().strip()
-    # if raw_lower and raw_lower not in tokens:
-    #     tokens.insert(0, raw_lower)
-    return tokens
+        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in seg)
+        if has_cjk:
+            # Mixed CJK + Latin: break into alternating spans
+            sub_parts = _re.split(r"([\u4e00-\u9fff]+)", seg)
+            for sub in sub_parts:
+                if not sub:
+                    continue
+                if all("\u4e00" <= ch <= "\u9fff" for ch in sub):
+                    # Pure CJK: emit individual chars + bigrams
+                    for i in range(len(sub)):
+                        ch = sub[i]
+                        if ch not in tokens:
+                            tokens.append(ch)
+                        if i + 1 < len(sub):
+                            bigram = sub[i:i + 2]
+                            if bigram not in tokens:
+                                tokens.append(bigram)
+                else:
+                    # Latin / numbers: camelCase split + lowercase
+                    cased = _re.sub(r"([a-z])([A-Z])", r"\1 \2", sub).lower().split()
+                    for p in cased:
+                        cleaned = _re.sub(r"[^a-z0-9]+", "", p)
+                        if cleaned and cleaned not in tokens:
+                            tokens.append(cleaned)
+        else:
+            # Split camelCase
+            parts = _re.sub(r"([a-z])([A-Z])", r"\1 \2", seg).lower().split()
+            for p in parts:
+                p = _re.sub(r"[^a-z0-9]+", "", p)
+                if p and p not in tokens:
+                    tokens.append(p)
+    # Limit to first 24 to avoid FTS5 query explosion while keeping precision
+    return tokens[:24]
 
 
 def _build_fts_query(tokens: list[str], operator: str = "AND") -> str:
@@ -370,28 +394,28 @@ class MemoryRepository:
         rows = await self.db.fetchall("SELECT * FROM memories WHERE active_state='active' ORDER BY importance_score DESC, updated_at DESC LIMIT ?;",(limit,))
         return [self._row_to_dict(r) for r in rows]
 
-    async def search_full_text(self, query: str, limit: int=20) -> list[dict[str,Any]]:
-        """Full-text search with fallback plan: phrase → AND → OR → alias OR (24.4-C)."""
+    async def search_full_text(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Full-text search with fallback plan: phrase → AND → OR → alias OR → fuzzy.
+
+        When FTS5 returns no matches, we expand the token list with
+        synonyms/typo aliases and run a second pass.
+        """
         tokens = tokenize_query_terms(query)
         if not tokens:
             return []
 
-        plans = []
+        plans: list[tuple[str, str]] = []
         phrase_q = _build_fts_query(tokens, "PHRASE")
         if phrase_q:
-            plans.append(phrase_q)
+            plans.append(("phrase", phrase_q))
         and_q = _build_fts_query(tokens, "AND")
         if and_q and and_q != phrase_q:
-            plans.append(and_q)
+            plans.append(("and", and_q))
         or_q = _build_fts_query(tokens, "OR")
         if or_q and or_q not in (phrase_q, and_q):
-            plans.append(or_q)
-        expanded = expand_with_aliases(tokens)
-        alias_or = _build_fts_query(expanded, "OR")
-        if alias_or and alias_or != or_q:
-            plans.append(alias_or)
+            plans.append(("or", or_q))
 
-        for fts_q in plans:
+        for _name, fts_q in plans:
             try:
                 rows = await self.db.fetchall(
                     "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
@@ -401,7 +425,28 @@ class MemoryRepository:
                 if rows:
                     return [self._row_to_dict(r) for r in rows]
             except Exception:
-                continue  # FTS syntax error → next plan
+                continue
+
+        # --- P0-6: fuzzy / alias expansion when FTS5 returns zero ---
+        try:
+            from memoryx.retrieval.fuzzy_search import expand_query_with_fuzzy_aliases
+        except Exception:
+            expand_query_with_fuzzy_aliases = None  # type: ignore
+
+        if expand_query_with_fuzzy_aliases is not None:
+            expanded = expand_query_with_fuzzy_aliases(tokens)
+            if expanded and set(expanded) != set(tokens):
+                expanded_or = _build_fts_query(expanded, "OR")
+                try:
+                    rows = await self.db.fetchall(
+                        "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+                        "WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",
+                        (expanded_or, limit),
+                    )
+                    if rows:
+                        return [self._row_to_dict(r) for r in rows]
+                except Exception:
+                    pass
         return []
 
     async def search_full_text_with_trace(
@@ -421,7 +466,8 @@ class MemoryRepository:
         ]
         expanded = expand_with_aliases(tokens)
         alias_q = _build_fts_query(expanded, "OR")
-        plan_defs.append(("alias", alias_q))
+        if alias_q and alias_q != plan_defs[-1][1]:
+            plan_defs.append(("alias", alias_q))
 
         fallback_steps: list[str] = []
         for plan_name, fts_q in plan_defs:
@@ -444,6 +490,34 @@ class MemoryRepository:
             except Exception:
                 fallback_steps.append(f"{plan_name}:error")
                 continue
+
+        # --- P0-6: fuzzy / alias expansion when FTS5 returns zero ---
+        try:
+            from memoryx.retrieval.fuzzy_search import expand_query_with_fuzzy_aliases
+        except Exception:
+            expand_query_with_fuzzy_aliases = None  # type: ignore
+
+        if expand_query_with_fuzzy_aliases is not None:
+            expanded = expand_query_with_fuzzy_aliases(tokens)
+            if expanded and set(expanded) != set(tokens):
+                fuzzy_q = _build_fts_query(expanded, "OR")
+                try:
+                    rows = await self.db.fetchall(
+                        "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+                        "WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?;",
+                        (fuzzy_q, limit),
+                    )
+                    count = len(rows)
+                    if count > 0:
+                        return [self._row_to_dict(r) for r in rows], {
+                            "query_plan_used": "fuzzy",
+                            "fallback_steps": fallback_steps,
+                            "raw_hit_count": count,
+                        }
+                    fallback_steps.append("fuzzy:0")
+                except Exception:
+                    fallback_steps.append("fuzzy:error")
+
         return [], {
             "query_plan_used": None,
             "fallback_steps": fallback_steps,
