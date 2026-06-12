@@ -3,11 +3,31 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from zoneinfo import ZoneInfo
 from datetime import datetime
 
+try:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:
+    ZoneInfo = None  # type: ignore[assignment]
+    ZoneInfoNotFoundError = Exception  # type: ignore[misc]
 
-CST = ZoneInfo("Asia/Shanghai")
+
+def _get_cst_tz():
+    """Return the Asia/Shanghai timezone, or fall back to UTC.
+
+    ``ZoneInfo("Asia/Shanghai")`` is not available on all Windows
+    configurations and some minimal Linux containers. We degrade to the system
+    local timezone so the rest of the module remains importable.
+    """
+    if ZoneInfo is None:
+        return None
+    try:
+        return ZoneInfo("Asia/Shanghai")
+    except ZoneInfoNotFoundError:
+        return None
+
+
+CST = _get_cst_tz()
 
 
 def _configured_artifact_root() -> Path:

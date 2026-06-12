@@ -203,6 +203,10 @@ Compatible with Claude Code, Gemini CLI, and other MCP clients.
 | Configuration Wizard | Run `bash configure_memoryx.sh` |
 | Hermes Integration | docs/HERMES_MEMORYX_AUTHORITATIVE.md |
 | Cognitive Models | docs/cognitive/ |
+| Pipeline (extraction / consolidation / storage / retrieval / forgetting) | docs/pipeline/ |
+| Evolutionary trajectory / preference tracking | docs/evolution/ |
+| Benchmarks & performance contracts | docs/benchmarks.md |
+| Architecture overview | docs/architecture.md |
 | API Reference | docs/ |
 | Changelog | CHANGELOG.md |
 | Credits | CREDITS.md |

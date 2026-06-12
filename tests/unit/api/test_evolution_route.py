@@ -267,7 +267,7 @@ class TestNodeToResponse:
 class TestGetManagerOr503:
     def test_returns_cached_manager(self):
         """A second call must reuse the cached manager, not rebuild it."""
-        from memoryx.api import routes.evolution as evo_mod
+        import memoryx.api.routes.evolution as evo_mod
 
         # Pre-seed the cache to confirm we never re-enter the build path.
         sentinel = object()
@@ -281,7 +281,7 @@ class TestGetManagerOr503:
         """If building the manager raises, we surface 503 — not a 500."""
         from fastapi import HTTPException
 
-        from memoryx.api import routes.evolution as evo_mod
+        import memoryx.api.routes.evolution as evo_mod
 
         # Ensure cache is empty so we exercise the build path.
         evo_mod._manager_cache.pop("default", None)
@@ -299,7 +299,7 @@ class TestGetManagerOr503:
 class TestBuildManager:
     def test_uses_settings_db_path(self, tmp_path: Path):
         """The builder must point at MemoryXSettings.db_path, not a hard-coded path."""
-        from memoryx.api import routes.evolution as evo_mod
+        import memoryx.api.routes.evolution as evo_mod
         from memoryx.config import MemoryXSettings
 
         # Build a settings object with a custom home so the DB lives in tmp_path.

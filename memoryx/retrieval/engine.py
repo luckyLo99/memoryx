@@ -186,12 +186,16 @@ class HybridRetrievalEngine:
         vector_hits: list[dict] = []
         keyword_hits: list[dict] = []
         fts_trace: dict = {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": 0}
+        vector_available = False
 
         async def _do_vector() -> list[dict]:
+            nonlocal vector_available
             if self.vector_store is None or not query_vector:
                 return []
             try:
-                return await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+                results = await self.vector_store.search(query_vector, limit=max(limit * 3, 10))
+                vector_available = True
+                return results
             except Exception:
                 return []
 
@@ -204,7 +208,6 @@ class HybridRetrievalEngine:
         vector_task = asyncio.create_task(_do_vector())
         keyword_task = asyncio.create_task(_do_keyword())
         vector_hits, (keyword_hits, fts_trace) = await asyncio.gather(vector_task, keyword_task)
-
         vector_scores: dict[str, float] = {item["memory_id"]: float(item["score"]) for item in vector_hits}
 
         # 24.4-B: fetch sizes for the first-pass retrieval

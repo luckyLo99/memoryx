@@ -5,12 +5,29 @@ import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:
+    ZoneInfo = None  # type: ignore[assignment]
+    ZoneInfoNotFoundError = Exception  # type: ignore[misc]
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 DB = os.getenv("MEMORYX_DB_PATH", str(REPO_DIR / 'data' / 'memoryx.db'))
 OUT_DIR = REPO_DIR / "study"
-CST = ZoneInfo("Asia/Shanghai")
+
+
+def _get_cst_tz():
+    """Return Asia/Shanghai timezone, or None if unavailable (graceful fallback)."""
+    if ZoneInfo is None:
+        return None
+    try:
+        return ZoneInfo("Asia/Shanghai")
+    except ZoneInfoNotFoundError:
+        return None
+
+
+CST = _get_cst_tz()
 
 
 def main() -> int:

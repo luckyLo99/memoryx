@@ -5,11 +5,22 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:
+    ZoneInfo = None  # type: ignore[assignment]
+    ZoneInfoNotFoundError = Exception  # type: ignore[misc]
 
 
 def _cst_now() -> str:
-    return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
+    """Return the current time formatted as CST, falling back to localtime."""
+    if ZoneInfo is not None:
+        try:
+            return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
+        except ZoneInfoNotFoundError:
+            pass
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 TYPE_META = {
