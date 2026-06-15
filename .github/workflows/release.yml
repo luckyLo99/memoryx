@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
-        with: { python-version: '3.11' }
+        with: { python-version: '3.12' }
 
       - run: pip install -e ".[dev,mcp]"
 
@@ -31,9 +31,8 @@ c.close()
 print('Schema: OK')
 "
 
-      - name: Core unit tests
-        run: |
-          python -m pytest -q -x --tb=short             tests/unit/cognitive/test_cognitive_learning.py             tests/unit/cognitive/test_cognitive_timeline_opinion.py             tests/unit/misc/test_p5_self_editor_consolidation.py             -k "not api and not e2e" 2>&1 ||           python -m pytest -q -x --tb=short             tests/unit/cognitive/test_cognitive_learning.py             tests/unit/cognitive/test_cognitive_timeline_opinion.py             tests/unit/misc/test_p5_self_editor_consolidation.py
+      - name: Run all non-E2E tests
+        run: python -m pytest --tb=short --ignore=tests/e2e --ignore=tools --ignore=scripts -x -q
 
       - name: Build wheel
         run: |
