@@ -20,14 +20,6 @@ jobs:
         run: python -c "import memoryx; print('ok v'+memoryx.__version__)"
       - name: Schema selfcheck
         run: |
-          python -c "
-import sqlite3, os
-db='/tmp/t.db'
-if os.path.exists(db): os.remove(db)
-c=sqlite3.connect(db)
-c.executescript(open('memoryx/storage/sql/schema.sql').read())
-c.close()
-print('Schema: OK')
-"
+          python -c "import sqlite3, os; db='/tmp/t.db'; os.path.exists(db) and os.remove(db); c=sqlite3.connect(db); c.executescript(open('memoryx/storage/sql/schema.sql').read()); c.close(); print('Schema: OK')"
       - name: Selfcheck
         run: python tools/memoryx_production_selfcheck.py --root . --fail-on warning 2>&1 | tail -20 || echo "Selfcheck had non-fatal items"
