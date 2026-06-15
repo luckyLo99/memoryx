@@ -13,18 +13,26 @@ from .session_summary import SessionSummaryStore
 
 class BudgetedContextAssembler:
     def __init__(self, db_path: str, policy: ContextBudgetPolicy | None = None):
-        self.db_path = db_path; self.policy = policy
-        self.guard = ActiveRequestStore(db_path); self.summary_store = SessionSummaryStore(db_path); self.history = ContextPackHistory(db_path)
+        self.db_path = db_path
+        self.policy = policy
+        self.guard = ActiveRequestStore(db_path)
+        self.summary_store = SessionSummaryStore(db_path)
+        self.history = ContextPackHistory(db_path)
 
     def assemble(self, *, query: str, session_id=None, agent_id=None, user_id=None, request_id=None,
                  session_history=None, limit=None, begin_request=True, mode=None, previous_pack_id=None) -> dict[str, Any]:
-        rid = request_id or uuid.uuid4().hex; pack_id = uuid.uuid4().hex
-        planner = AdaptiveContextPlanner(); plan = planner.plan(query, requested_mode=mode)
-        policy = self.policy or plan.policy; packer = ContextPacker(policy)
+        rid = request_id or uuid.uuid4().hex
+        pack_id = uuid.uuid4().hex
+        planner = AdaptiveContextPlanner()
+        plan = planner.plan(query, requested_mode=mode)
+        policy = self.policy or plan.policy
+        packer = ContextPacker(policy)
         if begin_request:
-            lease = self.guard.begin_request(session_id=session_id, task_text=query, request_id=rid); rid = lease.request_id
+            lease = self.guard.begin_request(session_id=session_id, task_text=query, request_id=rid)
+            rid = lease.request_id
         stale = self.guard.reject_if_stale(rid, session_id)
-        if stale: return stale
+        if stale:
+            return stale
 
         retriever = HybridRetriever(self.db_path, NullVectorProvider())
         rl = min(max(limit or policy.max_memory_items * 2, 1), policy.max_memory_items * 4)
@@ -38,7 +46,8 @@ class BudgetedContextAssembler:
 
         for hit in hits:
             meta = {"claim_type": hit.claim_type, "status": hit.status}
-            if policy.include_explanations: meta["explanation"] = hit.explanation
+            if policy.include_explanations:
+                meta["explanation"] = hit.explanation
             items.append(ContextItem(hit.claim_id, "relevant_memories", hit.content, float(hit.final_score), hit.claim_type, meta))
 
         prev_ids = set(self.history.get_item_ids(previous_pack_id))
@@ -48,7 +57,8 @@ class BudgetedContextAssembler:
         self.history.record_pack(pack_id=pack_id, session_id=session_id, request_id=rid, query=query, item_ids=included_ids, used_tokens=pack.used_tokens)
 
         stale2 = self.guard.reject_if_stale(rid, session_id)
-        if stale2: return stale2
+        if stale2:
+            return stale2
         self.guard.complete_request(rid, "completed")
         return {"ok": True, "request_id": rid, "session_id": session_id, "agent_id": agent_id, "user_id": user_id,
                 "context_pack": pack.to_dict(),

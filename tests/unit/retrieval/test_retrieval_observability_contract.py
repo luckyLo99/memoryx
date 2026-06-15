@@ -9,7 +9,6 @@ import pytest
 from memoryx.retrieval.engine import (
     HybridRetrievalEngine,
     _layer_score_boost,
-    _is_visible_memory_for_retrieval,
     _is_lesson_memory,
     _is_session_scoped_memory,
     _session_matches,

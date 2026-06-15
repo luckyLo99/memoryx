@@ -1,2 +1,1 @@
-from memoryx.embeddings.vector_store import *  # DEPRECATED: canonical location is memoryx.embeddings.vector_store
-
+from memoryx.embeddings.vector_store import *  # DEPRECATED: canonical location is memoryx.embeddings.vector_store  # noqa: F403

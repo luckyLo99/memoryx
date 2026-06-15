@@ -7,12 +7,15 @@ for action gating.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
 from memoryx.conversation_log import ConversationLogStore
-from memoryx.safety.llm_firewall import LLMFirewall, safety_preamble
+from memoryx.safety.llm_firewall import LLMFirewall, LLMSafetyDecision, safety_preamble
+
+logger = logging.getLogger(__name__)
 
 try:
     from memoryx.cognitive.guarded_generation import CognitiveGuard
@@ -50,6 +53,8 @@ class HermesMemoryBridge:
         retrieval_engine=None,
         lesson_policy=None,
         working_memory_engine=None,
+        attention_focus_engine=None,
+        golden_rule_engine=None,
         max_context_items: int = 6,
     ) -> None:
         self.repository = repository
@@ -64,11 +69,66 @@ class HermesMemoryBridge:
         )
         self.narrative = NarrativeReflectionEngine(repository=repository) if NarrativeReflectionEngine is not None else None
         self.working_memory_engine = working_memory_engine
+        self.attention_focus_engine = attention_focus_engine
+        self.golden_rule_engine = golden_rule_engine
         self.max_context_items = max_context_items
 
     async def on_user_message(self, *, session_id: str, content: str, **extra: Any) -> HermesBridgeResult:
-        safety = await self.llm_firewall.inspect_user_input(content, session_id=session_id)
-        await self.conversation_log.log_turn(session_id=session_id, role="user", content=content)
+        try:
+            safety = await self.llm_firewall.inspect_user_input(content, session_id=session_id)
+        except Exception:
+            logger.warning("Firewall inspect_user_input failed, using conservative block decision", exc_info=True)
+            safety = LLMSafetyDecision(
+                decision_id="firewall_error",
+                surface="user_input",
+                decision="block",
+                severity="high",
+                reason="Firewall error: content blocked as precaution",
+                flags=["firewall_error"],
+            )
+
+        try:
+            await self.conversation_log.log_turn(session_id=session_id, role="user", content=content)
+        except Exception:
+            logger.warning("conversation_log.log_turn failed for user message", exc_info=True)
+
+        # ── Attention Focus: track interruptions and mainline ──
+        attention_result: dict[str, Any] = {}
+        if self.attention_focus_engine is not None:
+            try:
+                attention_result = await self.attention_focus_engine.on_user_message(session_id, content)
+            except Exception:
+                logger.warning("attention_focus_engine.on_user_message failed", exc_info=True)
+
+        # ── Golden Rules: detect user corrections ──
+        golden_rule_applied = False
+        if self.golden_rule_engine is not None:
+            try:
+                if self.golden_rule_engine.detect_correction(content):
+                    # User is correcting us — extract and create golden rule
+                    corrected_fact = self.golden_rule_engine.extract_corrected_fact(content)
+                    if corrected_fact:
+                        # Store as a golden memory
+                        from memoryx.storage.repository import MemoryRecord
+                        record = MemoryRecord(
+                            content=corrected_fact,
+                            memory_type="FACT",
+                            scope="user",
+                            importance_score=1.0,
+                            confidence_score=1.0,
+                            tags=["golden_rule", "user_correction"],
+                        )
+                        mem_id = await self.repository.store_memory(record)
+                        await self.golden_rule_engine.create_golden_rule(
+                            memory_id=mem_id,
+                            corrected_content=corrected_fact,
+                            original_content=extra.get("last_assistant_message", ""),
+                            scope="global",
+                            session_id=session_id,
+                        )
+                        golden_rule_applied = True
+            except Exception:
+                logger.warning("golden_rule_engine processing failed", exc_info=True)
 
         memories: list[dict[str, Any]] = []
         if self.query_api is not None and hasattr(self.query_api, "search"):
@@ -83,9 +143,28 @@ class HermesMemoryBridge:
                     explain_scores=True,
                 )
             except Exception:
+                logger.warning("query_api.search failed", exc_info=True)
                 memories = []
 
+        # ── Apply Golden Rules to retrieved memories ──
+        if self.golden_rule_engine is not None and memories:
+            try:
+                memories = await self.golden_rule_engine.apply_golden_rules(memories, content, session_id)
+            except Exception:
+                logger.warning("golden_rule_engine.apply_golden_rules failed", exc_info=True)
+
         context_block = self.render_context_block(memories=memories, safety_block=self.llm_firewall.render_policy_block(safety))
+
+        # Inject attention focus context (主线恢复提示)
+        if attention_result.get("action") == "returned" and attention_result.get("restored_context"):
+            restored = attention_result["restored_context"]
+            restore_block = (
+                "<attention_restore>\n"
+                f"Restored focus: {restored['task_description']}\n"
+                f"Reasoning: {' -> '.join(restored.get('reasoning_chain', [])[-3:])}\n"
+                "</attention_restore>"
+            )
+            context_block = restore_block + "\n\n" + context_block
 
         # Inject working memory context (L0), if available
         working_lines: list[str] = []
@@ -95,7 +174,7 @@ class HermesMemoryBridge:
                 if snap and snap.get("has_state"):
                     working_lines = snap["lines"]
             except Exception:
-                pass  # degraded, not crash
+                logger.warning("working_memory_engine.snapshot failed", exc_info=True)
         if working_lines:
             working_block = "<working_context>\n" + "\n".join(working_lines) + "\n</working_context>"
             context_block = working_block + "\n\n" + context_block
@@ -112,9 +191,16 @@ class HermesMemoryBridge:
                         "</conflict_warning>"
                     )
             except Exception:
-                pass  # degraded
+                logger.warning("count_open_conflicts failed", exc_info=True)
         if conflict_warning:
             context_block = conflict_warning + "\n\n" + context_block
+
+        metadata: dict[str, Any] = {"flags": safety.flags}
+        if attention_result:
+            metadata["attention"] = attention_result.get("action")
+        if golden_rule_applied:
+            metadata["golden_rule_created"] = True
+
         return HermesBridgeResult(
             event="on_user_message",
             session_id=session_id,
@@ -124,7 +210,7 @@ class HermesMemoryBridge:
             should_block=safety.should_block,
             requires_user=safety.requires_user,
             memories=memories,
-            metadata={"flags": safety.flags},
+            metadata=metadata,
         )
 
     async def on_tool_call(
@@ -136,11 +222,22 @@ class HermesMemoryBridge:
         intent: str | None = None,
         **extra: Any,
     ) -> HermesBridgeResult:
-        firewall_decision = await self.llm_firewall.evaluate_tool_call(
-            tool_name=tool_name,
-            args=args or {},
-            session_id=session_id,
-        )
+        try:
+            firewall_decision = await self.llm_firewall.evaluate_tool_call(
+                tool_name=tool_name,
+                args=args or {},
+                session_id=session_id,
+            )
+        except Exception:
+            logger.warning("Firewall evaluate_tool_call failed, using conservative block decision", exc_info=True)
+            firewall_decision = LLMSafetyDecision(
+                decision_id="firewall_error",
+                surface="tool_call",
+                decision="block",
+                severity="high",
+                reason="Firewall error: tool call blocked as precaution",
+                flags=["firewall_error"],
+            )
         guard_block = self.llm_firewall.render_policy_block(firewall_decision)
         decision = firewall_decision.decision
         should_block = firewall_decision.should_block
@@ -170,7 +267,7 @@ class HermesMemoryBridge:
                 should_block = should_block or action_guard.should_block
                 requires_user = requires_user or action_guard.requires_user
             except Exception:
-                pass
+                logger.warning("cognitive_guard.evaluate_action failed", exc_info=True)
 
         return HermesBridgeResult(
             event="on_tool_call",
@@ -191,7 +288,18 @@ class HermesMemoryBridge:
         **extra: Any,
     ) -> HermesBridgeResult:
         text = result if isinstance(result, str) else str(result)
-        safety = await self.llm_firewall.inspect_tool_output(text, session_id=session_id)
+        try:
+            safety = await self.llm_firewall.inspect_tool_output(text, session_id=session_id)
+        except Exception:
+            logger.warning("Firewall inspect_tool_output failed, using conservative block decision", exc_info=True)
+            safety = LLMSafetyDecision(
+                decision_id="firewall_error",
+                surface="tool_output",
+                decision="block",
+                severity="high",
+                reason="Firewall error: tool output blocked as precaution",
+                flags=["firewall_error"],
+            )
         return HermesBridgeResult(
             event="on_tool_result",
             session_id=session_id,
@@ -204,8 +312,23 @@ class HermesMemoryBridge:
         )
 
     async def on_assistant_response(self, *, session_id: str, content: str, question: str = "", **extra: Any) -> HermesBridgeResult:
-        await self.conversation_log.log_turn(session_id=session_id, role="assistant", content=content)
-        safety = await self.llm_firewall.inspect_assistant_output(content, session_id=session_id)
+        try:
+            await self.conversation_log.log_turn(session_id=session_id, role="assistant", content=content)
+        except Exception:
+            logger.warning("conversation_log.log_turn failed for assistant message", exc_info=True)
+
+        try:
+            safety = await self.llm_firewall.inspect_assistant_output(content, session_id=session_id)
+        except Exception:
+            logger.warning("Firewall inspect_assistant_output failed, using conservative block decision", exc_info=True)
+            safety = LLMSafetyDecision(
+                decision_id="firewall_error",
+                surface="assistant_output",
+                decision="block",
+                severity="high",
+                reason="Firewall error: assistant output blocked as precaution",
+                flags=["firewall_error"],
+            )
 
         guard_block = self.llm_firewall.render_policy_block(safety)
         decision = safety.decision
@@ -227,7 +350,7 @@ class HermesMemoryBridge:
                 elif checked.guard_block and decision == "allow":
                     decision = "warn"
             except Exception:
-                pass
+                logger.warning("cognitive_guard.verify_answer failed", exc_info=True)
 
         return HermesBridgeResult(
             event="on_assistant_response",

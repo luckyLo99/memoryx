@@ -72,11 +72,13 @@ class SelfEditor:
             return SelfEditResult(memory_id=request.memory_id, applied=False, previews=[preview], error=preview.message or "preview failed")
         if request.edit_type == "correct":
             for k, v in request.changes.items():
-                if k in ("id", "created_at"): continue
-                await self.repository.db.execute(f"UPDATE memories SET {k}=?, updated_at=datetime('now') WHERE id=?;", (v, request.memory_id))
+                if k in ("id", "created_at"):
+                    continue
+                await self.repository.db.execute(f"UPDATE memories SET {k}=?, updated_at=datetime('now') WHERE id=?;", (v, request.memory_id))  # nosec B608
         elif request.edit_type == "merge":
             t = request.changes.get("merge_into", "")
-            if t: await self.repository.supersede_memory(request.memory_id, t)
+            if t:
+                await self.repository.supersede_memory(request.memory_id, t)
         elif request.edit_type == "forget":
             await self.repository.rollback_memory(request.memory_id)
         elif request.edit_type == "relevance":

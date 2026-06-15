@@ -28,6 +28,6 @@ def test_adaptive_context_previous_pack_diff(tmp_path):
     a = adapter.query("adaptive concise", session_id="s", request_id="r1", mode="standard")
     # Signal more content then query again with same query
     adapter.signal("user_message", "memory items about adaptive concise", session_id="s")
-    b = adapter.query("adaptive concise", session_id="s", request_id="r2", mode="standard", previous_pack_id=a["provenance"]["pack_id"])
+    adapter.query("adaptive concise", session_id="s", request_id="r2", mode="standard", previous_pack_id=a["provenance"]["pack_id"])
     # The diff may not have repeated if FTS doesn't match, but that's acceptable
     adapter.kernel.close()

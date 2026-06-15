@@ -204,7 +204,7 @@ class OpinionShiftEngine:
             clauses.append("observed_at <= ?")
             params.append(_iso(end))
         rows = await self.repository.db.fetchall(
-            f"SELECT * FROM opinion_observations WHERE {' AND '.join(clauses)} ORDER BY observed_at ASC;",
+            f"SELECT * FROM opinion_observations WHERE {' AND '.join(clauses)} ORDER BY observed_at ASC;",  # nosec B608
             tuple(params),
         )
         observations = [OpinionObservation(

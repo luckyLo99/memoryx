@@ -62,7 +62,7 @@
 
 | Gap | Severity | Plan |
 |-----|----------|------|
-| No automated CI security scan | P2 | Target 24.9-D: CodeQL / Bandit / pip-audit |
+| ~~No automated CI security scan~~ | ~~P2~~ | ✅ Fixed: CodeQL + Bandit + pip-audit in `.github/workflows/security.yml` |
 | No runtime taint tracking for model-inferred content | P3 | Design review — may exceed scope of available resources |
 | REST rate-limiting per key | P3 | Basic rate-limit exists; not per-key granular |
 | LanceDB access control | P3 | File-system permission only; no internal ACL |

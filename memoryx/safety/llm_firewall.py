@@ -21,12 +21,11 @@ import re
 import unicodedata
 
 logger = logging.getLogger(__name__)
-from dataclasses import asdict, dataclass, field
-from typing import Any
-from uuid import uuid4
+from dataclasses import asdict, dataclass, field  # noqa: E402
+from typing import Any  # noqa: E402
+from uuid import uuid4  # noqa: E402
 
-from memoryx.safety.context_isolation import (
-    isolation_preamble,
+from memoryx.safety.context_isolation import (  # noqa: E402
     wrap_untrusted_memory,
     wrap_untrusted_tool_output,
 )

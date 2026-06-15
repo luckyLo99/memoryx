@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..events import EventHandler, EventPriority, MemoryEvent, MemoryEventType
+from ..events import EventHandler, EventPriority, MemoryEventType
 
 
 class SubscriberManager:

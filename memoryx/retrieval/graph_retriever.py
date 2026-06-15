@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -93,7 +92,7 @@ class GraphRetriever:
         normalized = [n.lower().strip() for n in names]
         placeholders = ",".join("?" for _ in normalized)
         rows = await self.repository.db.fetchall(
-            f"SELECT id FROM entities WHERE LOWER(normalized_name) IN ({placeholders}) AND active_state = 'active';",
+            f"SELECT id FROM entities WHERE LOWER(normalized_name) IN ({placeholders}) AND active_state = 'active';",  # nosec B608
             tuple(normalized),
         )
         return [row["id"] for row in rows]

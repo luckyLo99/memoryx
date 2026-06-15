@@ -7,12 +7,7 @@ from pathlib import Path
 import pytest
 
 from memoryx.retrieval.engine import _layer_score_boost, _retrieval_dedup_key
-from memoryx.services.memory_candidate_service import (
-    MemoryCandidatePolicy,
-    MemoryCandidateRequest,
-    MemoryCandidateService,
-)
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 class FakeVectorStore:

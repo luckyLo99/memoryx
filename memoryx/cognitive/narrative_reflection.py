@@ -67,7 +67,7 @@ class NarrativeReflectionEngine:
         if entity_id:
             clauses.append("entity_id = ?")
             params.append(entity_id)
-        return await self.repository.db.fetchall(f"SELECT * FROM task_durations WHERE {' AND '.join(clauses)} ORDER BY duration_seconds DESC LIMIT 50;", tuple(params))
+        return await self.repository.db.fetchall(f"SELECT * FROM task_durations WHERE {' AND '.join(clauses)} ORDER BY duration_seconds DESC LIMIT 50;", tuple(params))  # nosec B608
 
     async def _opinion_shifts(self, start: str, end: str, entity_id: str | None):
         clauses = ["from_time >= ?", "to_time <= ?"]
@@ -75,7 +75,7 @@ class NarrativeReflectionEngine:
         if entity_id:
             clauses.append("entity_id = ?")
             params.append(entity_id)
-        return await self.repository.db.fetchall(f"SELECT * FROM opinion_shifts WHERE {' AND '.join(clauses)} ORDER BY ABS(delta) DESC LIMIT 50;", tuple(params))
+        return await self.repository.db.fetchall(f"SELECT * FROM opinion_shifts WHERE {' AND '.join(clauses)} ORDER BY ABS(delta) DESC LIMIT 50;", tuple(params))  # nosec B608
 
     async def _lessons(self, start: str, end: str, session_id: str | None):
         return await self.repository.db.fetchall(
@@ -89,7 +89,7 @@ class NarrativeReflectionEngine:
         if session_id:
             clauses.append("session_id = ?")
             params.append(session_id)
-        return await self.repository.db.fetchall(f"SELECT * FROM claim_verification_runs WHERE {' AND '.join(clauses)} ORDER BY risk_score DESC LIMIT 50;", tuple(params))
+        return await self.repository.db.fetchall(f"SELECT * FROM claim_verification_runs WHERE {' AND '.join(clauses)} ORDER BY risk_score DESC LIMIT 50;", tuple(params))  # nosec B608
 
     def _task_summary(self, rows) -> str:
         if not rows:

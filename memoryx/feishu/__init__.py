@@ -26,7 +26,7 @@ from .overflow import CardOverflowPolicy, OverflowResult
 from .attachment_prepare import AttachmentPreparer, PreparedAttachment
 from .trace import FeishuTraceStore
 from .stream_sanitizer import StreamSanitizer
-from .runner_factory import build_feishu_runner, EchoFeishuRunner, ShadowFeishuRunner
+from .runner_factory import build_feishu_runner, EchoFeishuRunner, ShadowFeishuRunner  # noqa: F401
 from .renderer import FeishuCardRenderer, STATE_META, VISIBLE_STATE_META
 from .client import FeishuClient, FeishuAPIError
 from .queue import FeishuSQLiteQueue

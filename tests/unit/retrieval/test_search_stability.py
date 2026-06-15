@@ -11,7 +11,6 @@ Covers:
 from __future__ import annotations
 
 import pytest
-import asyncio
 from pathlib import Path
 
 from memoryx.storage.repository import tokenize_query_terms, MemoryRepository
@@ -23,7 +22,6 @@ from memoryx.retrieval.fuzzy_search import (
     normalized_edit_distance,
     best_fuzzy_match,
 )
-from memoryx.storage import MemoryRecord
 
 
 # ======================================================================

@@ -7,8 +7,8 @@ and a unified ScoreBreakdown that can be used by any retrieval path.
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass, field
-from memoryx.cognitive.ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome
+from dataclasses import asdict, dataclass
+from memoryx.cognitive.ebbinghaus import EbbinghausForgettingCurve, RetrievalOutcome
 
 from datetime import datetime, timezone
 from typing import Any, Literal

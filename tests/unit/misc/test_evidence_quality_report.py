@@ -8,7 +8,6 @@ import pytest
 
 from memoryx.hermes_provider import MemoryXHermesProvider
 from memoryx.services.memory_candidate_service import (
-    CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,
@@ -226,7 +225,7 @@ async def test_no_json1_functions(ready_repo: MemoryRepository) -> None:
 
 @pytest.mark.asyncio
 async def test_fk_check_zero(ready_repo: MemoryRepository) -> None:
-    row = await ready_repo.db.fetchone("PRAGMA foreign_key_check;", ())
+    await ready_repo.db.fetchone("PRAGMA foreign_key_check;", ())
     # FK check returns rows only if violations exist; empty = pass
     rows = await ready_repo.db.fetchall("PRAGMA foreign_key_check;", ())
     assert len(rows) == 0, f"FK violations: {rows}"

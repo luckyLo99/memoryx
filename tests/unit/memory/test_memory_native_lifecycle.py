@@ -10,10 +10,9 @@ from memoryx.services.memory_candidate_service import (
     CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
-    MemoryCandidateRequest,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 @pytest.fixture
@@ -142,7 +141,7 @@ async def test_max_candidates_respected(svc: MemoryCandidateService) -> None:
 @pytest.mark.asyncio
 async def test_dedup(svc: MemoryCandidateService, ready_repo: MemoryRepository) -> None:
     # First extraction
-    ids1 = await svc.extract_candidates_from_turn(
+    await svc.extract_candidates_from_turn(
         session_id="s7",
         user_message="记住我喜欢Python",
         max_candidates=5,

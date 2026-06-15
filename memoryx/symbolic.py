@@ -2,5 +2,5 @@
 from __future__ import annotations
 import warnings as _w
 _w.warn("memoryx.symbolic is deprecated; use memoryx.graph.symbolic", DeprecationWarning, stacklevel=2)
-from memoryx.graph.symbolic import SymbolicIndex
+from memoryx.graph.symbolic import SymbolicIndex  # noqa: E402
 __all__ = ["SymbolicIndex"]

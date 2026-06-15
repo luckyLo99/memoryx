@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import pytest
 from memoryx.cognitive.dual_process import (
-    DualProcessGateway, QueryComplexityAnalyzer, RetrievalDecision,
-    RetrievalSystem, System1Retriever, System2Retriever,
+    DualProcessGateway, QueryComplexityAnalyzer, RetrievalSystem, System1Retriever, System2Retriever,
 )
 
 

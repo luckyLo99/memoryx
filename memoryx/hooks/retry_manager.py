@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from typing import Any
 
 from ..events import MemoryEvent
@@ -23,7 +22,7 @@ class RetryManager:
                 event.attempt = attempt + 1
                 await asyncio.wait_for(handler(event), timeout=self.timeout)
                 return
-            except Exception as exc:
+            except Exception:
                 self.retry_count += 1
                 if attempt == self.retries - 1:
                     self.failure_count += 1

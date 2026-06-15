@@ -12,7 +12,6 @@ from memoryx.storage import MemoryRecord, MemoryRepository
 async def test_scene_engine_clusters_memories(tmp_path: Path) -> None:
     repo = MemoryRepository(tmp_path / "scene-cluster.db")
     await repo.open()
-    base = "2026-05-22T10:00:00"
     for i, (mid, content, importance) in enumerate([
         ("s1", "deploy failed due to timeout", 0.9),
         ("s2", "rollback completed successfully", 0.8),

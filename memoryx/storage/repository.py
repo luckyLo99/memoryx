@@ -3,14 +3,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from .migrations import MigrationManager
 from .sqlite_async import AsyncSQLite
+from .record import MemoryRecord
+from .fts_utils import tokenize_query_terms, build_fts_query, expand_with_aliases
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 MEMORY_TYPES = {
@@ -20,8 +23,6 @@ MEMORY_TYPES = {
 }
 
 # === 24.6-B: chunking helper for batch IN queries =============================
-# SQLite host parameter limit: 32766 (≥3.32.0) or 999 (older).
-# Using batch_size=500 leaves headroom for other params.
 _BATCH_HYDRATION_CHUNK_SIZE = 500
 
 
@@ -30,196 +31,18 @@ def _chunked(items: list[str], size: int) -> list[list[str]]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-_QUERY_ALIASES: dict[str, list[str]] = {
-    "pytest": ["py test", "python test"],
-    "rust": ["rust programming", "rust language"],
-    "js": ["javascript"],
-    "ts": ["typescript"],
-    "sqlite": ["sqlite3", "fts5"],
-    "db": ["database"],
-    "deploy": ["release", "deployment"],
-    "build": ["compile"],
-}
-
-
-def tokenize_query_terms(query: str) -> list[str]:
-    """Deterministic query tokenizer for FTS5 searches.
-
-    Supports camelCase, snake_case, kebab-case, path, version numbers, and
-    produces 2-char (CJK bigram) tokens for Chinese/Japanese/Korean text so
-    contiguous Chinese content can still be matched (24.4-C / stability-improved).
-    Original words are preserved alongside split forms.
-    """
-    if not query or not query.strip():
-        return []
-    raw = query.strip()
-    import re as _re
-    segments = _re.split(r"[-_.\\/\s]", raw)
-    tokens: list[str] = []
-    for seg in segments:
-        if not seg:
-            continue
-        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in seg)
-        if has_cjk:
-            # Mixed CJK + Latin: break into alternating spans
-            sub_parts = _re.split(r"([\u4e00-\u9fff]+)", seg)
-            for sub in sub_parts:
-                if not sub:
-                    continue
-                if all("\u4e00" <= ch <= "\u9fff" for ch in sub):
-                    # Pure CJK: emit individual chars + bigrams
-                    for i in range(len(sub)):
-                        ch = sub[i]
-                        if ch not in tokens:
-                            tokens.append(ch)
-                        if i + 1 < len(sub):
-                            bigram = sub[i:i + 2]
-                            if bigram not in tokens:
-                                tokens.append(bigram)
-                else:
-                    # Latin / numbers: camelCase split + lowercase
-                    cased = _re.sub(r"([a-z])([A-Z])", r"\1 \2", sub).lower().split()
-                    for p in cased:
-                        cleaned = _re.sub(r"[^a-z0-9]+", "", p)
-                        if cleaned and cleaned not in tokens:
-                            tokens.append(cleaned)
-        else:
-            # Split camelCase
-            parts = _re.sub(r"([a-z])([A-Z])", r"\1 \2", seg).lower().split()
-            for p in parts:
-                p = _re.sub(r"[^a-z0-9]+", "", p)
-                if p and p not in tokens:
-                    tokens.append(p)
-    # Limit to first 24 to avoid FTS5 query explosion while keeping precision
-    return tokens[:24]
-
-
-def _build_fts_query(tokens: list[str], operator: str = "AND") -> str:
-    """Build a safe FTS5 MATCH query from tokens. Returns empty string if no safe tokens."""
-    safe = [t.replace('"', '""') for t in tokens if t]
-    if not safe:
-        return ""
-    if operator == "AND":
-        return " AND ".join(safe)
-    elif operator == "OR":
-        return " OR ".join(safe)
-    elif operator == "PHRASE":
-        return '"' + safe[0] + '"' if len(safe) == 1 else " NEAR/0 ".join(safe)
-    return " OR ".join(safe)
-
-
-def expand_with_aliases(tokens: list[str]) -> list[str]:
-    """Expand tokens using static alias map. Returns up to 16 unique tokens."""
-    expanded = list(tokens)
-    for t in tokens:
-        for alias in _QUERY_ALIASES.get(t, []):
-            for sub in alias.split():
-                if sub and sub not in expanded:
-                    expanded.append(sub)
-    return expanded[:16]
-
-
-@dataclass(init=False)
-class MemoryRecord:
-    """P0 schema: memories.id PK, not memory_id.
-
-    Legacy/public alias: ``memory_id`` is accepted in constructor and
-    exposed as a read-only property returning ``self.id``.
-    When both ``id`` and ``memory_id`` are supplied, ``id`` wins.
-    """
-    id: str
-    session_id: str | None = None
-    memory_type: str = "FACT"
-    content: str = ""
-    content_summary: str | None = None
-    content_hash: str = ""
-    checksum: str = ""
-    importance_score: float = 0.0
-    confidence_score: float = 0.0
-    decay_score: float = 0.0
-    recency_score: float = 0.0
-    access_count: int = 0
-    reinforcement_score: float = 0.0
-    safety_score: float = 1.0
-    active_state: str = "active"
-    superseded_by: str | None = None
-    contradiction_group_id: str | None = None
-    valid_from: str = ""
-    valid_to: str | None = None
-    archived_at: str | None = None
-    metadata_json: str = "{}"
-
-    def __init__(
-        self,
-        id: str | None = None,
-        memory_id: str | None = None,
-        session_id: str | None = None,
-        memory_type: str = "FACT",
-        content: str = "",
-        content_summary: str | None = None,
-        content_hash: str = "",
-        checksum: str = "",
-        importance_score: float = 0.0,
-        confidence_score: float = 0.0,
-        decay_score: float = 0.0,
-        recency_score: float = 0.0,
-        access_count: int = 0,
-        reinforcement_score: float = 0.0,
-        safety_score: float = 1.0,
-        active_state: str = "active",
-        superseded_by: str | None = None,
-        contradiction_group_id: str | None = None,
-        valid_from: str = "",
-        valid_to: str | None = None,
-        archived_at: str | None = None,
-        metadata_json: str = "{}",
-        scope: str = "global",
-        tags_json: str = "[]",
-        entities_json: str = "[]",
-        source_message_id: str | None = None,
-    ) -> None:
-        # id wins over memory_id; memory_id is legacy alias
-        if id is None and memory_id is not None:
-            id = memory_id
-        if id is None:
-            id = uuid4().hex
-        self.id = id
-        self.session_id = session_id
-        self.memory_type = memory_type
-        self.content = content
-        self.content_summary = content_summary
-        self.content_hash = content_hash
-        self.checksum = checksum
-        self.importance_score = importance_score
-        self.confidence_score = confidence_score
-        self.decay_score = decay_score
-        self.recency_score = recency_score
-        self.access_count = access_count
-        self.reinforcement_score = reinforcement_score
-        self.safety_score = safety_score
-        self.active_state = active_state
-        self.superseded_by = superseded_by
-        self.contradiction_group_id = contradiction_group_id
-        self.valid_from = valid_from
-        self.valid_to = valid_to
-        self.archived_at = archived_at
-        self.metadata_json = metadata_json
-        self.scope = scope
-        self.tags_json = tags_json
-        self.entities_json = entities_json
-        self.source_message_id = source_message_id
-
-    @property
-    def memory_id(self) -> str:
-        """Legacy public alias — always returns self.id."""
-        return self.id
-
+# Re-export for backward compatibility
+_MemoryRecord = MemoryRecord
 
 
 class MemoryRepository:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, time_provider=None) -> None:
         self.db = AsyncSQLite(db_path)
         self.migrations = MigrationManager(db=self.db)
+        if time_provider is None:
+            from memoryx.temporal.time_provider import get_time_provider
+            time_provider = get_time_provider()
+        self._time_provider = time_provider
 
     async def open(self) -> None:
         await self.db.open()
@@ -232,9 +55,8 @@ class MemoryRepository:
     def checksum(content: str) -> str:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-    @staticmethod
-    def _now_iso() -> str:
-        return datetime.now(timezone.utc).isoformat()
+    def _now_iso(self) -> str:
+        return self._time_provider.now().isoformat()
 
     def _normalize_record(self, record: MemoryRecord) -> MemoryRecord:
         if record.memory_type not in MEMORY_TYPES:
@@ -255,6 +77,68 @@ class MemoryRepository:
     def _normalize_search_query(query: str) -> str:
         tokens = [t for t in "".join(ch.lower() if ch.isalnum() else " " for ch in query).split() if t]
         return " OR ".join(tokens) if tokens else ""
+
+    async def count_memories(self) -> int:
+        """Return the total number of active (non-archived) memories."""
+        async with self.db.acquire() as conn:
+            cur = conn.execute("SELECT COUNT(*) FROM memories WHERE active_state != 'archived';")
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
+
+    async def archive_oldest_memories(self, limit: int = 100) -> int:
+        """Archive the oldest, least-important memories to control storage growth.
+
+        Returns the number of memories archived.
+        """
+        archived = 0
+        now = self._now_iso()
+        async with self.db.transaction(mode="IMMEDIATE") as conn:
+            # Select candidates: low importance, low access, oldest updated
+            cur = conn.execute(
+                """SELECT id, content, content_hash FROM memories
+                   WHERE active_state = 'active'
+                   ORDER BY importance_score ASC, access_count ASC, updated_at ASC
+                   LIMIT ?;""",
+                (limit,),
+            )
+            rows = cur.fetchall()
+            for row in rows:
+                mem_id, content, content_hash = row
+                conn.execute(
+                    """INSERT INTO archived_memories
+                       (id, memory_id, content, archived_reason, archived_at, checksum, metadata_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(id) DO UPDATE SET
+                       content=excluded.content, archived_at=excluded.archived_at;""",
+                    (uuid4().hex, mem_id, content or "",
+                     "auto_archive: storage limit", now,
+                     content_hash or self.checksum(content or ""), "{}"),
+                )
+                conn.execute(
+                    "UPDATE memories SET active_state = 'archived', archived_at = ? WHERE id = ?;",
+                    (now, mem_id),
+                )
+                archived += 1
+        return archived
+
+    async def _maybe_auto_archive(self, max_memories: int | None = None,
+                                   threshold_pct: float | None = None) -> int:
+        """Check if memory count exceeds threshold and auto-archive if needed."""
+        if max_memories is None or threshold_pct is None:
+            try:
+                from memoryx.config import get_settings
+                settings = get_settings()
+                max_memories = max_memories if max_memories is not None else settings.max_memories
+                threshold_pct = threshold_pct if threshold_pct is not None else settings.auto_archive_threshold_pct
+            except Exception:
+                max_memories = max_memories if max_memories is not None else 100_000
+                threshold_pct = threshold_pct if threshold_pct is not None else 0.9
+        threshold = int(max_memories * threshold_pct)
+        count = await self.count_memories()
+        if count > threshold:
+            overage = count - threshold + 1000  # archive 1k extra for headroom
+            return await self.archive_oldest_memories(limit=min(overage, 5000))
+        return 0
 
     async def store_memory(self, record: MemoryRecord) -> str:
         """Store one memory atomically using BEGIN IMMEDIATE via self.db.transaction(mode='IMMEDIATE').
@@ -300,10 +184,17 @@ class MemoryRepository:
                  json.dumps({"memory_type":n.memory_type,"checksum":n.checksum}),
                  self.checksum(f"{n.id}:store_memory:{now}"),now,"{}"))
 
+        # Auto-archive check (non-blocking, runs outside the write tx)
+        try:
+            await self._maybe_auto_archive()
+        except Exception:
+            logger.warning("Auto-archive check failed", exc_info=True)
+
         return n.id
 
     async def store_memories(self, records: list[MemoryRecord]) -> int:
-        if not records: return 0
+        if not records:
+            return 0
         async with self.db.transaction():
             conn = self.db._require_conn()
             now = self._now_iso()
@@ -379,7 +270,7 @@ class MemoryRepository:
         result: dict[str, dict[str, Any]] = {}
         for chunk in _chunked(ordered, batch_size):
             placeholders = ",".join(["?"] * len(chunk))
-            sql = f"SELECT * FROM memories WHERE id IN ({placeholders})"
+            sql = f"SELECT * FROM memories WHERE id IN ({placeholders})"  # nosec B608
             rows = await self.db.fetchall(sql, tuple(chunk))
             for row in rows:
                 d = self._row_to_dict(row)
@@ -405,13 +296,13 @@ class MemoryRepository:
             return []
 
         plans: list[tuple[str, str]] = []
-        phrase_q = _build_fts_query(tokens, "PHRASE")
+        phrase_q = build_fts_query(tokens, "PHRASE")
         if phrase_q:
             plans.append(("phrase", phrase_q))
-        and_q = _build_fts_query(tokens, "AND")
+        and_q = build_fts_query(tokens, "AND")
         if and_q and and_q != phrase_q:
             plans.append(("and", and_q))
-        or_q = _build_fts_query(tokens, "OR")
+        or_q = build_fts_query(tokens, "OR")
         if or_q and or_q not in (phrase_q, and_q):
             plans.append(("or", or_q))
 
@@ -436,7 +327,7 @@ class MemoryRepository:
         if expand_query_with_fuzzy_aliases is not None:
             expanded = expand_query_with_fuzzy_aliases(tokens)
             if expanded and set(expanded) != set(tokens):
-                expanded_or = _build_fts_query(expanded, "OR")
+                expanded_or = build_fts_query(expanded, "OR")
                 try:
                     rows = await self.db.fetchall(
                         "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
@@ -460,12 +351,12 @@ class MemoryRepository:
             return [], {"query_plan_used": None, "fallback_steps": [], "raw_hit_count": 0}
 
         plan_defs = [
-            ("phrase", _build_fts_query(tokens, "PHRASE")),
-            ("and",    _build_fts_query(tokens, "AND")),
-            ("or",     _build_fts_query(tokens, "OR")),
+            ("phrase", build_fts_query(tokens, "PHRASE")),
+            ("and",    build_fts_query(tokens, "AND")),
+            ("or",     build_fts_query(tokens, "OR")),
         ]
         expanded = expand_with_aliases(tokens)
-        alias_q = _build_fts_query(expanded, "OR")
+        alias_q = build_fts_query(expanded, "OR")
         if alias_q and alias_q != plan_defs[-1][1]:
             plan_defs.append(("alias", alias_q))
 
@@ -500,7 +391,7 @@ class MemoryRepository:
         if expand_query_with_fuzzy_aliases is not None:
             expanded = expand_query_with_fuzzy_aliases(tokens)
             if expanded and set(expanded) != set(tokens):
-                fuzzy_q = _build_fts_query(expanded, "OR")
+                fuzzy_q = build_fts_query(expanded, "OR")
                 try:
                     rows = await self.db.fetchall(
                         "SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
@@ -539,7 +430,7 @@ class MemoryRepository:
         states = include_states if include_states is not None else {"active", "archived"}
         placeholders = ",".join("?" for _ in states)
         rows = await self.db.fetchall(
-            f"SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+            f"SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "  # nosec B608
             f"WHERE memories_fts MATCH ? AND m.active_state IN ({placeholders}) "
             f"ORDER BY bm25(memories_fts) LIMIT ?;",
             (q, *states, limit),
@@ -569,7 +460,7 @@ class MemoryRepository:
             params.append(scope)
         where = " AND ".join(conditions)
         rows = await self.db.fetchall(
-            f"SELECT * FROM memories WHERE {where} ORDER BY updated_at DESC LIMIT ?;",
+            f"SELECT * FROM memories WHERE {where} ORDER BY updated_at DESC LIMIT ?;",  # nosec B608
             (*params, limit),
         )
         return [self._row_to_dict(r) for r in rows]
@@ -828,19 +719,23 @@ class MemoryRepository:
         # backward-compatible alias
         if name is None:
             name = entity_name or ""
-        eid = uuid4().hex; now = self._now_iso(); nn = name.lower().strip()
+        eid = uuid4().hex
+        now = self._now_iso()
+        nn = name.lower().strip()
         await self.db.execute("INSERT INTO entities(id,name,entity_type,normalized_name,active_state,checksum,created_at,metadata_json) VALUES (?,?,?,?,?,?,?,?);",
             (eid,name,entity_type,nn,"active",self.checksum(f"{nn}:{entity_type}"),now,metadata_json))
         return eid
 
     async def add_relation(self, source_entity_id: str, target_entity_id: str, relation_type: str, confidence_score: float=1.0) -> str:
-        rid = uuid4().hex; now = self._now_iso()
+        rid = uuid4().hex
+        now = self._now_iso()
         await self.db.execute("INSERT INTO relations(id,source_entity_id,target_entity_id,relation_type,confidence_score,active_state,checksum,created_at,metadata_json) VALUES (?,?,?,?,?,?,?,?,?);",
             (rid,source_entity_id,target_entity_id,relation_type,confidence_score,"active",self.checksum(f"{source_entity_id}:{target_entity_id}:{relation_type}"),now,"{}"))
         return rid
 
     async def add_session_summary(self, session_id: str, summary: str, source_count: int=0) -> None:
-        now = self._now_iso(); ch = self.checksum(summary)
+        now = self._now_iso()
+        ch = self.checksum(summary)
         await self.db.execute("INSERT INTO session_summaries(id,session_id,summary,content_hash,checksum,valid_from,active_state,created_at,metadata_json) VALUES (?,?,?,?,?,?,?,?,?);",
             (uuid4().hex,session_id,summary,ch,ch,now,"active",now,"{}"))
 
@@ -859,7 +754,9 @@ class MemoryRepository:
                 content = title
             if summary is None:
                 summary = title
-        eid = uuid4().hex; now = self._now_iso(); ch = self.checksum(content)
+        eid = uuid4().hex
+        now = self._now_iso()
+        ch = self.checksum(content)
         if not memory_id:
             memory_id = f"ep-{eid}"
             # Ensure parent row exists for FK constraint
@@ -927,7 +824,7 @@ class MemoryRepository:
             safe["updated_at"] = self._now_iso()
 
             set_sql = ", ".join(f"{k}=?" for k in safe)
-            conn.execute(f"UPDATE memories SET {set_sql} WHERE id=?;", (*safe.values(), memory_id))
+            conn.execute(f"UPDATE memories SET {set_sql} WHERE id=?;", (*safe.values(), memory_id))  # nosec B608
 
             row = conn.execute("SELECT content, checksum FROM memories WHERE id=?;", (memory_id,)).fetchone()
             if row is None:

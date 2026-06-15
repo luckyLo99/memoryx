@@ -144,7 +144,7 @@ class TaskDurationEngine:
             params.append(task_type)
         where = "WHERE " + " AND ".join(clauses) if clauses else ""
         row = await self.repository.db.fetchone(
-            f"SELECT COALESCE(SUM(duration_seconds), 0) AS total, COUNT(*) AS cnt FROM task_durations {where};",
+            f"SELECT COALESCE(SUM(duration_seconds), 0) AS total, COUNT(*) AS cnt FROM task_durations {where};",  # nosec B608
             tuple(params),
         )
         count = int(row["cnt"] if row else 0)
@@ -175,7 +175,7 @@ class TaskDurationEngine:
             GROUP BY {column}
             ORDER BY total_seconds DESC
             LIMIT ?;
-            """,
+            """,  # nosec B608
             (_iso(start), _iso(end), limit),
         )
         return [dict(r) for r in rows]

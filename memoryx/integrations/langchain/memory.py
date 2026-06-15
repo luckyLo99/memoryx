@@ -6,7 +6,6 @@ Provides integration with LangChain memory system.
 from __future__ import annotations
 
 import asyncio
-import uuid
 from typing import Any, List, Optional
 
 from langchain.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage

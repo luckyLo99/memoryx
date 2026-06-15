@@ -32,7 +32,7 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-Expected: `328 passed / 1 skipped / 0 failed`
+Expected: `1071 passed / 1 skipped / 0 failed`
 
 ## Start REST Server
 

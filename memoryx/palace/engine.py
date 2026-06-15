@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from collections import deque
-from typing import Any
 from uuid import uuid4
 
 from .models import PalaceDrawer, PalaceRoom, PalaceWing
@@ -177,7 +175,7 @@ class PalaceEngine:
                 for direction in ["source_room_id", "target_room_id"]:
                     other = "target_room_id" if direction == "source_room_id" else "source_room_id"
                     edges = await self.repository.db.fetchall(
-                        f"SELECT {other} AS neighbor_room_id FROM palace_tunnels WHERE {direction} = ? ORDER BY weight DESC;",
+                        f"SELECT {other} AS neighbor_room_id FROM palace_tunnels WHERE {direction} = ? ORDER BY weight DESC;",  # nosec B608
                         (room_id,),
                     )
                     for edge in edges:

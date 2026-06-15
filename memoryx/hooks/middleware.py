@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..events import EventHandler, MemoryEvent, MiddlewareHandler
+from ..events import MemoryEvent, MiddlewareHandler
 
 
 async def passthrough_middleware(next_handler, *args, **kwargs):

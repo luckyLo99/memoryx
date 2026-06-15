@@ -16,7 +16,6 @@ import hashlib
 import hmac
 import json
 import os
-from typing import Any
 
 
 def verify_challenge(payload: dict, verification_token: str) -> dict:
@@ -84,7 +83,6 @@ def decrypt_event(
 
     参考：https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNlz0M#encrypt
     """
-    import cryptography
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     from cryptography.hazmat.backends import default_backend
 

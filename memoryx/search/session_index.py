@@ -6,7 +6,6 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 
 _WORD_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)

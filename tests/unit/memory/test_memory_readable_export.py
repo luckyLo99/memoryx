@@ -6,15 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from memoryx.hermes_provider import MemoryXHermesProvider, _VALID_ACTIONS
+from memoryx.hermes_provider import MemoryXHermesProvider
 from memoryx.services.memory_candidate_service import (
-    CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 _VALID_FORMATS = {"memory_md", "user_md", "markdown", "json"}
 
@@ -182,7 +181,7 @@ async def test_export_no_file_write(fake_bridge, seeded_repo, tmp_path: Path) ->
     # Result is returned as text, not written to disk
     assert "text" in result
     # No file should have been created
-    files_before = list(tmp_path.rglob("*"))
+    list(tmp_path.rglob("*"))
     # Just verify result shape is correct
     assert isinstance(result["text"], str)
 

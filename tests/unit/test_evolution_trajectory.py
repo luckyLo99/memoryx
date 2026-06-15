@@ -1,7 +1,6 @@
 """Tests for the evolutionary memory trajectory module."""
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -12,7 +11,6 @@ from memoryx.evolution import (
     EvolutionManager,
     EvolutionNode,
     EvolutionRepository,
-    EvolutionTrajectory,
     PreferenceSignal,
     PreferenceSignalDetector,
     ensure_evolution_table,
@@ -283,7 +281,7 @@ class TestEvolutionIntegration:
         assert len(nodes) == 1
 
     def test_route_decision(self, manager):
-        from memoryx.evolution.integration import EvolutionIntegration, IntegrationDecision
+        from memoryx.evolution.integration import EvolutionIntegration
         integ = EvolutionIntegration(manager)
         # First signal → ADD
         sig1 = PreferenceSignal(entity_id="u1", slot="singer", value="张杰",

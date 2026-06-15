@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from memoryx.migration import MigrationEngine, AdapterRegistry
+from memoryx.migration import MigrationEngine
 from memoryx.storage import MemoryRecord, MemoryRepository
 
 

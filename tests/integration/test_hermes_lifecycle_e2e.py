@@ -4,7 +4,7 @@ Simulates the full Hermes Agent memory lifecycle without requiring
 a real Hermes Agent installation.
 """
 from __future__ import annotations
-import os, pytest
+import pytest
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ async def memoryx_env():
     db = Path(tmp) / "test.db"
     repo = MemoryRepository(db)
     await repo.open()
-    cs = MemoryCandidateService(repository=repo)
+    MemoryCandidateService(repository=repo)
     bridge = HermesMemoryBridge(repository=repo)
     provider = MemoryXHermesProvider(bridge=bridge)
     yield {"db": db, "repo": repo, "provider": provider}

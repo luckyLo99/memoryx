@@ -110,7 +110,7 @@ class LessonPolicyEngine:
             WHERE active_state = 'active'
               AND ({' OR '.join(clauses)})
             LIMIT ?;
-            """,
+            """,  # nosec B608
             (*params, limit),
         )
         ids = [str(r["lesson_id"]) for r in rows]
@@ -163,7 +163,7 @@ class LessonPolicyEngine:
               {candidate_clause}
             ORDER BY lm.severity DESC, lm.updated_at DESC
             LIMIT ?;
-            """,
+            """,  # nosec B608
             (*params, *candidate_params, limit),
         )
 

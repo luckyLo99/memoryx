@@ -4,7 +4,6 @@ import asyncio
 import hashlib
 import json
 import logging
-from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 

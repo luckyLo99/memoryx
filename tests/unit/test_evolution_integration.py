@@ -11,9 +11,8 @@ from memoryx.evolution import (
     EvolutionManager,
     EvolutionRepository,
     PreferenceSignal,
-    ensure_evolution_table,
 )
-from memoryx.evolution.integration import EvolutionIntegration, IntegrationDecision
+from memoryx.evolution.integration import EvolutionIntegration
 from memoryx.extraction.models import ExtractionMemory
 from memoryx.validation.conflict_resolver import ConflictResolver
 
@@ -73,7 +72,7 @@ class TestConflictResolverWithEvolution:
         existing = _make_memory("我最喜欢的歌星是张杰")
         candidate = _make_memory("我最喜欢的歌星是房东的猫")
         resolver = ConflictResolver()
-        conflict = resolver.resolve(candidate, [existing])
+        resolver.resolve(candidate, [existing])
         # The resolver may or may not detect a conflict here depending on
         # keyword overlap, but the key point is: when evolution integration
         # routes the signal as EVOLVE, the caller should skip conflict_resolver.

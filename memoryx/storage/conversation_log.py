@@ -102,7 +102,7 @@ class ConversationLogStore:
                 {where}
                 ORDER BY rank
                 LIMIT ?;
-                """,
+                """,  # nosec B608
                 tuple(params),
             )
         except Exception:
@@ -121,7 +121,7 @@ class ConversationLogStore:
                 {where}
                 ORDER BY timestamp DESC
                 LIMIT ?;
-                """,
+                """,  # nosec B608
                 tuple(params),
             )
         return [dict(row) for row in rows]

@@ -58,7 +58,7 @@ class Retriever:
             WHERE fts_memories MATCH ?
             {status_clause}
             ORDER BY bm25_score ASC LIMIT ?
-        """
+        """  # nosec B608
         return list(con.execute(sql, (query, limit)).fetchall())
 
     def _score_rows(self, rows: list[sqlite3.Row], opts: SearchOptions) -> list[RetrievalResult]:

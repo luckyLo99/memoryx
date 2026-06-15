@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ── Detection patterns ──────────────────────────────────────────
@@ -64,7 +66,7 @@ class PIIResult:
         return self.detected_count > 0
 
 
-import warnings
+import warnings  # noqa: E402
 
 class PIIFilter:
     """PII 检测 + HMAC 匿名化。
@@ -79,7 +81,7 @@ class PIIFilter:
         if secret is None and env_secret is None:
             warnings.warn(
                 "Using default PII secret is insecure. Please set MEMORYX_PII_SECRET environment variable or pass a secret to PIIFilter.",
-                SecurityWarning,
+                UserWarning,
                 stacklevel=2
             )
             self.secret = b"memoryx-pii-default"
@@ -90,34 +92,47 @@ class PIIFilter:
 
     def detect(self, text: str) -> PIIResult:
         """检测文本中的 PII 并生成 span。"""
-        spans: list[PIISpan] = []
-        self._find_all(text, _EMAIL_RE, "email", spans)
-        self._find_all(text, _PHONE_CN_RE, "phone_cn", spans)
-        self._find_all(text, _CN_ID_RE, "cn_id", spans)
-        self._find_all(text, _CREDIT_CARD_RE, "credit_card", spans)
-        self._find_all(text, _API_KEY_RE, "api_key", spans)
-        self._find_all(text, _BEARER_RE, "bearer", spans)
-        self._find_all(text, _IPV4_RE, "ipv4", spans)
+        try:
+            spans: list[PIISpan] = []
+            self._find_all(text, _EMAIL_RE, "email", spans)
+            self._find_all(text, _PHONE_CN_RE, "phone_cn", spans)
+            self._find_all(text, _CN_ID_RE, "cn_id", spans)
+            self._find_all(text, _CREDIT_CARD_RE, "credit_card", spans)
+            self._find_all(text, _API_KEY_RE, "api_key", spans)
+            self._find_all(text, _BEARER_RE, "bearer", spans)
+            self._find_all(text, _IPV4_RE, "ipv4", spans)
 
-        # Sort by position, remove overlaps (keep earliest)
-        spans.sort(key=lambda s: (s.start, -s.end))
-        filtered: list[PIISpan] = []
-        last_end = -1
-        for s in spans:
-            if s.start >= last_end:
-                filtered.append(s)
-                last_end = s.end
+            # Sort by position, remove overlaps (keep earliest)
+            spans.sort(key=lambda s: (s.start, -s.end))
+            filtered: list[PIISpan] = []
+            last_end = -1
+            for s in spans:
+                if s.start >= last_end:
+                    filtered.append(s)
+                    last_end = s.end
 
-        return PIIResult(
-            original_text=text,
-            anonymized_text=self._anonymize_text(text, filtered),
-            spans=filtered,
-            detected_count=len(filtered),
-        )
+            return PIIResult(
+                original_text=text,
+                anonymized_text=self._anonymize_text(text, filtered),
+                spans=filtered,
+                detected_count=len(filtered),
+            )
+        except Exception:
+            logger.exception("PII detection failed, redacting entire text for safety")
+            return PIIResult(
+                original_text=text,
+                anonymized_text="[PII_FILTER_ERROR: content redacted]",
+                spans=[],
+                detected_count=0,
+            )
 
     def filter(self, text: str) -> str:
         """便捷方法：返回匿名化后的文本。"""
-        return self.detect(text).anonymized_text
+        try:
+            return self.detect(text).anonymized_text
+        except Exception:
+            logger.exception("PII filter failed, redacting entire text for safety")
+            return "[PII_FILTER_ERROR: content redacted]"
 
     def anonymize(self, value: str) -> str:
         """对单个值执行 HMAC 匿名化。"""

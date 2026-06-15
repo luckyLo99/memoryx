@@ -1,4 +1,3 @@
-from pathlib import Path
 import json
 
 from memoryx.release import ReleaseManifestBuilder

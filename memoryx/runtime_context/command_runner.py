@@ -1,12 +1,11 @@
 from __future__ import annotations
-from pathlib import Path
 import shlex
 import subprocess
 import time
 import uuid
 from typing import Any
 
-from .artifacts import ArtifactStore, ArtifactRef
+from .artifacts import ArtifactStore
 from .budget import RuntimeContextBudget
 from .transcript import RuntimeTranscriptStore
 from .truncate import summarize_terminal_output
@@ -24,7 +23,7 @@ class RuntimeCommandRunner:
         
         cmd_args = shlex.split(command)
         started = time.perf_counter()
-        proc = subprocess.run(cmd_args, cwd=cwd, shell=shell, capture_output=True, text=True, timeout=timeout, env=env)
+        proc = subprocess.run(cmd_args, cwd=cwd, shell=False, capture_output=True, text=True, timeout=timeout, env=env)
         duration_ms = (time.perf_counter() - started) * 1000
         event_id = uuid.uuid4().hex
         stdout_ref = self.artifacts.write_text(kind="stdout", name=f"{event_id}.stdout.log", text=proc.stdout or "", summary=f"stdout for `{command}`; {len(proc.stdout or '')} chars") if proc.stdout else None

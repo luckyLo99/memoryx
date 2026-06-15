@@ -6,11 +6,9 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
 
 
 @dataclass
@@ -126,7 +124,6 @@ class LLMConsolidationEngine:
 
     def _heuristic_analyze(self, memory: dict) -> dict | None:
         """无 LLM 时的启发式分析。"""
-        content = str(memory.get("content", ""))
         decay = float(memory.get("decay_score", 0.0))
         access = int(memory.get("access_count", 0))
         confidence = float(memory.get("confidence_score", 1.0))

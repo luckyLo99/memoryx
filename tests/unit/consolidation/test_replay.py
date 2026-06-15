@@ -62,7 +62,7 @@ class TestMemoryReconsolidation:
     async def test_reconsolidate_no_repository(self):
         rc = MemoryReconsolidation()
         result = await rc.reconsolidate("m1", "new content")
-        assert result["updated"] == False
+        assert not result["updated"]
 
 
 class TestConsolidationScheduler:
@@ -76,10 +76,10 @@ class TestConsolidationScheduler:
     async def test_start_stop(self):
         scheduler = ConsolidationScheduler()
         scheduler.start()
-        assert scheduler.is_running() == True
+        assert scheduler.is_running()
         await scheduler.stop()
-        assert scheduler.is_running() == False
+        assert not scheduler.is_running()
 
     def test_not_running_initially(self):
         scheduler = ConsolidationScheduler()
-        assert scheduler.is_running() == False
+        assert not scheduler.is_running()

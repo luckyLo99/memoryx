@@ -6,11 +6,19 @@ JSONSchema = dict[str, Any]
 
 @dataclass(frozen=True)
 class ToolSpec:
-    name: str; description: str; input_schema: JSONSchema; read_only: bool = False; destructive: bool = False
+    name: str
+    description: str
+    input_schema: JSONSchema
+    read_only: bool = False
+    destructive: bool = False
 
 @dataclass(frozen=True)
 class ToolCallResult:
-    ok: bool; data: Any = None; error: str | None = None; tool_name: str | None = None; trace: dict[str, Any] = field(default_factory=dict)
+    ok: bool
+    data: Any = None
+    error: str | None = None
+    tool_name: str | None = None
+    trace: dict[str, Any] = field(default_factory=dict)
 
 def object_schema(properties: dict[str, Any], required: list[str] | None = None) -> JSONSchema:
     return {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": properties, "required": required or [], "additionalProperties": False}

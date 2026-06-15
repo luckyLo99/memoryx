@@ -147,7 +147,8 @@ class TencentDBAdapter(BaseAdapter):
                     for r in rows:
                         d = dict(r)
                         content = str(d.get("message_text", "")).strip()
-                        if not content: continue
+                        if not content:
+                            continue
                         records.append({"memory_id": d["record_id"], "memory_type": "OBSERVATION" if d["role"] == "assistant" else "EXPERIENCE",
                             "content": content, "scope": "conversation", "importance_score": 0.3, "confidence_score": 0.5,
                             "tags": [], "source_message_id": d.get("session_key", ""), "_source": "tencentdb_l0"})
@@ -224,8 +225,10 @@ class HolographicAdapter(BaseAdapter):
             ):
                 d = dict(r)
                 content = f"Entity: {d['name']} ({d.get('entity_type', 'unknown')})"
-                if d.get("aliases"): content += f" aliases: {d['aliases']}"
-                if d.get("facts"): content += f" | {d['facts'][:200]}"
+                if d.get("aliases"):
+                    content += f" aliases: {d['aliases']}"
+                if d.get("facts"):
+                    content += f" | {d['facts'][:200]}"
                 records.append({"memory_id": f"holo_ent_{d['entity_id']}", "memory_type": "ENT_RELATION", "content": content,
                     "scope": "entity", "importance_score": 0.5, "confidence_score": 0.8,
                     "tags": [d.get('entity_type', 'unknown')], "source_message_id": "", "_source": "holographic_entity"})
@@ -258,10 +261,12 @@ class HermesBuiltinAdapter(BaseAdapter):
         idx = 0
         for fname in ["MEMORY.md", "USER.md"]:
             fp = mem_dir / fname
-            if not fp.exists(): continue
+            if not fp.exists():
+                continue
             for entry in fp.read_text(encoding="utf-8").split("§"):
                 entry = entry.strip()
-                if not entry: continue
+                if not entry:
+                    continue
                 idx += 1
                 records.append({"memory_id": f"hermes_{idx}", "memory_type": "FACT", "content": entry,
                     "scope": "memory" if fname == "MEMORY.md" else "user",
@@ -280,7 +285,8 @@ class HermesBuiltinAdapter(BaseAdapter):
         mem_lines, user_lines = [], []
         for rec in records:
             content = rec.get("content", "").strip()
-            if not content: continue
+            if not content:
+                continue
             if rec.get("scope") == "user":
                 user_lines.append(content)
             else:
@@ -315,7 +321,8 @@ class Mem0Adapter(BaseAdapter):
         records = []
         for item in memories:
             content = item.get("content", item.get("text", "")).strip()
-            if not content: continue
+            if not content:
+                continue
             records.append({"memory_id": item.get("id", uuid4().hex), "memory_type": "FACT",
                 "content": content, "scope": item.get("category", item.get("memory_type", "mem0")),
                 "importance_score": float(item.get("importance", item.get("score", 0.5))),
@@ -350,7 +357,8 @@ class HindsightAdapter(BaseAdapter):
         for bank in banks:
             memories = bank if isinstance(bank, dict) else {"content": str(bank)}
             content = memories.get("content", memories.get("text", "")).strip()
-            if not content: continue
+            if not content:
+                continue
             records.append({"memory_id": memories.get("id", uuid4().hex), "memory_type": "EXPERIENCE",
                 "content": content, "scope": memories.get("bank", memories.get("scope", "hindsight")),
                 "importance_score": float(memories.get("importance", 0.5)),
@@ -382,7 +390,8 @@ class LettaAdapter(BaseAdapter):
         records = []
         for block in blocks:
             content = block.get("content", block.get("value", block.get("text", ""))).strip()
-            if not content: continue
+            if not content:
+                continue
             records.append({"memory_id": block.get("id", uuid4().hex), "memory_type": "FACT",
                 "content": content, "scope": block.get("label", block.get("name", "letta")),
                 "importance_score": float(block.get("importance", 0.5)),
@@ -412,7 +421,8 @@ class ZepAdapter(BaseAdapter):
         records = []
         for ses in sessions:
             content = ses.get("summary", ses.get("content", ses.get("text", ""))).strip()
-            if not content: continue
+            if not content:
+                continue
             records.append({"memory_id": ses.get("uuid", ses.get("id", uuid4().hex)), "memory_type": "OBSERVATION",
                 "content": content, "scope": "zep",
                 "importance_score": float(ses.get("importance", 0.5)),
@@ -442,7 +452,8 @@ class CogneeAdapter(BaseAdapter):
         records = []
         for unit in units:
             content = unit.get("text", unit.get("content", unit.get("statement", ""))).strip()
-            if not content: continue
+            if not content:
+                continue
             records.append({"memory_id": unit.get("id", uuid4().hex), "memory_type": "OBSERVATION",
                 "content": content, "scope": unit.get("layer", unit.get("type", "cognee")),
                 "importance_score": float(unit.get("confidence", unit.get("importance", 0.5))),
@@ -473,7 +484,8 @@ class GBrainAdapter(BaseAdapter):
         records = []
         for md_file in sorted(mem_dir.rglob("*.md")):
             content = md_file.read_text(encoding="utf-8").strip()
-            if not content: continue
+            if not content:
+                continue
             records.append({"memory_id": f"gbrain_{md_file.stem[:40]}", "memory_type": "FACT",
                 "content": content, "scope": "gbrain",
                 "importance_score": 0.5, "confidence_score": 0.5, "tags": [],
@@ -491,7 +503,8 @@ class GBrainAdapter(BaseAdapter):
         count = 0
         for rec in records:
             content = rec.get("content", "").strip()
-            if not content: continue
+            if not content:
+                continue
             safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in content[:60])
             (out_dir / f"memoryx_{safe_name}.md").write_text(content, encoding="utf-8")
             count += 1
@@ -516,7 +529,8 @@ class JsonAdapter(BaseAdapter):
         if suffix in (".json", ".jsonl"):
             raw = fpath.read_text(encoding="utf-8")
             data = [json.loads(line) for line in raw.split("\n") if line.strip()] if suffix == ".jsonl" else json.loads(raw)
-            if isinstance(data, dict): data = data.get("memories", data.get("records", [data]))
+            if isinstance(data, dict):
+                data = data.get("memories", data.get("records", [data]))
             for item in data:
                 records.append(self._map_record(item))
         elif suffix == ".csv":

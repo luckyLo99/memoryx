@@ -9,7 +9,7 @@ from typing import Any
 from memoryx._version import __version__
 
 from .redactor import hash_text, redact_mapping, redact_text
-from .schemas import ReplayCase, ReplayStep, TraceEvent
+from .schemas import ReplayCase, ReplayStep
 
 
 class ReplayExporter:

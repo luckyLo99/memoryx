@@ -17,10 +17,10 @@ References:
 from __future__ import annotations
 
 import re
-import time
+from time import perf_counter
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 
 class RetrievalSystem(Enum):
@@ -117,7 +117,7 @@ class DualProcessGateway:
 
     async def retrieve(self, query: str, limit: int = 10,
                       session_id: str | None = None) -> tuple[list[dict], RetrievalDecision]:
-        t0 = time.time()
+        t0 = perf_counter()
         complexity = self.analyzer.analyze(query)
         system = self.analyzer.classify(complexity)
         decision = RetrievalDecision(
@@ -140,7 +140,7 @@ class DualProcessGateway:
             self.stats["s2_calls"] += 1
             results = await self.system2.search(query, limit=limit * 2, session_id=session_id)
 
-        decision.processing_time_ms = (time.time() - t0) * 1000
+        decision.processing_time_ms = (perf_counter() - t0) * 1000
         return results, decision
 
     @staticmethod

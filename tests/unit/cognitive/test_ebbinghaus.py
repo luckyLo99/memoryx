@@ -1,10 +1,8 @@
 """Tests for Ebbinghaus forgetting curve and spaced repetition module."""
 from __future__ import annotations
 
-import math
 import time
 
-import pytest
 from memoryx.cognitive.ebbinghaus import (
     EbbinghausForgettingCurve,
     MemoryStrength,
@@ -55,7 +53,6 @@ class TestEbbinghausForgettingCurve:
         assert r > 0.99
 
     def test_retention_decays_over_time(self):
-        import time
         s = EbbinghausForgettingCurve.initial_strength(0.5)
         s.last_accessed_at = time.time() - 86400
         r_old = EbbinghausForgettingCurve.retention(s)
@@ -104,12 +101,11 @@ class TestEbbinghausForgettingCurve:
         assert d <= 1.15
 
     def test_is_due_for_review(self):
-        import time
         now = time.time()
         s = MemoryStrength(next_review_interval=0, last_accessed_at=now)
-        assert EbbinghausForgettingCurve.is_due_for_review(s) == True
+        assert EbbinghausForgettingCurve.is_due_for_review(s)
         s2 = MemoryStrength(next_review_interval=86400*365, last_accessed_at=now)
-        assert EbbinghausForgettingCurve.is_due_for_review(s2) == False
+        assert not EbbinghausForgettingCurve.is_due_for_review(s2)
 
 
 class TestSpacedRepetitionScheduler:
@@ -129,7 +125,6 @@ class TestSpacedRepetitionScheduler:
         assert SpacedRepetitionScheduler.box_for_memory(s2) >= 5
 
     def test_batch_due_memories(self):
-        import time
         now = time.time()
         due_now = MemoryStrength(next_review_interval=0, last_accessed_at=now - 86400)
         not_due = MemoryStrength(next_review_interval=999999999, last_accessed_at=now)
@@ -147,7 +142,7 @@ class TestSpacedRepetitionScheduler:
 
 class TestEbbinghausScorerIntegration:
     def test_ebbinghaus_decay_multiplier_function(self):
-        from memoryx.retrieval.scorer import ebbinghaus_decay_multiplier, decay_multiplier
+        from memoryx.retrieval.scorer import ebbinghaus_decay_multiplier
         edm = ebbinghaus_decay_multiplier(importance=0.8, retrieval_count=3)
         assert 0.20 <= edm <= 1.15
 

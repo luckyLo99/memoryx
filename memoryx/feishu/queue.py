@@ -423,7 +423,7 @@ class FeishuSQLiteQueue:
                 WHERE id=?;
                 """, (download_status, error_msg, now, att_id))
 
-    async def download_attachments(self, job: FeishuRenderJob, client: "FeishuClient") -> list[AttachmentRef]:
+    async def download_attachments(self, job: FeishuRenderJob, client: "FeishuClient") -> list[AttachmentRef]:  # noqa: F821
         """下载 job 的所有待处理附件，返回更新后的 attachment refs"""
         attachments = list(job.attachments)
         pending = [(i, a) for i, a in enumerate(attachments) if a.local_path is None and (a.image_key or a.file_key)]

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 try:
@@ -86,17 +85,9 @@ async def collect_lancedb_stats(vector_store) -> dict | None:
 def build_stats_bar(elements: list[dict], by_type: dict[str, dict], total: int) -> None:
     """插入类型分布柱状图——用 column_set + 短 md 实现视觉条。"""
     items = []
-    colors = {
-        "OBSERVATION": "#808080",
-        "EPISODIC": "#3370FF",
-        "FACT": "#00B42A",
-        "PERSONA": "#722ED1",
-        "LESSON": "#F77234",
-    }
     for mtype, data in by_type.items():
         meta = TYPE_META.get(mtype, {"emoji": "📄", "label": mtype})
         pct = data["total"] / total * 100 if total > 0 else 0
-        color = colors.get(mtype, "#3370FF")
         items.append({
             "tag": "column",
             "width": "weighted",

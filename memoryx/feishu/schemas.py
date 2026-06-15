@@ -198,7 +198,6 @@ class FeishuRenderJob:
             "phase": self.phase,
             "revision": self.revision,
             "title": self.title,
-            "text": self.text,
             "receive_id_type": self.receive_id_type,
             "context_summary": self.context_summary,
             "answer": self.answer,

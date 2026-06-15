@@ -5,43 +5,126 @@ on:
     tags:
       - 'v*'
       - 'baseline/*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must already exist). Defaults to pushed tag on tag events."
+        required: false
+        default: ''
+      make_latest:
+        description: "Mark as latest release"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
 
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with: { python-version: '3.11' }
+        with:
+          fetch-depth: 0
 
-      - run: pip install -e ".[dev]"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - run: python -m pip install --upgrade pip setuptools
+      - run: pip install -e ".[dev,mcp]"
 
       - name: Verify import
         run: python -c "import memoryx; print('ok v'+memoryx.__version__)"
 
       - name: Schema check
         run: |
-          python -c "
-import sqlite3, os
-db='/tmp/t.db'
-if os.path.exists(db): os.remove(db)
-c=sqlite3.connect(db)
-c.executescript(open('memoryx/storage/sql/schema.sql').read())
-c.close()
-print('Schema: OK')
-"
+          python -c "import sqlite3, os; db='/tmp/t.db'; os.path.exists(db) and os.remove(db); c=sqlite3.connect(db); c.executescript(open('memoryx/storage/sql/schema.sql').read()); c.close(); print('Schema: OK')"
 
-      - name: Core unit tests
-        run: |
-          python -m pytest -q -x --tb=short             tests/unit/cognitive/test_cognitive_learning.py             tests/unit/cognitive/test_cognitive_timeline_opinion.py             tests/unit/misc/test_p5_self_editor_consolidation.py             -k "not api and not e2e" 2>&1 ||           python -m pytest -q -x --tb=short             tests/unit/cognitive/test_cognitive_learning.py             tests/unit/cognitive/test_cognitive_timeline_opinion.py             tests/unit/misc/test_p5_self_editor_consolidation.py
+      - name: Run all non-E2E tests
+        run: python -m pytest --tb=short --ignore=tests/e2e --ignore=tools --ignore=scripts -x -q
 
       - name: Build wheel
         run: |
           pip install build
           python -m build
 
-      - name: Upload artifacts
+      - name: Collect metadata
+        id: meta
+        run: |
+          python -c "import memoryx; print('version=' + memoryx.__version__)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: dist
+          name: dist-${{ steps.meta.outputs.version }}
           path: dist/
+
+  create-release:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist-${{ needs.test-and-build.outputs.version }}
+          path: dist
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${GITHUB_REF_NAME}" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ needs.test-and-build.outputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine latest flag
+        id: latest
+        run: |
+          v="${{ needs.test-and-build.outputs.version }}"
+          case "$v" in
+            v*.*.*)
+              major_minor="${v#v}"
+              major="${major_minor%%.*}"
+              if [ "$major" -ge 3 ]; then latest=true; else latest=false; fi
+              ;;
+            *)
+              latest=false
+              ;;
+          esac
+          if [ "${{ github.event.inputs.make_latest }}" = "true" ]; then latest=true; fi
+          echo "make_latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release exists
+        id: exists
+        continue-on-error: true
+        run: |
+          if gh release view "${{ steps.tag.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Delete existing release (if any)
+        if: steps.exists.outputs.exists == 'true'
+        run: gh release delete "${{ steps.tag.outputs.tag }}" --yes
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "MemoryX ${{ steps.tag.outputs.tag }}"
+          generate_release_notes: true
+          make_latest: ${{ steps.latest.outputs.make_latest }}
+          files: |
+            dist/*.tar.gz
+            dist/*.whl

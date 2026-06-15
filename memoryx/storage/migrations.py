@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from memoryx.config import MIGRATIONS_DIR, SCHEMA_PATH
 from .sqlite_async import AsyncSQLite
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -27,18 +30,30 @@ class MigrationManager:
         applied = False
 
         if current == 0:
-            await self.db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-            await self.db.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);")
-            current = 1
-            applied = True
+            try:
+                await self.db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+                await self.db.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);")
+                current = 1
+                applied = True
+            except Exception:
+                logger.exception("Failed to apply initial schema (version 1)")
+                return MigrationResult(applied=False, schema_version=current)
 
         for version, sql in self._load_migrations():
             if version <= current:
                 continue
-            await self.db.executescript(sql)
-            await self.db.execute("INSERT INTO schema_migrations(version) VALUES (?);", (version,))
-            current = version
-            applied = True
+            try:
+                # Wrap each migration in a transaction for atomicity.
+                # executescript commits any pending transaction first, so we
+                # add BEGIN/COMMIT around the SQL to ensure atomicity.
+                transactional_sql = f"BEGIN;\n{sql}\nCOMMIT;"
+                await self.db.executescript(transactional_sql)
+                await self.db.execute("INSERT INTO schema_migrations(version) VALUES (?);", (version,))
+                current = version
+                applied = True
+            except Exception:
+                logger.exception("Failed to apply migration version %d, stopping further migrations", version)
+                break
         return MigrationResult(applied=applied, schema_version=current)
 
     def _load_migrations(self) -> list[tuple[int, str]]:

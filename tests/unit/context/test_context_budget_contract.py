@@ -5,11 +5,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-import pytest
 
-from memoryx.context.engine import ContextAssemblyEngine, _annotate_line, _resolve_layer_from_result, _is_result_lesson, _compress_priority_key
+from memoryx.context.engine import ContextAssemblyEngine, _annotate_line, _compress_priority_key
 from memoryx.context.models import ContextBundle, ContextBudgetPolicy
-from memoryx.retrieval.models import RetrievalResult
 
 
 @dataclass
@@ -201,7 +199,7 @@ def test_backward_compatible_output() -> None:
 
 def test_budget_report_structure() -> None:
     p = ContextBudgetPolicy()
-    engine = ContextAssemblyEngine(policy=p)
+    ContextAssemblyEngine(policy=p)
     report = {"max_tokens": 1200, "sections": {"working_context": {"allocated": 120}}}
     assert "max_tokens" in report
     assert "sections" in report

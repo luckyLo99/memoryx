@@ -21,7 +21,7 @@ class ConflictMatch:
 def _memory_id(memory: ExtractionMemory) -> str:
     """为 ExtractionMemory 生成唯一标识（基于 content + timestamp）。"""
     key = f"{memory.content}|{memory.timestamp.isoformat()}"
-    return hashlib.md5(key.encode()).hexdigest()[:12]
+    return hashlib.sha256(key.encode()).hexdigest()[:12]  # nosec B324 - used for dedup, not security
 
 
 class ConflictResolver:

@@ -35,6 +35,11 @@ class MemoryXSettings(BaseSettings):
     sqlite_mmap_size: int = Field(default=268435456, ge=0, le=2147483647)
     sqlite_cache_size_kib: int = Field(default=8192, ge=1024, le=262144)
     sqlite_busy_timeout_ms: int = Field(default=5000, ge=100, le=60000)
+    max_memories: int = Field(default=100_000, ge=1000, le=10_000_000)
+    auto_archive_threshold_pct: float = Field(default=0.9, gt=0.5, le=0.99)
+    llm_enabled: bool = Field(default=True)
+    database_url: str | None = Field(default=None)
+    api_key: str = Field(default="")
 
     @property
     def logs_dir(self) -> Path:
@@ -102,7 +107,7 @@ def get_settings() -> MemoryXSettings:
     return MemoryXSettings(_env_file=os.getenv("MEMORYX_ENV_FILE", ".env"))
 
 # ── Path constants (moved from legacy memoryx.db) ──────────────────────
-from pathlib import Path as _Path
+from pathlib import Path as _Path  # noqa: E402
 _REPO_ROOT = _Path(__file__).resolve().parents[1]
 REPO_ROOT = _REPO_ROOT
 SCHEMA_PATH = _REPO_ROOT / "memoryx" / "storage" / "sql" / "schema.sql"

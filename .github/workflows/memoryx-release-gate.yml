@@ -25,6 +25,18 @@ jobs:
       - name: Verify release truth
         run: python -m memoryx.dev.check_release_truth 2>/dev/null || echo "Manifest check non-fatal"
 
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - name: Run ruff check
+        run: ruff check memoryx/ tests/
+
   release-gate:
     runs-on: ubuntu-latest
     steps:
@@ -39,5 +51,5 @@ jobs:
           python -m pip install -e ".[dev,mcp]"
       - name: Collect tests
         run: python -m pytest --collect-only --tb=short --ignore=tests/e2e --ignore=tools --ignore=scripts/test_siliconflow_embedding.py
-      - name: Run tests (non-E2E)
-        run: python -m pytest --tb=short --ignore=tests/e2e --ignore=tools --ignore=scripts/test_siliconflow_embedding.py -x
+      - name: Run tests with coverage
+        run: python -m pytest --tb=short --ignore=tests/e2e --ignore=tools --ignore=scripts/test_siliconflow_embedding.py -x -q --cov=memoryx --cov-report=term --cov-fail-under=60

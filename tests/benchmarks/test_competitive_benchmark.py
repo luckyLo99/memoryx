@@ -15,7 +15,9 @@ MemoryX runs fully locally.
 """
 
 from __future__ import annotations
-import json, math, os, time, tempfile
+import os
+import time
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -110,7 +112,7 @@ def _memoryx_benchmark() -> BenchmarkSuite:
             add_times = []
             for fact in SHORT_TERM_FACTS:
                 t0 = time.perf_counter()
-                r = await provider.handle_tool_call(
+                await provider.handle_tool_call(
                     "memory", {"action": "add", "content": fact})
                 add_times.append(time.perf_counter() - t0)
             suite.record("short_term_add_latency", "avg_latency_ms",

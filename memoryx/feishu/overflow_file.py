@@ -7,7 +7,6 @@ from __future__ import annotations
 import re
 import time
 from pathlib import Path
-from typing import Any
 
 
 def safe_filename(text: str, fallback: str = "hermes_answer") -> str:

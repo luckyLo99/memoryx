@@ -9,8 +9,6 @@ import pytest
 from memoryx.hermes_provider import MemoryXHermesProvider
 from memoryx.retrieval.engine import _is_session_scoped_memory, _session_matches
 from memoryx.services.memory_candidate_service import (
-    CandidateState,
-    EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,
     MemoryCandidateService,

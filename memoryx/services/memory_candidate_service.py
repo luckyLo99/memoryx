@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
-from uuid import uuid4
 
 from memoryx.storage import MemoryRecord
 
@@ -600,7 +599,6 @@ class MemoryCandidateService:
         if memory is None:
             return False
 
-        now = self._now_iso()
         patch = {
             "candidate_state": CandidateState.REJECTED.value,
             "rejection_reason": reason,

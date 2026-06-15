@@ -12,7 +12,6 @@ from typing import Any
 
 from memoryx.hermes.bridge import HermesMemoryBridge
 from memoryx.services.memory_candidate_service import (
-    CandidateDecision,
     CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,

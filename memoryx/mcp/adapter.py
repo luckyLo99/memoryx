@@ -87,7 +87,7 @@ class MemoryXMCPAdapter:
             row_counts = {}
             for t in all_tables:
                 try:
-                    row_counts[t] = conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] if t in existing else -1
+                    row_counts[t] = conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] if t in existing else -1  # nosec B608
                 except Exception:
                     row_counts[t] = -1
             return {'row_counts': row_counts, 'tables': all_tables}

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pytest
 
 from memoryx.extraction import ExtractionMemory
 from memoryx.validation.conflict_resolver import ConflictResolver
@@ -15,7 +14,9 @@ def create_memory(content: str, reasoning: str = "") -> ExtractionMemory:
         content=content,
         reasoning=reasoning,
         timestamp=datetime.now(),
-        metadata={}
+        memory_type="PREFERENCE",
+        importance_score=0.5,
+        confidence_score=0.8,
     )
 
 
