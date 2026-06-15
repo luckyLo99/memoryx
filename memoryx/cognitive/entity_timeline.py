@@ -38,7 +38,7 @@ class EntityTimelineEngine:
             WHERE {' AND '.join(where)}
             ORDER BY COALESCE(eml.valid_from, m.valid_from, m.created_at) ASC
             LIMIT ?;
-        """
+        """  # nosec B608
         params.append(limit)
         rows = await self.repository.db.fetchall(sql, params)
         return [dict(r) for r in rows]

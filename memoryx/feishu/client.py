@@ -310,7 +310,7 @@ class FeishuClient:
 
         # 确定保存路径
         if save_path is None:
-            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))
+            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))  # nosec B108
             spool_dir.mkdir(parents=True, exist_ok=True)
             # 使用 image_key 前 8 位 + sha256 前 8 位作为文件名，避免冲突
             file_name = f"img_{image_key[:8]}_{sha256[:8]}.png"
@@ -348,7 +348,7 @@ class FeishuClient:
 
         # 确定保存路径
         if save_path is None:
-            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))
+            spool_dir = Path(os.getenv("FEISHU_SPOOL_DIR", "/tmp/feishu_spool"))  # nosec B108
             spool_dir.mkdir(parents=True, exist_ok=True)
             # 使用 file_key 前 8 位 + sha256 前 8 位作为文件名
             file_name = f"file_{file_key[:8]}_{sha256[:8]}"

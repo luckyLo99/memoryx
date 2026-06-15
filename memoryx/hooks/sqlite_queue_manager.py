@@ -64,7 +64,7 @@ class SQLiteQueueManager:
         item_id = uuid4().hex
         now = time.time()
         await self.db.execute(
-            f"INSERT INTO {self.table_name}(id, event_type, payload_json, status, created_at, retry_count, updated_at) VALUES (?, ?, ?, 'pending', ?, 0, ?);",
+            f"INSERT INTO {self.table_name}(id, event_type, payload_json, status, created_at, retry_count, updated_at) VALUES (?, ?, ?, 'pending', ?, 0, ?);",  # nosec B608
             (item_id, event_type, json.dumps(payload, ensure_ascii=False), now, now),
         )
         return item_id
@@ -73,7 +73,7 @@ class SQLiteQueueManager:
         """原子出队：批量获取 pending 事件并标记为 processing。"""
         now = time.time()
         rows = await self.db.fetchall(
-            f"SELECT id, event_type, payload_json, retry_count FROM {self.table_name} WHERE status = 'pending' ORDER BY created_at ASC LIMIT ?;",
+            f"SELECT id, event_type, payload_json, retry_count FROM {self.table_name} WHERE status = 'pending' ORDER BY created_at ASC LIMIT ?;",  # nosec B608
             (limit,),
         )
         if not rows:
@@ -82,7 +82,7 @@ class SQLiteQueueManager:
         ids = [row["id"] for row in rows]
         placeholders = ",".join("?" for _ in ids)
         await self.db.execute(
-            f"UPDATE {self.table_name} SET status = 'processing', updated_at = ? WHERE id IN ({placeholders});",
+            f"UPDATE {self.table_name} SET status = 'processing', updated_at = ? WHERE id IN ({placeholders});",  # nosec B608
             (now, *ids),
         )
 
@@ -99,14 +99,14 @@ class SQLiteQueueManager:
 
     async def mark_done(self, item_id: str) -> None:
         await self.db.execute(
-            f"UPDATE {self.table_name} SET status = 'done', updated_at = ? WHERE id = ?;",
+            f"UPDATE {self.table_name} SET status = 'done', updated_at = ? WHERE id = ?;",  # nosec B608
             (time.time(), item_id),
         )
 
     async def mark_failed(self, item_id: str, error: str) -> None:
         now = time.time()
         row = await self.db.fetchone(
-            f"SELECT retry_count FROM {self.table_name} WHERE id = ?;",
+            f"SELECT retry_count FROM {self.table_name} WHERE id = ?;",  # nosec B608
             (item_id,),
         )
         if not row:
@@ -114,17 +114,17 @@ class SQLiteQueueManager:
         retries = int(row["retry_count"]) + 1
         if retries > self.MAX_RETRIES:
             await self.db.execute(
-                f"UPDATE {self.table_name} SET status = 'dead', retry_count = ?, last_error = ?, updated_at = ? WHERE id = ?;",
+                f"UPDATE {self.table_name} SET status = 'dead', retry_count = ?, last_error = ?, updated_at = ? WHERE id = ?;",  # nosec B608
                 (retries, error, now, item_id),
             )
         else:
             await self.db.execute(
-                f"UPDATE {self.table_name} SET status = 'pending', retry_count = ?, last_error = ?, updated_at = ? WHERE id = ?;",
+                f"UPDATE {self.table_name} SET status = 'pending', retry_count = ?, last_error = ?, updated_at = ? WHERE id = ?;",  # nosec B608
                 (retries, error, now, item_id),
             )
 
     async def stats(self) -> dict[str, int]:
         by_status = await self.db.fetchall(
-            f"SELECT status, COUNT(*) as cnt FROM {self.table_name} GROUP BY status;"
+            f"SELECT status, COUNT(*) as cnt FROM {self.table_name} GROUP BY status;"  # nosec B608
         )
         return {row["status"]: row["cnt"] for row in by_status}

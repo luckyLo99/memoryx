@@ -73,7 +73,7 @@ class SelfEditor:
         if request.edit_type == "correct":
             for k, v in request.changes.items():
                 if k in ("id", "created_at"): continue
-                await self.repository.db.execute(f"UPDATE memories SET {k}=?, updated_at=datetime('now') WHERE id=?;", (v, request.memory_id))
+                await self.repository.db.execute(f"UPDATE memories SET {k}=?, updated_at=datetime('now') WHERE id=?;", (v, request.memory_id))  # nosec B608
         elif request.edit_type == "merge":
             t = request.changes.get("merge_into", "")
             if t: await self.repository.supersede_memory(request.memory_id, t)

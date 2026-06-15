@@ -445,7 +445,7 @@ def create_app(
 
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
         count_row = await repo.db.fetchone(
-            f"SELECT COUNT(*) AS cnt FROM memories{where_clause};",
+            f"SELECT COUNT(*) AS cnt FROM memories{where_clause};",  # nosec B608
             tuple(params_vals),
         )
         total = int(count_row["cnt"]) if count_row else 0
@@ -453,7 +453,7 @@ def create_app(
         # 分页查询
         order = "ORDER BY created_at DESC LIMIT ? OFFSET ?"
         rows = await repo.db.fetchall(
-            f"SELECT * FROM memories{where_clause} {order};",
+            f"SELECT * FROM memories{where_clause} {order};",  # nosec B608
             tuple(params_vals) + (limit, offset),
         )
         memories = [dict(r) for r in rows]

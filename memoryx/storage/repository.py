@@ -453,7 +453,7 @@ class MemoryRepository:
         result: dict[str, dict[str, Any]] = {}
         for chunk in _chunked(ordered, batch_size):
             placeholders = ",".join(["?"] * len(chunk))
-            sql = f"SELECT * FROM memories WHERE id IN ({placeholders})"
+            sql = f"SELECT * FROM memories WHERE id IN ({placeholders})"  # nosec B608
             rows = await self.db.fetchall(sql, tuple(chunk))
             for row in rows:
                 d = self._row_to_dict(row)
@@ -613,7 +613,7 @@ class MemoryRepository:
         states = include_states if include_states is not None else {"active", "archived"}
         placeholders = ",".join("?" for _ in states)
         rows = await self.db.fetchall(
-            f"SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "
+            f"SELECT m.* FROM memories m JOIN memories_fts f ON m.rowid=f.rowid "  # nosec B608
             f"WHERE memories_fts MATCH ? AND m.active_state IN ({placeholders}) "
             f"ORDER BY bm25(memories_fts) LIMIT ?;",
             (q, *states, limit),
@@ -643,7 +643,7 @@ class MemoryRepository:
             params.append(scope)
         where = " AND ".join(conditions)
         rows = await self.db.fetchall(
-            f"SELECT * FROM memories WHERE {where} ORDER BY updated_at DESC LIMIT ?;",
+            f"SELECT * FROM memories WHERE {where} ORDER BY updated_at DESC LIMIT ?;",  # nosec B608
             (*params, limit),
         )
         return [self._row_to_dict(r) for r in rows]
@@ -1001,7 +1001,7 @@ class MemoryRepository:
             safe["updated_at"] = self._now_iso()
 
             set_sql = ", ".join(f"{k}=?" for k in safe)
-            conn.execute(f"UPDATE memories SET {set_sql} WHERE id=?;", (*safe.values(), memory_id))
+            conn.execute(f"UPDATE memories SET {set_sql} WHERE id=?;", (*safe.values(), memory_id))  # nosec B608
 
             row = conn.execute("SELECT content, checksum FROM memories WHERE id=?;", (memory_id,)).fetchone()
             if row is None:

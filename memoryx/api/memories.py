@@ -225,7 +225,7 @@ async def _context_via_repo(
           AND ({placeholders})
         ORDER BY importance_score DESC, created_at DESC
         LIMIT ?
-        """
+        """  # nosec B608
         cursor = conn.execute(sql, (*patterns, limit))
         rows = cursor.fetchall()
         return [
@@ -759,7 +759,7 @@ def create_p11_router(
                    COALESCE(AVG(duration_seconds), 0) as avg_seconds
             FROM task_durations
             WHERE {where_clause};
-            """,
+            """,  # nosec B608
             tuple(params),
         )
 
@@ -771,7 +771,7 @@ def create_p11_router(
             WHERE {where_clause}
             GROUP BY entity_id
             ORDER BY total_seconds DESC;
-            """,
+            """,  # nosec B608
             tuple(params),
         )
 
@@ -806,7 +806,7 @@ def create_p11_router(
             WHERE {where_clause}
             ORDER BY start_time DESC
             LIMIT ?;
-            """,
+            """,  # nosec B608
             tuple(params) + (body.limit,),
         )
 

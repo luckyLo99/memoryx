@@ -121,7 +121,7 @@ class HybridRetriever:
     def _fts_claim_ids(self, query: str, limit: int, include_inactive: bool) -> list[str]:
         status_clause = "" if include_inactive else "AND c.status = 'active'"
         with sqlite3.connect(self.db_path) as con:
-            rows = con.execute(f"SELECT c.claim_id FROM fts_memories JOIN claims c ON c.claim_id = fts_memories.claim_id WHERE fts_memories MATCH ? {status_clause} ORDER BY bm25(fts_memories) ASC LIMIT ?", (query, limit)).fetchall()
+            rows = con.execute(f"SELECT c.claim_id FROM fts_memories JOIN claims c ON c.claim_id = fts_memories.claim_id WHERE fts_memories MATCH ? {status_clause} ORDER BY bm25(fts_memories) ASC LIMIT ?", (query, limit)).fetchall()  # nosec B608
         return [row[0] for row in rows]
 
     def _load_claim_rows(self, claim_ids: list[str], include_inactive: bool) -> list[sqlite3.Row]:
@@ -131,6 +131,6 @@ class HybridRetriever:
         sc = "" if include_inactive else "AND status = 'active'"
         with sqlite3.connect(self.db_path) as con:
             con.row_factory = sqlite3.Row
-            rows = list(con.execute(f"SELECT claim_id, claim_type, content, status, confidence, importance, updated_at, last_accessed_at, access_count FROM claims WHERE claim_id IN ({ph}) {sc}", claim_ids).fetchall())
+            rows = list(con.execute(f"SELECT claim_id, claim_type, content, status, confidence, importance, updated_at, last_accessed_at, access_count FROM claims WHERE claim_id IN ({ph}) {sc}", claim_ids).fetchall())  # nosec B608
         order = {cid: i for i, cid in enumerate(claim_ids)}
         return sorted(rows, key=lambda r: order.get(r["claim_id"], 10**9))

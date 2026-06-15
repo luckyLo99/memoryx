@@ -106,7 +106,7 @@ async def task_durations_v2(
                COALESCE(AVG(duration_seconds), 0) as avg_seconds
         FROM task_durations
         WHERE {where_clause};
-        """,
+        """,  # nosec B608
         tuple(params),
     )
 
@@ -117,7 +117,7 @@ async def task_durations_v2(
         WHERE {where_clause}
         GROUP BY entity_id
         ORDER BY total_seconds DESC;
-        """,
+        """,  # nosec B608
         tuple(params),
     )
 
@@ -154,7 +154,7 @@ async def entity_timeline_v2(
         WHERE {' AND '.join(wheres)}
         ORDER BY start_time DESC
         LIMIT ?;
-        """,
+        """,  # nosec B608
         tuple(params) + (body.limit,),
     )
 

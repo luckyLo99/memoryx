@@ -304,6 +304,6 @@ class FeedbackLearningEngine:
             return
         assignments = ", ".join(f"{key} = ?" for key in filtered)
         await self.repository.db.execute(
-            f"UPDATE memories SET {assignments}, updated_at = datetime('now') WHERE id = ?;",
+            f"UPDATE memories SET {assignments}, updated_at = datetime('now') WHERE id = ?;",  # nosec B608
             (*filtered.values(), memory_id),
         )

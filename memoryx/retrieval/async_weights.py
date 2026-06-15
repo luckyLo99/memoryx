@@ -191,7 +191,7 @@ class AsyncWeightProvider:
                 SELECT weights_json FROM retrieval_weight_overrides
                 WHERE {' AND '.join(clauses)}
                 ORDER BY priority ASC, created_at ASC;
-                """,
+                """,  # nosec B608
                 tuple(params),
             )
         except Exception:

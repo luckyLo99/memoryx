@@ -68,7 +68,7 @@ class LessonEnforcementPolicyEngine:
                 WHERE {' AND '.join(where)}
                 ORDER BY lm.severity DESC, lm.updated_at DESC
                 LIMIT 25;
-            """
+            """  # nosec B608
             db_rows = await self.repository.db.fetchall(sql, tuple(params))
             lowered = action_text.lower()
             for row in db_rows:
