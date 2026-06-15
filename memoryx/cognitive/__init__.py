@@ -23,5 +23,8 @@ __all__ = [
     "TaskDuration", "TaskDurationEngine",
 ]
 
+from .attention_focus import AttentionFocusEngine
 from .ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome, SpacedRepetitionScheduler
 from .working_memory import BaddeleyWorkingMemory, CentralExecutive, ModalityType, PhonologicalLoop, WorkingMemoryState
+
+__all__.append("AttentionFocusEngine")

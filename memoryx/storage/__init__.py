@@ -1,4 +1,5 @@
 from .backup import BackupManager
+from .backend import BackendFactory, PostgreSQLBackend, SQLiteBackend, StorageBackend
 from .import_export import ImportExportManager
 from .maintenance import StorageMaintenance
 from .migrations import MigrationManager, MigrationResult
@@ -8,10 +9,14 @@ from .sqlite_async import AsyncSQLite
 __all__ = [
     "AsyncSQLite",
     "BackupManager",
+    "BackendFactory",
     "ImportExportManager",
     "MigrationManager",
     "MigrationResult",
     "MemoryRecord",
     "MemoryRepository",
+    "PostgreSQLBackend",
+    "SQLiteBackend",
+    "StorageBackend",
     "StorageMaintenance",
 ]

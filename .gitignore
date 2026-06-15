@@ -148,6 +148,7 @@ __pycache__/
 # Agent working directories
 .trae/
 .trae*/
+.claude/
 
 # Ad-hoc test scripts (not part of the formal test suite)
 test_*.py

@@ -217,9 +217,13 @@ class MemoryRecord:
 
 
 class MemoryRepository:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, time_provider=None) -> None:
         self.db = AsyncSQLite(db_path)
         self.migrations = MigrationManager(db=self.db)
+        if time_provider is None:
+            from memoryx.temporal.time_provider import get_time_provider
+            time_provider = get_time_provider()
+        self._time_provider = time_provider
 
     async def open(self) -> None:
         await self.db.open()
@@ -232,9 +236,8 @@ class MemoryRepository:
     def checksum(content: str) -> str:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-    @staticmethod
-    def _now_iso() -> str:
-        return datetime.now(timezone.utc).isoformat()
+    def _now_iso(self) -> str:
+        return self._time_provider.now().isoformat()
 
     def _normalize_record(self, record: MemoryRecord) -> MemoryRecord:
         if record.memory_type not in MEMORY_TYPES:
@@ -255,6 +258,68 @@ class MemoryRepository:
     def _normalize_search_query(query: str) -> str:
         tokens = [t for t in "".join(ch.lower() if ch.isalnum() else " " for ch in query).split() if t]
         return " OR ".join(tokens) if tokens else ""
+
+    async def count_memories(self) -> int:
+        """Return the total number of active (non-archived) memories."""
+        async with self.db.acquire() as conn:
+            cur = conn.execute("SELECT COUNT(*) FROM memories WHERE active_state != 'archived';")
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
+
+    async def archive_oldest_memories(self, limit: int = 100) -> int:
+        """Archive the oldest, least-important memories to control storage growth.
+
+        Returns the number of memories archived.
+        """
+        archived = 0
+        now = self._now_iso()
+        async with self.db.transaction(mode="IMMEDIATE") as conn:
+            # Select candidates: low importance, low access, oldest updated
+            cur = conn.execute(
+                """SELECT id, content, content_hash FROM memories
+                   WHERE active_state = 'active'
+                   ORDER BY importance_score ASC, access_count ASC, updated_at ASC
+                   LIMIT ?;""",
+                (limit,),
+            )
+            rows = cur.fetchall()
+            for row in rows:
+                mem_id, content, content_hash = row
+                conn.execute(
+                    """INSERT INTO archived_memories
+                       (id, memory_id, content, archived_reason, archived_at, checksum, metadata_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(id) DO UPDATE SET
+                       content=excluded.content, archived_at=excluded.archived_at;""",
+                    (uuid4().hex, mem_id, content or "",
+                     "auto_archive: storage limit", now,
+                     content_hash or self.checksum(content or ""), "{}"),
+                )
+                conn.execute(
+                    "UPDATE memories SET active_state = 'archived', archived_at = ? WHERE id = ?;",
+                    (now, mem_id),
+                )
+                archived += 1
+        return archived
+
+    async def _maybe_auto_archive(self, max_memories: int | None = None,
+                                   threshold_pct: float | None = None) -> int:
+        """Check if memory count exceeds threshold and auto-archive if needed."""
+        if max_memories is None or threshold_pct is None:
+            try:
+                from memoryx.config import get_settings
+                settings = get_settings()
+                max_memories = max_memories or settings.max_memories
+                threshold_pct = threshold_pct or settings.auto_archive_threshold_pct
+            except Exception:
+                max_memories = max_memories or 100_000
+                threshold_pct = threshold_pct or 0.9
+        threshold = int(max_memories * threshold_pct)
+        count = await self.count_memories()
+        if count > threshold:
+            overage = count - threshold + 1000  # archive 1k extra for headroom
+            return await self.archive_oldest_memories(limit=min(overage, 5000))
+        return 0
 
     async def store_memory(self, record: MemoryRecord) -> str:
         """Store one memory atomically using BEGIN IMMEDIATE via self.db.transaction(mode='IMMEDIATE').
@@ -299,6 +364,12 @@ class MemoryRepository:
                 (uuid4().hex,"memories",n.id,"store_memory",
                  json.dumps({"memory_type":n.memory_type,"checksum":n.checksum}),
                  self.checksum(f"{n.id}:store_memory:{now}"),now,"{}"))
+
+        # Auto-archive check (non-blocking, runs outside the write tx)
+        try:
+            await self._maybe_auto_archive()
+        except Exception:
+            pass  # Never let archiving break the write path
 
         return n.id
 

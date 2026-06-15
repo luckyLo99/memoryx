@@ -29,8 +29,12 @@ class TemporalScorer:
     # 衰减常数（天）
     DECAY_HALF_LIFE_DAYS: float = 90.0
 
-    def __init__(self, *, repository=None) -> None:
+    def __init__(self, *, repository=None, time_provider=None) -> None:
         self.repository = repository
+        if time_provider is None:
+            from .time_provider import get_time_provider
+            time_provider = get_time_provider()
+        self.time_provider = time_provider
 
     async def score(
         self,
@@ -38,7 +42,7 @@ class TemporalScorer:
         intent: TemporalQueryIntent | None = None,
     ) -> float:
         """计算单条 memory 的时序分数 (0.0–1.0)。"""
-        now = intent.reference_time if intent and intent.reference_time else datetime.now(timezone.utc)
+        now = intent.reference_time if intent and intent.reference_time else self.time_provider.now()
 
         valid_from = self._parse_dt(memory.get("valid_from"))
         valid_to = self._parse_dt(memory.get("valid_to"))

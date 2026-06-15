@@ -91,6 +91,7 @@ from .retrieval import (
     RankedCandidate,
 )
 from .routing import MemoryRouter, RoutePlan, RoutingIntent
+from .cognitive.persona import PersonaEngine
 from .cognition import RuntimeCognitiveState, RuntimeCognitiveStateEngine
 from .safety import MemorySafetyEngine
 from .episodic.scene import Scene, SceneEngine

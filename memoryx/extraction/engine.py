@@ -12,13 +12,19 @@ class ExtractionClient(Protocol):
 
 
 class MemoryExtractionEngine:
-    def __init__(self, client: ExtractionClient, batch_size: int = 8, min_importance: float = 0.3, min_confidence: float = 0.4) -> None:
+    def __init__(self, client: ExtractionClient | None = None, batch_size: int = 8,
+                 min_importance: float = 0.3, min_confidence: float = 0.4,
+                 llm_enabled: bool = True) -> None:
         self.client = client
         self.batch_size = batch_size
         self.min_importance = min_importance
         self.min_confidence = min_confidence
+        self.llm_enabled = llm_enabled
+        self._rule_engine: Any | None = None
 
     async def extract(self, request: ExtractionRequest) -> ExtractionResult:
+        if not self.llm_enabled or self.client is None:
+            return self._rule_extract(request)
         all_memories: list[ExtractionMemory] = []
         for batch in self._batched(request.sources):
             payload = await self.client.extract(ExtractionRequest(session_id=request.session_id, sources=batch))
@@ -29,6 +35,16 @@ class MemoryExtractionEngine:
             if memory.importance_score >= self.min_importance and memory.confidence_score >= self.min_confidence
         ]
         return ExtractionResult(memories=filtered)
+
+    def _rule_extract(self, request: ExtractionRequest) -> ExtractionResult:
+        """Fallback to rule-based extraction when LLM is disabled."""
+        if self._rule_engine is None:
+            from .rule_engine import RuleExtractionEngine
+            self._rule_engine = RuleExtractionEngine(
+                min_importance=self.min_importance,
+                min_confidence=self.min_confidence,
+            )
+        return self._rule_engine.extract(request)
 
     def _batched(self, sources: list[ExtractionSource]) -> Iterable[list[ExtractionSource]]:
         for index in range(0, len(sources), self.batch_size):

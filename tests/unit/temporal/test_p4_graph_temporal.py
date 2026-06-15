@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -69,9 +70,8 @@ async def test_temporal_score_expired_memory():
 @pytest.mark.asyncio
 async def test_temporal_score_recent_memory():
     ts = TemporalScorer()
-    from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    yesterday = now.replace(day=now.day - 1 if now.day > 1 else 28).isoformat()
+    yesterday = (now - timedelta(days=1)).isoformat()
     memory = {"valid_from": yesterday, "valid_to": None}
     score = await ts.score(memory, TemporalQueryIntent(intent="current"))
     assert score > 0.8  # recent memory, high score
