@@ -133,6 +133,7 @@ class WorkingMemoryEngine:
         todos: list[str] | None = None,
         workflow_state: dict | None = None,
     ) -> WorkingMemoryState:
+        await self.expire_stale()
         async with self._lock:
             state = self._states.get(session_id)
             if state is None:
@@ -174,6 +175,7 @@ class WorkingMemoryEngine:
             return state
 
     async def get_state(self, session_id: str) -> WorkingMemoryState | None:
+        await self.expire_stale()
         async with self._lock:
             state = self._states.get(session_id)
             if state is None:

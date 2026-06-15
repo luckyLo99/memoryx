@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any, List, Dict
 import pytest
 
+from memoryx.storage.repository import MemoryRecord
+
 
 TEST_DIR = Path(tempfile.mkdtemp()) / "beam"
 
@@ -155,11 +157,12 @@ def _run_beam_write_benchmark(num_records: int = 1000) -> BEAMResult:
             
             for fact in facts:
                 start = time.perf_counter()
-                await repo.add_memory(
+                record = MemoryRecord(
                     content=fact,
-                    memory_type="fact",
-                    scope="global"
+                    memory_type="FACT",
+                    scope="global",
                 )
+                await repo.store_memory(record)
                 latency = (time.perf_counter() - start) * 1000
                 latencies.append(latency)
         finally:
@@ -200,11 +203,12 @@ def _run_beam_search_benchmark(num_records: int = 1000,
         await repo.open()
         facts = [generate_random_fact() for _ in range(num_records)]
         for fact in facts:
-            await repo.add_memory(
+            record = MemoryRecord(
                 content=fact,
-                memory_type="fact",
-                scope="global"
+                memory_type="FACT",
+                scope="global",
             )
+            await repo.store_memory(record)
     
     async def _run_queries():
         queries = generate_queries(num_queries)
@@ -273,6 +277,7 @@ def test_beam_small_scale():
     
     # 保存报告
     report_path = TEST_DIR / "beam_small_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(suite.summary(), f, indent=2, ensure_ascii=False)
     
@@ -302,6 +307,7 @@ def test_beam_large_scale():
     suite.results.append(search_result)
     
     report_path = TEST_DIR / "beam_large_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(suite.summary(), f, indent=2, ensure_ascii=False)
     

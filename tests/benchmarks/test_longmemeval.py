@@ -250,6 +250,7 @@ def test_longmemeval_preference_evolution(tmp_path):
 
     # Save standalone report
     report_path = TEST_DIR / "longmemeval_preference_evolution_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
     print(f"Report saved to: {report_path}")
@@ -264,7 +265,7 @@ def test_longmemeval_preference_evolution(tmp_path):
 def _run_memoryx_longmemeval() -> LongMemEvalSuite:
     """运行 MemoryX 的 LongMemEval 基准测试."""
     import asyncio
-    from memoryx.storage.repository import MemoryRepository
+    from memoryx.storage.repository import MemoryRepository, MemoryRecord
     
     suite = LongMemEvalSuite()
     
@@ -280,11 +281,11 @@ def _run_memoryx_longmemeval() -> LongMemEvalSuite:
             scenario = SCENARIO_FACT_RECALL[0]
             
             for fact in scenario["facts"]:
-                await repo.add_memory(
+                await repo.store_memory(MemoryRecord(
                     content=fact,
-                    memory_type="fact",
+                    memory_type="FACT",
                     scope="global"
-                )
+                ))
             
             for query, expected in scenario["queries"]:
                 results = await repo.search_full_text(query, limit=5)
@@ -304,11 +305,11 @@ def _run_memoryx_longmemeval() -> LongMemEvalSuite:
             scenario = SCENARIO_TEMPORAL_REASONING[0]
             
             for event in scenario["events"]:
-                await repo.add_memory(
+                await repo.store_memory(MemoryRecord(
                     content=event,
-                    memory_type="event",
+                    memory_type="EPISODIC",
                     scope="global"
-                )
+                ))
             
             for query, expected in scenario["queries"]:
                 results = await repo.search_full_text(query, limit=5)
@@ -328,18 +329,18 @@ def _run_memoryx_longmemeval() -> LongMemEvalSuite:
             scenario = SCENARIO_CONFLICT_RESOLUTION[0]
             
             for fact in scenario["initial"]:
-                await repo.add_memory(
+                await repo.store_memory(MemoryRecord(
                     content=fact,
-                    memory_type="fact",
+                    memory_type="FACT",
                     scope="global"
-                )
+                ))
             
             for update in scenario["updates"]:
-                await repo.add_memory(
+                await repo.store_memory(MemoryRecord(
                     content=update,
-                    memory_type="fact",
+                    memory_type="FACT",
                     scope="global"
-                )
+                ))
             
             for query, expected in scenario["queries"]:
                 results = await repo.search_full_text(query, limit=5)

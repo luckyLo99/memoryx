@@ -16,8 +16,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from memoryx.temporal.time_provider import TimeProvider, get_time_provider
@@ -44,8 +45,8 @@ class AttentionFrame:
     reasoning_chain: list[str] = field(default_factory=list)
     active_todos: list[str] = field(default_factory=list)
     activation: float = 1.0  # 0.0–1.0, dominant = highest
-    created_at: datetime = field(default_factory=lambda: datetime.now())
-    last_accessed_at: datetime = field(default_factory=lambda: datetime.now())
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_accessed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     # Stack for nested interruptions
     parent_task_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -86,6 +87,7 @@ class AttentionFocusEngine:
         self._dominant_task_id: str | None = None
         self._interruption_stack: list[AttentionFrame] = []
         self._interruption_history: list[InterruptionRecord] = []
+        self._interruption_history_maxlen: int = 1000
         self._lock = asyncio.Lock()
 
     # ── Core API ──────────────────────────────────────────────────
@@ -155,39 +157,47 @@ class AttentionFocusEngine:
     async def get_attention_snapshot(self) -> dict[str, Any]:
         """Return current attention state for debugging/context."""
         async with self._lock:
-            self._decay_all()
-            return {
-                "dominant_task": self._dominant_task_id,
-                "dominant_description": (
-                    self._frames[self._dominant_task_id].task_description
-                    if self._dominant_task_id and self._dominant_task_id in self._frames
-                    else None
-                ),
-                "active_frames": len([f for f in self._frames.values() if f.activation > _MIN_ACTIVATION]),
-                "stack_depth": len(self._interruption_stack),
-                "frames": [
-                    {
-                        "task_id": f.task_id,
-                        "description": f.task_description[:60],
-                        "activation": round(f.activation, 3),
-                    }
-                    for f in sorted(self._frames.values(), key=lambda x: x.activation, reverse=True)
-                    if f.activation > _MIN_ACTIVATION
-                ],
-            }
+            return self._get_attention_snapshot_unlocked()
+
+    def _get_attention_snapshot_unlocked(self) -> dict[str, Any]:
+        """Internal: return attention snapshot without acquiring lock (caller must hold lock)."""
+        self._decay_all()
+        return {
+            "dominant_task": self._dominant_task_id,
+            "dominant_description": (
+                self._frames[self._dominant_task_id].task_description
+                if self._dominant_task_id and self._dominant_task_id in self._frames
+                else None
+            ),
+            "active_frames": len([f for f in self._frames.values() if f.activation > _MIN_ACTIVATION]),
+            "stack_depth": len(self._interruption_stack),
+            "frames": [
+                {
+                    "task_id": f.task_id,
+                    "description": f.task_description[:60],
+                    "activation": round(f.activation, 3),
+                }
+                for f in sorted(self._frames.values(), key=lambda x: x.activation, reverse=True)
+                if f.activation > _MIN_ACTIVATION
+            ],
+        }
 
     async def pop_stack(self) -> AttentionFrame | None:
         """Manually pop the interruption stack. Used when user says 'go back'."""
         async with self._lock:
-            if not self._interruption_stack:
-                return None
-            frame = self._interruption_stack.pop()
-            self._dominant_task_id = frame.task_id
-            frame.activation = 1.0
-            frame.last_accessed_at = self.time_provider.now()
-            self._frames[frame.task_id] = frame
-            await self._persist_frame(frame)
-            return frame
+            return await self._pop_stack_unlocked()
+
+    async def _pop_stack_unlocked(self) -> AttentionFrame | None:
+        """Internal: pop stack without acquiring lock (caller must hold lock)."""
+        if not self._interruption_stack:
+            return None
+        frame = self._interruption_stack.pop()
+        self._dominant_task_id = frame.task_id
+        frame.activation = 1.0
+        frame.last_accessed_at = self.time_provider.now()
+        self._frames[frame.task_id] = frame
+        await self._persist_frame(frame)
+        return frame
 
     # ── Intent Classification ─────────────────────────────────────
 
@@ -254,8 +264,8 @@ class AttentionFocusEngine:
 
     async def _handle_return(self, session_id: str, content: str) -> dict[str, Any]:
         """User wants to return to previous mainline task."""
-        # Pop from stack
-        restored_frame = await self.pop_stack()
+        # Pop from stack (already inside lock via on_user_message)
+        restored_frame = await self._pop_stack_unlocked()
 
         if restored_frame is None:
             # No stack, try to recover most active historical frame
@@ -267,7 +277,7 @@ class AttentionFocusEngine:
                 "success": False,
                 "reason": "no_previous_task",
                 "restored_context": None,
-                "attention_snapshot": await self.get_attention_snapshot(),
+                "attention_snapshot": self._get_attention_snapshot_unlocked(),
             }
 
         # Record successful recovery
@@ -289,15 +299,15 @@ class AttentionFocusEngine:
             "action": "returned",
             "success": True,
             "restored_context": context,
-            "attention_snapshot": await self.get_attention_snapshot(),
+            "attention_snapshot": self._get_attention_snapshot_unlocked(),
         }
 
     async def _handle_interruption(self, session_id: str, content: str) -> dict[str, Any]:
         """User interrupted with a new topic. Save current context."""
         old_dominant = self._dominant_task_id
 
-        # Create a new frame for the interruption
-        new_task_id = f"interrupt_{session_id}_{self.time_provider.now().timestamp()}"
+        # Create a new frame for the interruption (uuid4 suffix prevents task_id collision)
+        new_task_id = f"interrupt_{session_id}_{self.time_provider.now().timestamp()}_{uuid.uuid4().hex[:8]}"
         frame = AttentionFrame(
             task_id=new_task_id,
             task_description=content[:200],
@@ -316,6 +326,9 @@ class AttentionFocusEngine:
                 interrupting_query=content[:500],
                 timestamp=self.time_provider.now(),
             ))
+            # Cap history to prevent unbounded growth
+            if len(self._interruption_history) > self._interruption_history_maxlen:
+                self._interruption_history = self._interruption_history[-self._interruption_history_maxlen:]
 
         await self._persist_frame(frame)
 
@@ -323,7 +336,7 @@ class AttentionFocusEngine:
             "action": "interrupted",
             "previous_task": old_dominant,
             "new_task": new_task_id,
-            "attention_snapshot": await self.get_attention_snapshot(),
+            "attention_snapshot": self._get_attention_snapshot_unlocked(),
         }
 
     async def _handle_continue(self, session_id: str, content: str) -> dict[str, Any]:
@@ -336,7 +349,7 @@ class AttentionFocusEngine:
 
         return {
             "action": "continue",
-            "attention_snapshot": await self.get_attention_snapshot(),
+            "attention_snapshot": self._get_attention_snapshot_unlocked(),
         }
 
     # ── Decay & Recovery ──────────────────────────────────────────

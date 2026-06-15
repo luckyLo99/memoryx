@@ -87,11 +87,13 @@ class GoldenRuleEngine:
         *,
         repository=None,
         time_provider: TimeProvider | None = None,
+        max_rules: int = 10000,
     ) -> None:
         self.repository = repository
         self.time_provider = time_provider or get_time_provider()
         self._rules: dict[str, GoldenRule] = {}
         self._lock = asyncio.Lock()
+        self._max_rules = max_rules
 
     # ── Detection ─────────────────────────────────────────────────
 
@@ -149,6 +151,7 @@ class GoldenRuleEngine:
             )
             self._rules[rule_id] = rule
             await self._persist_rule(rule)
+            await self._enforce_max_rules()
 
             # Also mark the underlying memory as golden
             if self.repository is not None:
@@ -299,3 +302,59 @@ class GoldenRuleEngine:
         except Exception:
             logger.exception("Failed to load golden rules from DB")
             return 0
+
+    # ── Rule deletion and pruning ─────────────────────────────────
+
+    async def delete_rule(self, rule_id: str) -> bool:
+        """Delete a single golden rule by ID. Returns True if found and deleted."""
+        async with self._lock:
+            if rule_id not in self._rules:
+                return False
+            del self._rules[rule_id]
+            if self.repository is not None:
+                try:
+                    await self.repository.db.execute(
+                        "DELETE FROM golden_rules WHERE rule_id = ?;",
+                        (rule_id,),
+                    )
+                except Exception:
+                    logger.exception("Failed to delete golden rule %s from DB", rule_id)
+            logger.info("Deleted golden rule %s", rule_id)
+            return True
+
+    async def prune_session_rules(self, session_id: str) -> int:
+        """Remove all session-scoped rules for the given session. Returns count pruned."""
+        async with self._lock:
+            to_delete = [
+                rid for rid, rule in self._rules.items()
+                if rule.scope == "session" and rule.session_id == session_id
+            ]
+            for rid in to_delete:
+                del self._rules[rid]
+            if self.repository is not None and to_delete:
+                try:
+                    await self.repository.db.execute(
+                        "DELETE FROM golden_rules WHERE scope = 'session' AND session_id = ?;",
+                        (session_id,),
+                    )
+                except Exception:
+                    logger.exception("Failed to prune session rules for %s from DB", session_id)
+            if to_delete:
+                logger.info("Pruned %d session rules for session %s", len(to_delete), session_id)
+            return len(to_delete)
+
+    async def _enforce_max_rules(self) -> None:
+        """Enforce max_rules cap by removing oldest session-scoped rules first."""
+        while len(self._rules) > self._max_rules:
+            # Find oldest session-scoped rule
+            oldest_session_rule: GoldenRule | None = None
+            for rule in self._rules.values():
+                if rule.scope == "session":
+                    if oldest_session_rule is None or rule.created_at < oldest_session_rule.created_at:
+                        oldest_session_rule = rule
+            if oldest_session_rule is not None:
+                await self.delete_rule(oldest_session_rule.rule_id)
+                continue
+            # No session rules left; remove oldest global rule
+            oldest_rule = min(self._rules.values(), key=lambda r: r.created_at)
+            await self.delete_rule(oldest_rule.rule_id)

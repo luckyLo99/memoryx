@@ -33,13 +33,19 @@ class SlidingWindowRateLimiter:
         cutoff = now - self.window_seconds
         while window and window[0] < cutoff:
             window.popleft()
+        if not window:
+            del self._windows[key]
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()
         if key not in self._windows:
             self._windows[key] = deque()
         self._prune(key, now)
-        window = self._windows[key]
+        # _prune may have deleted the key if deque became empty
+        window = self._windows.get(key)
+        if window is None:
+            window = deque()
+            self._windows[key] = window
         if len(window) >= self.max_requests:
             return False
         window.append(now)

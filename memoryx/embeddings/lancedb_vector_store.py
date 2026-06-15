@@ -141,9 +141,11 @@ class LanceDBVectorStore:
             if self._table is None:
                 return
             try:
+                # Escape single quotes to prevent SQL injection in LanceDB filter
+                safe_id = memory_id.replace("'", "''")
                 await asyncio.to_thread(
                     self._table.delete,
-                    f"memory_id = '{memory_id}'",
+                    f"memory_id = '{safe_id}'",
                 )
             except Exception:
                 pass

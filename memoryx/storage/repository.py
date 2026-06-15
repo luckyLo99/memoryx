@@ -12,6 +12,9 @@ from uuid import uuid4
 from .migrations import MigrationManager
 from .sqlite_async import AsyncSQLite
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 MEMORY_TYPES = {
     "FACT", "EXPERIENCE", "OBSERVATION", "OPINION", "PREFERENCE",
@@ -309,11 +312,11 @@ class MemoryRepository:
             try:
                 from memoryx.config import get_settings
                 settings = get_settings()
-                max_memories = max_memories or settings.max_memories
-                threshold_pct = threshold_pct or settings.auto_archive_threshold_pct
+                max_memories = max_memories if max_memories is not None else settings.max_memories
+                threshold_pct = threshold_pct if threshold_pct is not None else settings.auto_archive_threshold_pct
             except Exception:
-                max_memories = max_memories or 100_000
-                threshold_pct = threshold_pct or 0.9
+                max_memories = max_memories if max_memories is not None else 100_000
+                threshold_pct = threshold_pct if threshold_pct is not None else 0.9
         threshold = int(max_memories * threshold_pct)
         count = await self.count_memories()
         if count > threshold:
@@ -369,7 +372,7 @@ class MemoryRepository:
         try:
             await self._maybe_auto_archive()
         except Exception:
-            pass  # Never let archiving break the write path
+            logger.warning("Auto-archive check failed", exc_info=True)
 
         return n.id
 

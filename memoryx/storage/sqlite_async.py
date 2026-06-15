@@ -14,7 +14,7 @@ class AsyncSQLite:
         self.timeout = timeout
         self._conn: sqlite3.Connection | None = None
         self._lock = asyncio.Lock()
-        self._inside_transaction: bool = False
+        self._transaction_holder: asyncio.Task | None = None
 
     async def open(self) -> None:
         if self._conn is not None:
@@ -46,8 +46,8 @@ class AsyncSQLite:
         return self._conn
 
     async def execute(self, sql: str, params: Iterable[Any] = ()) -> int:
-        """Safe execute: acquires lock unless inside transaction (uses lock-free path)."""
-        if self._inside_transaction:
+        """Safe execute: acquires lock unless current task holds the transaction lock."""
+        if self._transaction_holder is asyncio.current_task():
             cursor = self._require_conn().execute(sql, tuple(params))
             cursor.close()
             return 0  # rowcount inside transaction is approximate
@@ -72,7 +72,7 @@ class AsyncSQLite:
             return rowcount
 
     async def fetchone(self, sql: str, params: Iterable[Any] = ()) -> Optional[sqlite3.Row]:
-        if self._inside_transaction:
+        if self._transaction_holder is asyncio.current_task():
             cursor = self._require_conn().execute(sql, tuple(params))
             row = cursor.fetchone()
             cursor.close()
@@ -85,7 +85,7 @@ class AsyncSQLite:
             return row
 
     async def fetchall(self, sql: str, params: Iterable[Any] = ()) -> list[sqlite3.Row]:
-        if self._inside_transaction:
+        if self._transaction_holder is asyncio.current_task():
             cursor = self._require_conn().execute(sql, tuple(params))
             rows = cursor.fetchall()
             cursor.close()
@@ -109,7 +109,7 @@ class AsyncSQLite:
         """
         conn = self._require_conn()
         async with self._lock:
-            self._inside_transaction = True
+            self._transaction_holder = asyncio.current_task()
             await asyncio.to_thread(conn.execute, "BEGIN IMMEDIATE;")
             try:
                 yield conn
@@ -119,7 +119,7 @@ class AsyncSQLite:
             else:
                 await asyncio.to_thread(conn.execute, "COMMIT;")
             finally:
-                self._inside_transaction = False
+                self._transaction_holder = None
 
     async def vacuum(self) -> None:
         await self.execute("VACUUM;")
