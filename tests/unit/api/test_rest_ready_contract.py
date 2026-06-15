@@ -72,11 +72,16 @@ def test_ready_read_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 
 def test_ready_counts_storage_vs_retrieval(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("MEMORYX_DB_PATH", str(tmp_path / "storage_vs_retrieval.db"))
+    monkeypatch.setenv("MEMORYX_API_KEY", "test-key-12345")
     from memoryx.api.app_factory import create_app
     from fastapi.testclient import TestClient
     app = create_app(auto_open=True)
     with TestClient(app) as client:
-        create_resp = client.post("/v1/memories", json={"content": "Test memory for ready contract.", "memory_type": "FACT"})
+        create_resp = client.post(
+            "/v1/memories",
+            json={"content": "Test memory for ready contract.", "memory_type": "FACT"},
+            headers={"X-MemoryX-API-Key": "test-key-12345"},
+        )
         assert create_resp.status_code == 201
         ready_resp = client.get("/ready")
         ready_data = ready_resp.json()

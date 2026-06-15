@@ -3,12 +3,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from pathlib import Path
 
-import pytest
 
 from memoryx.context.engine import ContextAssemblyEngine
-from memoryx.context.models import ContextBundle
 
 
 # Mock a RetrievalResult-like object
@@ -276,6 +273,6 @@ def test_to_prompt_text_structure() -> None:
     assert "<long_term_context>" in text
     # Policy should come before working and long_term
     policy_idx = text.find("<policy_context>")
-    working_idx = text.find("<working_context>")
+    text.find("<working_context>")
     long_term_idx = text.find("<long_term_context>")
     assert policy_idx < long_term_idx, "policy should come before long_term in prompt"

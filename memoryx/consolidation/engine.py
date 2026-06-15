@@ -1,9 +1,11 @@
 from __future__ import annotations
-from memoryx.cognitive.ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome, SpacedRepetitionScheduler
 
 import hashlib
+import json
 from collections import defaultdict
 from uuid import uuid4
+
+from memoryx.cognitive.ebbinghaus import EbbinghausForgettingCurve, MemoryStrength, RetrievalOutcome, SpacedRepetitionScheduler
 
 
 class ConsolidationEngine:
@@ -93,8 +95,10 @@ class ConsolidationEngine:
             return
         raw = memory.get('ebbinghaus_data', {})
         if isinstance(raw, str):
-            try: raw = json.loads(raw)
-            except: raw = {}
+            try:
+                raw = json.loads(raw)
+            except Exception:
+                raw = {}
         strength = MemoryStrength.from_dict(raw) if raw else EbbinghausForgettingCurve.initial_strength(importance)
         try:
             outcome_enum = RetrievalOutcome(outcome)
@@ -104,9 +108,12 @@ class ConsolidationEngine:
         ebbinghaus_data = strength.to_dict()
         meta_raw = memory.get('metadata_json', '{}')
         if isinstance(meta_raw, str):
-            try: meta = json.loads(meta_raw)
-            except: meta = {}
-        else: meta = meta_raw
+            try:
+                meta = json.loads(meta_raw)
+            except Exception:
+                meta = {}
+        else:
+            meta = meta_raw
         meta['ebbinghaus'] = ebbinghaus_data
         await self.repository.db.execute(
             'UPDATE memories SET metadata_json = ?, access_count = access_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
@@ -120,8 +127,10 @@ class ConsolidationEngine:
             for m in memories:
                 raw = m.get('ebbinghaus_data', {})
                 if isinstance(raw, str):
-                    try: raw = json.loads(raw)
-                    except: raw = {}
+                    try:
+                        raw = json.loads(raw)
+                    except Exception:
+                        raw = {}
                 s = MemoryStrength.from_dict(raw) if raw else None
                 if s:
                     mid = m.get('memory_id') or m.get('id')

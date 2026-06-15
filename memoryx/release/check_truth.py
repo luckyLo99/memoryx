@@ -6,7 +6,6 @@ Expected output: PASS release truth consistent: <VERSION>
 """
 
 import sys
-import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -20,12 +19,7 @@ def main() -> int:
     # 2. memoryx/__init__.py
     from memoryx import __version__ as pkg_version
 
-    # 3. pyproject.toml
-    pyproject_path = REPO_ROOT / "pyproject.toml"
-    with open(pyproject_path, "rb") as f:
-        pyproject = tomllib.load(f)
-
-    # 4. CHANGELOG.md uses the same next version
+    # 3. CHANGELOG.md uses the same next version
     changelog_path = REPO_ROOT / "CHANGELOG.md"
     changelog = changelog_path.read_text()
 

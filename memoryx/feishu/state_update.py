@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from .state_machine import VisibleState, assert_transition
+from .state_machine import assert_transition
 
 if TYPE_CHECKING:
     from .queue import FeishuSQLiteQueue

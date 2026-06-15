@@ -1,7 +1,6 @@
 """Tests for REST runtime path parity: DB path resolution."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest

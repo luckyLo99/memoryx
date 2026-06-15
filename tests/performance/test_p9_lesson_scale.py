@@ -10,7 +10,8 @@ from memoryx.storage import MemoryRepository
 async def test_lesson_match_p95_under_threshold(tmp_path: Path):
     """Verify lesson match stays performant after trigger index hardening."""
     from memoryx.cognitive.lesson_policy import LessonPolicyEngine
-    import time, statistics
+    import time
+    import statistics
 
     repo = MemoryRepository(tmp_path / "p9-lesson-scale.db")
     await repo.open()

@@ -7,9 +7,9 @@ from __future__ import annotations
 作为记忆检索的排名信号而非门。
 """
 
-import re
-from typing import Any
-from uuid import uuid4
+import re  # noqa: E402
+from typing import Any  # noqa: E402
+from uuid import uuid4  # noqa: E402
 
 
 class SymbolicIndex:

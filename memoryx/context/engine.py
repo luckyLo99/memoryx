@@ -228,7 +228,6 @@ class ContextAssemblyEngine:
             title = spec["title"]
             lines = spec["lines"]
             quota = spec["quota"]
-            hard = spec["hard"]
             key = spec["key"]
 
             available = min(quota, max_tokens - used)

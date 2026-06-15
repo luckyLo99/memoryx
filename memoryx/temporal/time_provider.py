@@ -23,7 +23,6 @@ import time as _time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import ClassVar
 
 
 class TimeProvider(ABC):

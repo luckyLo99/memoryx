@@ -1,4 +1,4 @@
-from ._version import __version__
+from ._version import __version__  # noqa: F401
 
 from .api import MemoryQueryAPI
 from .storage.bank import MemoryBank

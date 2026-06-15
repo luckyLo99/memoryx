@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from memoryx.retrieval.graph_retriever import GraphRetriever
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 from memoryx.temporal_scorer import TemporalScorer, TemporalQueryIntent
 
 

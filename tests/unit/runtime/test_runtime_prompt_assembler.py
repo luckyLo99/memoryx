@@ -1,4 +1,3 @@
-from pathlib import Path
 from memoryx.runtime_context import ArtifactStore, RuntimeContextBudget, RuntimePromptAssembler, RuntimeTranscriptStore, TaskCapsule, TaskCapsuleStore
 
 def test_runtime_prompt_assembler_uses_artifact_refs_not_full_patch(tmp_path):

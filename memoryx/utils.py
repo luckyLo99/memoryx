@@ -7,7 +7,7 @@ import os
 import re
 import sys
 import time
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 

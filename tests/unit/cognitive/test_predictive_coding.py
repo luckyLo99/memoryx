@@ -1,6 +1,5 @@
 """Tests for predictive coding and active inference."""
 from __future__ import annotations
-import pytest
 from memoryx.cognitive.predictive_coding import (
     ActiveInferenceGate, ContextExpectation, ContextPredictor,
     PredictionError, PredictiveRetrieval,
@@ -40,22 +39,22 @@ class TestActiveInferenceGate:
     def test_should_retrieve_low_confidence(self):
         gate = ActiveInferenceGate(0.3)
         exp = ContextExpectation(confidence=0.1)
-        assert gate.should_retrieve(exp) == True
+        assert gate.should_retrieve(exp)
 
     def test_should_retrieve_high_confidence(self):
         gate = ActiveInferenceGate(0.3)
         exp = ContextExpectation(confidence=0.9)
-        assert gate.should_retrieve(exp) == False
+        assert not gate.should_retrieve(exp)
 
     def test_should_update_high_error(self):
         gate = ActiveInferenceGate(0.3)
         pe = PredictionError(error=0.8, surprise=3.0, precision=0.5)
-        assert gate.should_update(pe) == True
+        assert gate.should_update(pe)
 
     def test_should_ignore_low_error(self):
         gate = ActiveInferenceGate()
         pe = PredictionError(error=0.05, surprise=0.5, precision=1.0)
-        assert gate.should_ignore(pe) == True
+        assert gate.should_ignore(pe)
 
     def test_free_energy_calculation(self):
         gate = ActiveInferenceGate()

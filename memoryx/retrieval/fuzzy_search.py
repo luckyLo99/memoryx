@@ -91,13 +91,11 @@ FUZZY_ALIASES: dict[str, list[str]] = {
     "文件": ["file"],
     "项目": ["project"],
     "测试": ["test", "测试"],
-    "部署": ["deploy"],
     "数据库": ["database", "db"],
 }
 
 # Very common prefix/transformation pairs for short typos:
 _TYPO_NORMALIZE: dict[str, str] = {
-    "colour": "color",
     "colour": "color",
     "favourite": "favorite",
     "favor": "favor",

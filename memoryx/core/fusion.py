@@ -1,2 +1,1 @@
-from memoryx.retrieval.fusion import *  # DEPRECATED: canonical location is memoryx.retrieval.fusion
-
+from memoryx.retrieval.fusion import *  # DEPRECATED: canonical location is memoryx.retrieval.fusion  # noqa: F403

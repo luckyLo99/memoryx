@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pytest
 
 from memoryx.extraction import ExtractionMemory
 from memoryx.validation.conflict_resolver import ConflictResolver

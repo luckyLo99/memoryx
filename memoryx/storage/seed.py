@@ -56,7 +56,6 @@ class ConversationSeed:
                 continue
             session_id = str(session.get("id", session.get("session_id", session_key)))
             for msg in messages:
-                role = str(msg.get("role", "user"))
                 content = str(msg.get("content", ""))
                 if not content:
                     continue

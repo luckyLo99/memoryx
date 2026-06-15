@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import json
 import sqlite3
 from typing import Any
 
-import sqlite3
 
 
 def utc_iso() -> str:

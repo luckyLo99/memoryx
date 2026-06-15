@@ -1,7 +1,6 @@
 """Tests for Baddeley multi-component working memory model."""
 from __future__ import annotations
 
-import pytest
 from memoryx.cognitive.working_memory import (
     BaddeleyWorkingMemory, CentralExecutive, EpisodicBuffer,
     ModalityType, PhonologicalLoop, VisuospatialSketchpad,
@@ -11,11 +10,11 @@ from memoryx.cognitive.working_memory import (
 
 class TestPhonologicalLoop:
     def test_can_hold_short_phrase(self):
-        assert PhonologicalLoop.can_hold("hello world") == True
+        assert PhonologicalLoop.can_hold("hello world")
 
     def test_cannot_hold_long_text(self):
         long = "word " * 20
-        assert PhonologicalLoop.can_hold(long, loop_duration=2.0) == False
+        assert not PhonologicalLoop.can_hold(long, loop_duration=2.0)
 
     def test_encode_verbal(self):
         chunks = PhonologicalLoop.encode("hello world foo bar")
@@ -92,7 +91,7 @@ class TestBaddeleyWorkingMemory:
     def test_overloaded_detection(self):
         wm = BaddeleyWorkingMemory(capacity=2)
         wm.process("hello world foo bar baz qux", modality=ModalityType.VERBAL)
-        assert wm.is_overloaded() == True
+        assert wm.is_overloaded()
 
     def test_remaining_capacity(self):
         wm = BaddeleyWorkingMemory(capacity=7)

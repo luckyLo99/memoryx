@@ -32,14 +32,13 @@ from pathlib import Path
 import pytest
 
 from memoryx.services.memory_candidate_service import (
-    CandidateDecision,
     CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 # ---------------------------------------------------------------------------

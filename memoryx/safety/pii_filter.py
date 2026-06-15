@@ -12,7 +12,6 @@ import hmac
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class PIIResult:
         return self.detected_count > 0
 
 
-import warnings
+import warnings  # noqa: E402
 
 class PIIFilter:
     """PII 检测 + HMAC 匿名化。
@@ -82,7 +81,7 @@ class PIIFilter:
         if secret is None and env_secret is None:
             warnings.warn(
                 "Using default PII secret is insecure. Please set MEMORYX_PII_SECRET environment variable or pass a secret to PIIFilter.",
-                SecurityWarning,
+                UserWarning,
                 stacklevel=2
             )
             self.secret = b"memoryx-pii-default"

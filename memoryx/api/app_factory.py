@@ -26,13 +26,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from memoryx.api.auth import verify_api_key
+from memoryx.api.auth import verify_api_key, ensure_api_key
 from memoryx.api.errors import http_exception_handler, unhandled_exception_handler, validation_exception_handler
 from memoryx.api.memories import create_p11_router
 from memoryx.api.bootstrap import install_p8_observability
 from memoryx.api.routes.learning import router as learning_router
 from memoryx.api.routes.learning import distill_router
-from memoryx.api.rate_limit import EmbeddingConcurrencyGate, SlidingWindowRateLimiter
 from memoryx._version import __version__
 
 # ── P14: Feishu UX Adapter ──
@@ -155,6 +154,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Ensure API key is configured (generates random dev key if unset)
+        ensure_api_key()
+
         if auto_open and initial_state.repository is None:
             app.state.memoryx = await _build_default_state()
         else:
@@ -233,8 +235,6 @@ def create_app(
         allow_headers=["*"],
     )
 
-    rate_limiter = SlidingWindowRateLimiter(max_requests=200, window_seconds=60.0)
-    embedding_gate = EmbeddingConcurrencyGate(max_concurrent=4)
 
     def state() -> MemoryXAppState:
         if not hasattr(app.state, "memoryx"):
@@ -266,7 +266,7 @@ def create_app(
         return {"status": "ok", "live": True, "version": __version__}
 
     @app.get("/ready")
-    async def ready(_key: str | None = Depends(verify_api_key)) -> dict:
+    async def ready() -> dict:
         """Enhanced readiness endpoint with DB path and memory statistics.
 
         This enables operators to confirm REST is connected to the same

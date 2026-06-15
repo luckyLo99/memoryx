@@ -336,7 +336,6 @@ def test_fk_zero_structural() -> None:
     text = repo_path.read_text(encoding="utf-8")
     # The batch_get_memories method must not close foreign_keys
     # (INSERT OR IGNORE is pre-existing in unrelated store paths - not our concern here)
-    import re
     batch_block = text[text.index("def batch_get_memories"):text.index("async def list_memories")]
     assert "foreign_keys = OFF" not in batch_block
     assert "INSERT OR IGNORE" not in batch_block

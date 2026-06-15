@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from memoryx.knowledge_distillation import KnowledgeDistillationEngine
-from memoryx.storage.repository import MemoryRecord
 
 
 class PersonaEngine:

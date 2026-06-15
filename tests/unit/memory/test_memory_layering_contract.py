@@ -8,7 +8,6 @@ import pytest
 
 from memoryx.hermes_provider import MemoryXHermesProvider
 from memoryx.services.memory_candidate_service import (
-    CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,

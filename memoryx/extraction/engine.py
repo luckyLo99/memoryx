@@ -32,6 +32,11 @@ class MemoryExtractionEngine:
         for batch in self._batched(request.sources):
             try:
                 payload = await self.client.extract(ExtractionRequest(session_id=request.session_id, sources=batch))
+            except (ConnectionError, TimeoutError, OSError) as e:
+                logger.warning("LLM extraction network error, falling back to rule-based: %s", e)
+                rule_result = self._rule_extract(ExtractionRequest(session_id=request.session_id, sources=batch))
+                all_memories.extend(rule_result.memories)
+                continue
             except Exception:
                 logger.warning("LLM extraction failed, falling back to rule-based extraction", exc_info=True)
                 rule_result = self._rule_extract(ExtractionRequest(session_id=request.session_id, sources=batch))
@@ -66,6 +71,8 @@ class MemoryExtractionEngine:
                 if "timestamp" not in item or not item["timestamp"]:
                     item = {**item, "timestamp": datetime.now(timezone.utc).isoformat()}
                 result.append(ExtractionMemory.model_validate(item))
+            except (ValueError, TypeError, KeyError) as e:
+                logger.warning("Skipping invalid extraction memory item: %s — %s", item, e)
             except Exception:
                 logger.warning("Skipping invalid extraction memory item: %s", item, exc_info=True)
         return result

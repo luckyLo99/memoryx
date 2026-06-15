@@ -1,44 +1,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 
 from memoryx.api.dependencies import get_repository, get_task_service
+from memoryx.api.models import TaskStartRequest, TaskEndRequest, TaskDurationsQuery, EntityTimelineQuery
 from memoryx.services.task_service import TaskService
 
 
 router = APIRouter(prefix="/v1/cognitive", tags=["cognitive-tasks"])
-
-
-class TaskStartRequest(BaseModel):
-    session_id: str = "default"
-    entity_id: str = "general"
-    task_type: str = "conversation"
-    title: str = "Hermes session"
-    source: str = "hermes"
-
-
-class TaskEndRequest(BaseModel):
-    session_id: str = "default"
-    entity_id: str = "general"
-    status: str = "done"
-    summary: str = ""
-    source: str = "hermes"
-
-
-class TaskDurationsQuery(BaseModel):
-    session_id: str | None = None
-    entity_id: str | None = None
-    task_type: str | None = None
-    since: str | None = None
-    until: str | None = None
-
-
-class EntityTimelineQuery(BaseModel):
-    entity_id: str = "general"
-    since: str | None = None
-    until: str | None = None
-    limit: int = 50
 
 
 @router.post("/task/start-v2")

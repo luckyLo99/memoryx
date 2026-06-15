@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from memoryx.cognitive.guarded_generation import CognitiveGuard
 from memoryx.cognitive.narrative_reflection import NarrativeReflectionEngine
 from memoryx.cognitive.trust import MemoryTrustScorer
+from memoryx.api.models import TaskStartRequest, TaskEndRequest, TaskDurationsQuery, EntityTimelineQuery
 
 logger = logging.getLogger(__name__)
 
@@ -63,37 +64,9 @@ class ToolResultRequest(BaseModel):
     source: str = "hermes.post_tool_call"
 
 
-# ── P15.2: Task lifecycle request models ──
-
-class TaskStartRequest(BaseModel):
-    session_id: str = "default"
-    entity_id: str = "general"
-    task_type: str = "conversation"
-    title: str = "Hermes session"
-    source: str = "hermes"
-
-
-class TaskEndRequest(BaseModel):
-    session_id: str = "default"
-    entity_id: str = "general"
-    status: str = "done"
-    summary: str = ""
-    source: str = "hermes"
-
-
-class TaskDurationsQuery(BaseModel):
-    session_id: str | None = None
-    entity_id: str | None = None
-    task_type: str | None = None
-    since: str | None = None
-    until: str | None = None
-
-
-class EntityTimelineQuery(BaseModel):
-    entity_id: str = "general"
-    since: str | None = None
-    until: str | None = None
-    limit: int = 50
+# ── P15.2: Task lifecycle request models (imported from memoryx.api.models) ──
+# TaskStartRequest, TaskEndRequest, TaskDurationsQuery, EntityTimelineQuery
+# are imported from memoryx.api.models to avoid duplication with routes/tasks.py
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +189,7 @@ async def _context_via_repo(
 
     try:
         patterns = _cjk_like_patterns(query)
-        placeholders = " OR ".join(f"content LIKE ?" for _ in patterns)
+        placeholders = " OR ".join("content LIKE ?" for _ in patterns)
         sql = f"""
         SELECT id, memory_type, content, importance_score, created_at,
                source_type, verification_status, trust_score
@@ -527,7 +500,9 @@ def create_p11_router(
         if not body.user_message and not body.assistant_response:
             return {"stored": False, "reason": "no content"}
 
-        import hashlib, json, uuid
+        import hashlib
+        import json
+        import uuid
         from datetime import datetime, timezone
 
         content = f"User: {body.user_message}\nAssistant: {body.assistant_response}"
@@ -581,7 +556,9 @@ def create_p11_router(
         if not body.tool_name:
             return {"stored": False, "reason": "no tool_name"}
 
-        import hashlib, json, uuid
+        import hashlib
+        import json
+        import uuid
         from datetime import datetime, timezone
 
         content = f"Tool: {body.tool_name}\nResult: {body.result[:2000]}"
@@ -629,7 +606,8 @@ def create_p11_router(
     @router.post("/task/start")
     async def task_start(body: TaskStartRequest, repo: Any = Depends(repo_dep)) -> dict:
         """Start a task — creates a running task entry."""
-        import json, uuid
+        import json
+        import uuid
         from datetime import datetime, timezone
 
         task_id = uuid.uuid4().hex
@@ -658,7 +636,8 @@ def create_p11_router(
     @router.post("/task/end")
     async def task_end(body: TaskEndRequest, repo: Any = Depends(repo_dep)) -> dict:
         """End the most recent running task for this session/entity."""
-        import json, uuid
+        import json
+        import uuid
         from datetime import datetime, timezone
 
         now_iso = datetime.now(timezone.utc).isoformat()

@@ -18,7 +18,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from memoryx.temporal.time_provider import TimeProvider, get_time_provider

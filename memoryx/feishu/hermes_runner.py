@@ -17,10 +17,7 @@ from .schemas import (
     HermesRunState,
     ToolCallRecord,
     ToolPhase,
-    VisibleState,
-    get_visible_state,
 )
-from .state_machine import assert_transition
 
 
 class RunnerStage(StrEnum):
@@ -311,7 +308,7 @@ class HermesRunner:
                 phase=ToolPhase.GUARD,
                 status="done" if guard_decision == "pass" else "warn",
                 user_visible_name="Claim Guard",
-                summary=f"验证通过" if guard_decision == "pass" else f"{len(warnings)} 条警告",
+                summary="验证通过" if guard_decision == "pass" else f"{len(warnings)} 条警告",
                 started_at=time.strftime("%H:%M:%S"),
                 finished_at=time.strftime("%H:%M:%S"),
                 duration_ms=int((time.monotonic() - start) * 1000),

@@ -1,13 +1,11 @@
 """Repository for evolution nodes (storage layer)."""
 from __future__ import annotations
 
-import json
 import sqlite3
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-from .models import EvolutionKind, EvolutionNode
+from .models import EvolutionNode
 
 
 SCHEMA_SQL = """

@@ -163,9 +163,7 @@ async def test_project_unaffected(ready_repo, seeded_lessons) -> None:
 
 @pytest.mark.asyncio
 async def test_lesson_filter_preserves_policy_context(ready_repo, seeded_lessons) -> None:
-    from memoryx.context.engine import ContextAssemblyEngine
     from memoryx.retrieval import HybridRetrievalEngine
-    from memoryx.routing import RoutePlan, RoutingIntent
     vs = FakeVectorStore()
     engine = HybridRetrievalEngine(repository=ready_repo, vector_store=vs)
     results = await engine.retrieve(query="Friday deploy", query_vector=[], include_lessons=False, limit=20)
@@ -186,7 +184,6 @@ async def test_context_assembly_lessons_empty_when_false(ready_repo, seeded_less
     vs = FakeVectorStore()
     engine = HybridRetrievalEngine(repository=ready_repo, vector_store=vs)
     results = await engine.retrieve(query="Friday", query_vector=[], include_lessons=False, limit=20)
-    from memoryx.routing import RoutePlan
     plan = RoutePlan(intent=RoutingIntent.CODING, primary_route="coding", results=results)
     bundle = ContextAssemblyEngine(max_token_budget=2000).assemble(
         system_prompt="S", soul_prompt="S", current_task="T",

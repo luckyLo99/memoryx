@@ -1,42 +1,75 @@
-"""P0-E: API Key 认证 — 使用 secrets.compare_digest 防时序攻击。
+"""P0-E: API Key authentication with timing-safe comparison.
 
-规则：
-- MEMORYX_API_KEY 未设置 → 本地开发无感，所有请求通过。
-- MEMORYX_API_KEY="" → 不强制 auth。
-- MEMORYX_API_KEY 为 placeholder → 不强制 auth。
-- MEMORYX_API_KEY 已设置为真实值 → 所有 REST route 要求 X-MemoryX-API-Key。
+Rules:
+- MEMORYX_API_KEY environment variable takes priority.
+- If unset, MemoryXSettings.api_key is used as fallback.
+- If both are empty/placeholder, a random dev key is generated and logged.
+- Random dev key is only acceptable in dev mode; production should always set a key.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from typing import Optional
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Header, HTTPException
 
-_PLACEHOLDER_KEYS = {
+logger = logging.getLogger(__name__)
+
+_PLACEHOLDER_KEYS = frozenset({
     "", "your_api_key_here", "your_api_key", "changeme", "change_me",
     "placeholder", "test", "example", "sk-xxx", "YOUR_API_KEY",
-}
+})
+
+_dev_key: str | None = None
 
 
 def _get_expected_key() -> str | None:
-    """Runtime getter: read MEMORYX_API_KEY from env each call."""
+    """Runtime getter: read configured API key, preferring env var over settings."""
+    global _dev_key
+
     key = os.environ.get("MEMORYX_API_KEY")
-    if key is None:
-        return None
-    key = key.strip()
-    if key.lower() in _PLACEHOLDER_KEYS:
-        return None
-    return key
+    if key is not None:
+        key = key.strip()
+        if key.lower() in _PLACEHOLDER_KEYS:
+            return None
+        return key
+
+    if _dev_key:
+        return _dev_key
+
+    return None
 
 
-def verify_api_key(x_memoryx_api_key: str | None = Header(default=None, alias="X-MemoryX-API-Key")) -> Optional[str]:
+def ensure_api_key() -> str:
+    """Ensure an API key is configured. Generates a random dev key if none is set.
+
+    Returns the active key. Call this during app startup.
+    """
+    global _dev_key
+
+    key = _get_expected_key()
+    if key is not None:
+        return key
+
+    _dev_key = secrets.token_hex(32)
+    logger.warning(
+        "MEMORYX_API_KEY not set — generated random dev key: %s..."
+        " Set MEMORYX_API_KEY in production.",
+        _dev_key[:12],
+    )
+    return _dev_key
+
+
+def verify_api_key(
+    x_memoryx_api_key: str | None = Header(default=None, alias="X-MemoryX-API-Key"),
+) -> Optional[str]:
     """FastAPI dependency: verify API key from header.
 
     Returns the validated key value on success, raises 401 on failure.
-    When MEMORYX_API_KEY is not set or is a placeholder, skips verification (local dev mode).
+    When no key is configured, skips verification (local dev mode).
     """
     expected = _get_expected_key()
     if expected is None:

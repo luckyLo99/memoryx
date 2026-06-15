@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Optional
 
 from .manager import EvolutionManager
 from .models import EvolutionDecision, EvolutionNode, PreferenceSignal

@@ -1,14 +1,12 @@
 from __future__ import annotations
 from memoryx.storage import MemoryRecord
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
-from .adapters import AdapterRegistry, BaseAdapter
+from .adapters import AdapterRegistry
 
 logger = logging.getLogger(__name__)
 

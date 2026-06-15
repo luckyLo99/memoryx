@@ -1,11 +1,15 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import json, sqlite3
-from typing import Any
+import json
+import sqlite3
 
 @dataclass(frozen=True)
 class ContextPackDiff:
-    previous_pack_id: str | None; current_pack_id: str; repeated_item_ids: list[str]; new_item_ids: list[str]; omitted_repeated_item_ids: list[str]
+    previous_pack_id: str | None
+    current_pack_id: str
+    repeated_item_ids: list[str]
+    new_item_ids: list[str]
+    omitted_repeated_item_ids: list[str]
 
 class ContextPackHistory:
     def __init__(self, db_path: str):
@@ -16,7 +20,8 @@ class ContextPackHistory:
             con.commit()
 
     def get_item_ids(self, pack_id: str | None) -> list[str]:
-        if not pack_id: return []
+        if not pack_id:
+            return []
         with sqlite3.connect(self.db_path) as con:
             con.row_factory = sqlite3.Row
             row = con.execute("SELECT item_ids_json FROM memoryx_context_packs WHERE pack_id = ?", (pack_id,)).fetchone()
@@ -28,5 +33,6 @@ class ContextPackHistory:
             con.commit()
 
     def diff(self, previous_pack_id: str | None, current_item_ids: list[str], current_pack_id: str) -> ContextPackDiff:
-        prev = set(self.get_item_ids(previous_pack_id)); cur = set(current_item_ids)
+        prev = set(self.get_item_ids(previous_pack_id))
+        cur = set(current_item_ids)
         return ContextPackDiff(previous_pack_id, current_pack_id, sorted(prev & cur), sorted(cur - prev), [])

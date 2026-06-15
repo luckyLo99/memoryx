@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 @pytest.mark.asyncio
@@ -82,7 +82,6 @@ async def test_audit_logs_uses_metadata_json(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_hierarchical_episodic_tier_has_episodic_id(tmp_path: Path) -> None:
     """HierarchicalMemoryManager episodic tier must return episodic_id."""
-    from memoryx.episodic.engine import EpisodicMemoryEngine
     from memoryx.hierarchy.engine import HierarchicalMemoryManager, MemoryTier
     from memoryx.working_memory import WorkingMemoryEngine
     repo = MemoryRepository(tmp_path / "sql-hierarchy.db")

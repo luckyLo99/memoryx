@@ -5,7 +5,6 @@ Aligns with Phase 1 specification.
 
 from __future__ import annotations
 
-import os as _os
 import tempfile
 from pathlib import Path
 

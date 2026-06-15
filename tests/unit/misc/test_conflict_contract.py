@@ -346,7 +346,7 @@ async def test_fk_zero_violations(ready_repo: MemoryRepository) -> None:
 async def test_bridge_injects_conflict_warning(svc: MemoryCandidateService, ready_repo) -> None:
     """Hermes bridge's on_user_message should include conflict warning when >0."""
     from memoryx.hermes_bridge import HermesMemoryBridge
-    bridge = HermesMemoryBridge(repository=ready_repo)
+    HermesMemoryBridge(repository=ready_repo)
     # Create two real memories first, then conflict between them
     m1 = await _create_committed(svc, "Memory A")
     m2 = await _create_committed(svc, "Memory B")

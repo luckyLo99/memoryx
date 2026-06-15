@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 @pytest.mark.asyncio

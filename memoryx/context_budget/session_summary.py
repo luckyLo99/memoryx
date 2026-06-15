@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import sqlite3
-from typing import Any
 
 from .tokens import TokenEstimator
 

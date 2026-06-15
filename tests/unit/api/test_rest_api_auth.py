@@ -139,7 +139,7 @@ async def test_embedding_gate_limits_concurrency():
         acquired = True
 
     import asyncio
-    task = asyncio.create_task(try_acquire())
+    asyncio.create_task(try_acquire())
     await asyncio.sleep(0.1)
     assert not acquired, "Third acquire should be blocked"
 

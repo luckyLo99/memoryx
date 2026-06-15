@@ -14,13 +14,12 @@ from memoryx.retrieval.engine import (
     _layer_score_boost,
 )
 from memoryx.services.memory_candidate_service import (
-    CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 class FakeVectorStore:
@@ -115,7 +114,6 @@ def test_rejected_stale_superseded_invisible() -> None:
 # ===================================================================
 
 def test_context_block_order() -> None:
-    from memoryx.context.engine import ContextAssemblyEngine
     from memoryx.context.models import ContextBundle
     bundle = ContextBundle(rendered="# test", token_count=5)
     d = bundle.to_dict()

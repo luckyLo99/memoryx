@@ -148,7 +148,6 @@ class CLIHermesRunner:
         on_stage: Callable[[str, str], Awaitable[None]] | None = None,
     ) -> str:
         """Run a single Hermes query via CLI."""
-        import subprocess
 
         # Record trace: hermes CLI started
         if self.trace_store:

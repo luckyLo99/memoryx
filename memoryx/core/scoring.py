@@ -1,2 +1,1 @@
-from memoryx.retrieval.scorer import *  # DEPRECATED: canonical location is memoryx.retrieval.scorer
-
+from memoryx.retrieval.scorer import *  # DEPRECATED: canonical location is memoryx.retrieval.scorer  # noqa: F403

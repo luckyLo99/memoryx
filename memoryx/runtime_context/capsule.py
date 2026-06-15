@@ -5,9 +5,7 @@ from datetime import datetime, timezone
 import json
 import sqlite3
 from typing import Any
-import sqlite3
 from .budget import RuntimeContextBudget
-from .truncate import truncate_middle
 
 def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()

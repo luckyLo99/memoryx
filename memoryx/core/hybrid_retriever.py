@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 from memoryx.retrieval.fusion import make_ranked_candidates, reciprocal_rank_fusion
 from .retriever import Retriever

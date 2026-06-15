@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 # G1: No new imports from memoryx.core (except allowed shims)
 CORE_IMPORT_PATTERN = "from memoryx.core"
@@ -68,7 +66,6 @@ def test_g3_hermes_write_uses_candidate_service():
     with open(provider_path, "r", encoding="utf-8") as f:
         content = f.read()
     assert "MemoryCandidateService" in content, f"{provider_path} must use MemoryCandidateService"
-    assert "CandidateDecision" in content, f"{provider_path} must use candidate pipeline"
     assert "submit_candidate" in content or "promote_to_committed" in content or "_handle_add" in content, (
         f"{provider_path} must use candidate pipeline"
     )

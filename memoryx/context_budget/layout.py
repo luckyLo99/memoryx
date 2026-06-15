@@ -6,7 +6,7 @@ from memoryx.safety.context_isolation import wrap_untrusted_session_context
 from memoryx.safety.context_isolation import is_isolated_context
 from memoryx.safety.llm_firewall import LLMFirewall, safety_preamble
 
-from .fingerprint import sha256_obj, sha256_text
+from .fingerprint import sha256_text
 
 LAYOUT_VERSION = "memoryx.context_layout.v1"
 

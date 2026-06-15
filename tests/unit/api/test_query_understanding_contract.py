@@ -6,11 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from memoryx.storage.repository import (
+from memoryx.storage import (
     tokenize_query_terms,
-    _build_fts_query,
+    build_fts_query,
     expand_with_aliases,
-    _QUERY_ALIASES,
 )
 from memoryx.storage import MemoryRecord, MemoryRepository
 
@@ -85,7 +84,7 @@ def test_path_like_tokenization() -> None:
 # ===================================================================
 
 def test_exact_phrase_preserved() -> None:
-    q = _build_fts_query(["dark mode"], "PHRASE")
+    q = build_fts_query(["dark mode"], "PHRASE")
     assert "NEAR/0" in q or '"' in q
 
 

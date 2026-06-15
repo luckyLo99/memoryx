@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import time
 from pathlib import Path
 from typing import Any

@@ -1,6 +1,5 @@
 """Tests for cognitive load optimization and procedural memory."""
 from __future__ import annotations
-import pytest
 from memoryx.cognitive.cognitive_load import CognitiveLoadOptimizer, CHUNK_LIMIT
 from memoryx.cognitive.procedural_memory import ProceduralMemory
 
@@ -44,12 +43,12 @@ class TestProceduralMemory:
         pm.extract_pattern([{"content": "run test"}, {"content": "run test"}, {"content": "deploy"}])
         sid = list(pm.skills.keys())[0]
         result = pm.execute(sid)
-        assert result["ok"] == True
+        assert result["ok"]
 
     def test_execute_not_found(self):
         pm = ProceduralMemory()
         result = pm.execute("nonexistent")
-        assert result["ok"] == False
+        assert not result["ok"]
 
     def test_match_trigger(self):
         pm = ProceduralMemory()

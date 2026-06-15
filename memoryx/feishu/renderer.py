@@ -13,9 +13,8 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from .schemas import AttachmentRef, FeishuRenderJob, HermesRunState, ToolCallRecord
+from .schemas import AttachmentRef, FeishuRenderJob, HermesRunState
 from .stream_sanitizer import StreamSanitizer
-from .render_text import attachment_status_text
 
 
 CST = timezone(timedelta(hours=8))  # Asia/Shanghai 北京时间
@@ -87,8 +86,6 @@ class FeishuCardRenderer:
         # P14.3: 优先使用可见状态
         visible = job.visible_state.value if hasattr(job, 'visible_state') else job.state
         vs_meta = VISIBLE_STATE_META.get(visible, VISIBLE_STATE_META["queued"])
-        state = HermesRunState(job.state)
-        meta = STATE_META[state]
         
         # 确保元素不超过 200（飞书限制）
         elements: list[dict[str, Any]] = []

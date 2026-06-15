@@ -2,5 +2,5 @@
 from __future__ import annotations
 import warnings as _w
 _w.warn("memoryx.manager is deprecated; import directly from memoryx.hooks", DeprecationWarning, stacklevel=2)
-from memoryx.hooks import DeadLetterQueue, EventDispatcher, HealthMonitor, MemoryHookManager, QueueManager, RetryManager, SessionEventListener, SubscriberManager
+from memoryx.hooks import DeadLetterQueue, EventDispatcher, HealthMonitor, MemoryHookManager, QueueManager, RetryManager, SessionEventListener, SubscriberManager  # noqa: E402
 __all__ = ["DeadLetterQueue", "EventDispatcher", "HealthMonitor", "MemoryHookManager", "QueueManager", "RetryManager", "SessionEventListener", "SubscriberManager"]

@@ -11,7 +11,6 @@ P14.4.3 集成：
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -26,15 +25,12 @@ from .schemas import (
     HermesRunState,
     ToolCallRecord,
     VisibleState,
-    get_visible_state,
 )
-from .state_update import transition_job
-from .state_machine import STATE_VIEW
 from .update_coalescer import CardUpdateCoalescer
-from .overflow import CardOverflowPolicy, OverflowResult
+from .overflow import CardOverflowPolicy
 from .overflow_file import OverflowFileWriter
 from .output_policy import FeishuOutputPolicy
-from .attachment_prepare import AttachmentPreparer, PreparedAttachment
+from .attachment_prepare import AttachmentPreparer
 from .trace import FeishuTraceStore
 from .hermes_runner import HermesRunner as RealHermesRunner, RunnerStage
 

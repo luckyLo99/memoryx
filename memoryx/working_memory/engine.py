@@ -11,9 +11,8 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
-from memoryx.temporal.time_provider import SystemTimeProvider, TimeProvider, get_time_provider
+from memoryx.temporal.time_provider import SystemTimeProvider, TimeProvider
 
 from .models import WorkingMemoryState
 

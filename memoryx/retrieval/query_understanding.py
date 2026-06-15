@@ -213,7 +213,6 @@ class QueryUnderstanding:
         # Normalize by catalog size, clamped.
         if not score:
             return 0.0
-        total_kws = max(1, sum(len(v) for v in catalog.values()))
         return min(1.0, score / 3.0)
 
 

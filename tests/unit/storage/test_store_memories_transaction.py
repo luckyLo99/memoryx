@@ -33,7 +33,6 @@ async def test_store_memories_writes_all_tables(tmp_path: Path) -> None:
         assert mem["active_state"] == "active"
 
     # Verify memory_versions table
-    import asyncio
     from memoryx.storage import AsyncSQLite
 
     db = AsyncSQLite(tmp_path / "memoryx_txn.db")

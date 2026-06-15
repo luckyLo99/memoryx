@@ -9,9 +9,7 @@ References:
 - Paas et al. (2003). Cognitive load theory and instructional design.
 """
 from __future__ import annotations
-import math
 from dataclasses import dataclass, field
-from typing import Any
 
 CHUNK_LIMIT = 7
 

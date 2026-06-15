@@ -13,7 +13,6 @@ import pytest
 from memoryx.hermes_provider import (
     MemoryXHermesProvider,
     _VALID_ACTIONS,
-    _VALID_TARGETS,
 )
 from memoryx.services.memory_candidate_service import (
     CandidateState,
@@ -21,7 +20,7 @@ from memoryx.services.memory_candidate_service import (
     MemoryCandidatePolicy,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 # ---------------------------------------------------------------------------

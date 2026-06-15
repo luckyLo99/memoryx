@@ -111,7 +111,6 @@ class RuleExtractionEngine:
 
         for pattern, mem_type, importance, confidence in _EXTRACTION_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                groups = match.groups()
                 content = match.group(0).strip()
                 if not content:
                     continue

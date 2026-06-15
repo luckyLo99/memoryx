@@ -13,7 +13,7 @@ from memoryx.services.memory_candidate_service import (
     MemoryCandidateRequest,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 @pytest.fixture

@@ -8,13 +8,12 @@ import pytest
 
 from memoryx.retrieval.engine import _is_visible_memory_for_retrieval
 from memoryx.services.memory_candidate_service import (
-    CandidateState,
     EvidenceLevel,
     MemoryCandidatePolicy,
     MemoryCandidateRequest,
     MemoryCandidateService,
 )
-from memoryx.storage import MemoryRecord, MemoryRepository
+from memoryx.storage import MemoryRepository
 
 
 @pytest.fixture

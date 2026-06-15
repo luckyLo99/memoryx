@@ -45,7 +45,7 @@ async def test_persona_engine_persists_to_reflection_summaries(tmp_path: Path) -
                                          confidence_score=0.91, importance_score=0.9))
 
     engine = PersonaEngine(repository=repo)
-    result = await engine.generate(persist=True)
+    await engine.generate(persist=True)
     rows = await repo.db.fetchall("SELECT summary FROM reflection_summaries ORDER BY created_at DESC LIMIT 1;")
 
     assert rows

@@ -26,7 +26,7 @@ pip install memoryx
 
 ### Option 2: Clone and configure (recommended for full setup)
 ```bash
-git clone https://github.com/luckyl214/memoryx.git
+git clone https://github.com/luckyLo99/memoryx.git
 cd memoryx
 bash configure_memoryx.sh
 ```
@@ -49,7 +49,7 @@ bash install.sh
 
 ### Option 3: Manual setup
 ```bash
-git clone https://github.com/luckyl214/memoryx.git
+git clone https://github.com/luckyLo99/memoryx.git
 cd memoryx
 python3 -m venv .venv
 source .venv/bin/activate

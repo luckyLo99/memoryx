@@ -2,5 +2,5 @@
 from __future__ import annotations
 import warnings as _w
 _w.warn("memoryx.temporal_scorer is deprecated; use memoryx.temporal.scorer", DeprecationWarning, stacklevel=2)
-from memoryx.temporal.scorer import TemporalScorer, TemporalQueryIntent
+from memoryx.temporal.scorer import TemporalScorer, TemporalQueryIntent  # noqa: E402
 __all__ = ["TemporalScorer", "TemporalQueryIntent"]
