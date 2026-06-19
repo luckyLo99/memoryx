@@ -54,7 +54,7 @@ vector = [
     "sentence-transformers>=5.5.1",
 ]
 mcp = [
-    "mcp>=1.0",
+    "mcp>=1.28.0",
 ]
 
 [project.urls]
