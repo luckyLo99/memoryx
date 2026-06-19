@@ -45,7 +45,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "black>=24.0",
     "ruff>=0.15.17",
-    "fastapi>=0.115.0",
+    "fastapi>=0.137.2",
     "httpx2>=0.1",
     "uvicorn[standard]>=0.34.0",
 ]
