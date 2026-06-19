@@ -46,7 +46,7 @@ dev = [
     "black>=24.0",
     "ruff>=0.15.17",
     "fastapi>=0.115.0",
-    "httpx2>=0.1",
+    "httpx2>=2.4.0",
     "uvicorn[standard]>=0.34.0",
 ]
 vector = [
